@@ -48,7 +48,7 @@ public partial class HomeWindow : Window
                 ApplyUpdateButton.Visibility = Visibility.Visible;
                 break;
             case UpdatePreparationState.DevelopmentBuild:
-                UpdateStatusLabel.Text = $"DEV BUILD · v{CurrentVersion()} · UPDATE OFF";
+                UpdateStatusLabel.Text = $"BẢN CHẠY THỬ · v{CurrentVersion()}";
                 break;
             case UpdatePreparationState.Unavailable:
                 UpdateStatusLabel.Text = $"v{CurrentVersion()} · KHÔNG KIỂM TRA ĐƯỢC UPDATE";

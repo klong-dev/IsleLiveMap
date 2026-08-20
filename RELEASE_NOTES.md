@@ -1,8 +1,7 @@
-# Isle Live Map 1.0.0
+# Isle Live Map 1.0.1
 
-- Overlay minimap và status cho EraGaming, DinoVietNam và DinoVietNam Premium.
-- Home mới với liên kết K-Long.dev, YouTube và GitHub.
-- Đăng nhập an toàn bằng profile Microsoft Edge WebView2 riêng.
-- Global shortcuts cho zoom, ẩn/hiện map, Edit Mode và ẩn hướng dẫn.
-- Auto-update qua GitHub Releases bằng Velopack.
-- Ứng dụng ngoài process: không inject DLL, không đọc memory và không gọi RCON.
+- Tăng kích thước, độ đậm và độ tương phản chữ trên màn hình Home.
+- Đổi nội dung thành `PHÁT TRIỂN`, `KLONG.DEV` và `CHỌN SERVER` để dễ hiểu hơn.
+- Làm rõ trạng thái của bản chạy thử; auto-update trên bản cài đặt vẫn hoạt động bình thường.
+- Bổ sung hướng dẫn sử dụng ngắn gọn dành cho Discord.
+- Giữ nguyên giao diện và hoạt động của overlay trong game.
