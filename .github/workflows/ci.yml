@@ -1,0 +1,17 @@
+name: build
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 8.0.x
+      - run: dotnet restore TheIsleOverlay.sln
+      - run: dotnet test TheIsleOverlay.sln --configuration Release --no-restore
+      - run: dotnet build TheIsleOverlay.sln --configuration Release --no-restore

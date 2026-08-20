@@ -1,0 +1,164 @@
+<Window x:Class="TheIsleOverlay.App.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Isle Live Map" Width="318" MinWidth="318" SizeToContent="Height"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent"
+        ResizeMode="NoResize" Topmost="True" ShowInTaskbar="True"
+        FontFamily="Segoe UI Variable Text" TextOptions.TextFormattingMode="Display"
+        Loaded="Window_Loaded" Closed="Window_Closed">
+    <Grid Margin="7">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="8" />
+            <RowDefinition Height="170" />
+            <RowDefinition Height="8" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <Border x:Name="MapPanel" Grid.Row="0" Height="304" Background="#0C2020" BorderBrush="#783E625B" BorderThickness="1" CornerRadius="4" ClipToBounds="True">
+            <Border.Effect>
+                <DropShadowEffect Color="#000000" BlurRadius="14" ShadowDepth="2" Opacity="0.58" />
+            </Border.Effect>
+            <Grid>
+                <Canvas x:Name="MapViewport" Background="#102423" SizeChanged="MapViewport_SizeChanged" ClipToBounds="True">
+                    <Image x:Name="MapImage" Stretch="Fill" Opacity="0.93" />
+                    <Rectangle x:Name="MapShade" Fill="#0D00BBAA" IsHitTestVisible="False" />
+                    <Grid x:Name="PlayerMarker" Width="38" Height="38" IsHitTestVisible="False">
+                        <Ellipse Width="31" Height="31" Stroke="#B037D4C6" StrokeThickness="1" />
+                        <Ellipse Width="18" Height="18" Fill="#2B071719" Stroke="#ECF5F2" StrokeThickness="1" />
+                        <Grid x:Name="DirectionNeedle" Width="38" Height="38" RenderTransformOrigin="0.5,0.5">
+                            <Grid.RenderTransform>
+                                <RotateTransform x:Name="PlayerHeadingTransform" Angle="0" />
+                            </Grid.RenderTransform>
+                            <Path Data="M 19,1 L 25,22 L 19,18 L 13,22 Z" Fill="#F4FFFB" Stroke="#37D4C6" StrokeThickness="0.7" />
+                            <Line X1="19" Y1="20" X2="19" Y2="34" Stroke="#A337D4C6" StrokeThickness="1" />
+                        </Grid>
+                    </Grid>
+                </Canvas>
+
+                <Border HorizontalAlignment="Left" VerticalAlignment="Top" Margin="9" Background="#B5071517" Padding="8,5">
+                    <StackPanel>
+                        <TextBlock Text="GATEWAY / LIVE" Foreground="#DCE8E0" FontFamily="Bahnschrift SemiCondensed" FontSize="11" FontWeight="SemiBold" />
+                        <TextBlock x:Name="CoordinateLabel" Text="X —  Y —  Z —" Foreground="#82A49B" FontFamily="Bahnschrift" FontSize="9" Margin="0,2,0,0" />
+                    </StackPanel>
+                </Border>
+
+                <Border HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="9" Background="#92071517" Padding="7,4">
+                    <TextBlock x:Name="HeadingModeLabel" Text="COURSE · WAITING" Foreground="#7DA89F" FontFamily="Bahnschrift SemiCondensed" FontSize="9" />
+                </Border>
+
+                <StackPanel x:Name="EditToolbar" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,8,8,0">
+                    <Border x:Name="DragRegion" Background="#D7102424" BorderBrush="#4D7B7267" BorderThickness="1" CornerRadius="2" Padding="8,4" MouseLeftButtonDown="DragRegion_MouseLeftButtonDown" Cursor="SizeAll">
+                        <TextBlock Text="MOVE" Foreground="#BBD1C9" FontFamily="Bahnschrift SemiCondensed" FontSize="9" />
+                    </Border>
+                    <Button Style="{StaticResource ChromeButton}" Content="HOME" Margin="4,0,0,0" Padding="7,3" Click="HomeButton_Click" ToolTip="Đổi nguồn telemetry" />
+                    <Button x:Name="LockButton" Style="{StaticResource ChromeButton}" Content="LOCK" Margin="4,0,0,0" Click="LockButton_Click" ToolTip="Khóa xuyên chuột · Ctrl+Shift+O để mở" />
+                    <Button Style="{StaticResource ChromeButton}" Content="—" Margin="4,0,0,0" Width="25" Padding="0" Click="MinimizeButton_Click" />
+                    <Button Style="{StaticResource ChromeButton}" Content="×" Margin="4,0,0,0" Width="25" Padding="0" Click="CloseButton_Click" />
+                </StackPanel>
+
+                <StackPanel x:Name="MapZoomControls" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,8,8,8">
+                    <Button Style="{StaticResource ChromeButton}" Content="+" Width="27" Height="25" Padding="0" Click="ZoomInButton_Click" />
+                    <Button Style="{StaticResource ChromeButton}" Content="−" Width="27" Height="25" Padding="0" Margin="0,4,0,0" Click="ZoomOutButton_Click" />
+                </StackPanel>
+
+                <TextBlock x:Name="MapStateLabel" Text="ĐANG TẢI BẢN ĐỒ" Foreground="#A5BDB5" Background="#C0091718" Padding="10,6" HorizontalAlignment="Center" VerticalAlignment="Center" FontFamily="Bahnschrift SemiCondensed" FontSize="10" />
+            </Grid>
+        </Border>
+
+        <Border Grid.Row="2" BorderBrush="#5A3E625B" BorderThickness="1" CornerRadius="4" Padding="11,9,11,8">
+            <Border.Background>
+                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                    <GradientStop Color="#A3071517" Offset="0" />
+                    <GradientStop Color="#76071517" Offset="1" />
+                </LinearGradientBrush>
+            </Border.Background>
+            <Border.Effect>
+                <DropShadowEffect Color="#000000" BlurRadius="13" ShadowDepth="2" Opacity="0.55" />
+            </Border.Effect>
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="1" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <Grid>
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBlock x:Name="SpeciesLabel" Text="NO ACTIVE DINOSAUR" Foreground="{StaticResource FogBrush}" FontFamily="Bahnschrift SemiCondensed" FontWeight="SemiBold" FontSize="16" />
+                        <TextBlock x:Name="PlayerNameLabel" Text="Awaiting telemetry" Foreground="{StaticResource MutedBrush}" FontSize="10" Margin="0,1,0,0" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" HorizontalAlignment="Right">
+                        <TextBlock Text="GROWTH" Foreground="{StaticResource MutedBrush}" FontFamily="Bahnschrift SemiCondensed" FontSize="8" HorizontalAlignment="Right" />
+                        <TextBlock x:Name="GrowthLabel" Text="—" Foreground="#E7B74E" FontFamily="Bahnschrift" FontSize="15" HorizontalAlignment="Right" />
+                    </StackPanel>
+                </Grid>
+
+                <Rectangle Grid.Row="1" Fill="#425D57" Margin="0,8,0,0" />
+
+                <StackPanel Grid.Row="2" Margin="0,10,0,0">
+                    <Grid Margin="0,0,0,7">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="55" /><ColumnDefinition Width="*" /><ColumnDefinition Width="62" /></Grid.ColumnDefinitions>
+                        <TextBlock Text="HEALTH" Foreground="#D6E4DE" FontFamily="Bahnschrift SemiCondensed" FontSize="10" />
+                        <ProgressBar x:Name="HealthBar" Grid.Column="1" Style="{StaticResource TelemetryBar}" Foreground="#EF6461" VerticalAlignment="Center" />
+                        <TextBlock x:Name="HealthValue" Grid.Column="2" Text="— / —" Foreground="#AFC3BC" FontFamily="Bahnschrift" FontSize="9" HorizontalAlignment="Right" />
+                    </Grid>
+                    <Grid Margin="0,0,0,7">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="55" /><ColumnDefinition Width="*" /><ColumnDefinition Width="62" /></Grid.ColumnDefinitions>
+                        <TextBlock Text="STAMINA" Foreground="#D6E4DE" FontFamily="Bahnschrift SemiCondensed" FontSize="10" />
+                        <ProgressBar x:Name="StaminaBar" Grid.Column="1" Style="{StaticResource TelemetryBar}" Foreground="#37D4C6" VerticalAlignment="Center" />
+                        <TextBlock x:Name="StaminaValue" Grid.Column="2" Text="— / —" Foreground="#AFC3BC" FontFamily="Bahnschrift" FontSize="9" HorizontalAlignment="Right" />
+                    </Grid>
+                    <Grid Margin="0,0,0,7">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="55" /><ColumnDefinition Width="*" /><ColumnDefinition Width="62" /></Grid.ColumnDefinitions>
+                        <TextBlock Text="HUNGER" Foreground="#D6E4DE" FontFamily="Bahnschrift SemiCondensed" FontSize="10" />
+                        <ProgressBar x:Name="HungerBar" Grid.Column="1" Style="{StaticResource TelemetryBar}" Foreground="#D8874D" VerticalAlignment="Center" />
+                        <TextBlock x:Name="HungerValue" Grid.Column="2" Text="— / —" Foreground="#AFC3BC" FontFamily="Bahnschrift" FontSize="9" HorizontalAlignment="Right" />
+                    </Grid>
+                    <Grid>
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="55" /><ColumnDefinition Width="*" /><ColumnDefinition Width="62" /></Grid.ColumnDefinitions>
+                        <TextBlock Text="WATER" Foreground="#D6E4DE" FontFamily="Bahnschrift SemiCondensed" FontSize="10" />
+                        <ProgressBar x:Name="WaterBar" Grid.Column="1" Style="{StaticResource TelemetryBar}" Foreground="#4B9BD4" VerticalAlignment="Center" />
+                        <TextBlock x:Name="WaterValue" Grid.Column="2" Text="— / —" Foreground="#AFC3BC" FontFamily="Bahnschrift" FontSize="9" HorizontalAlignment="Right" />
+                    </Grid>
+                </StackPanel>
+
+                <Grid Grid.Row="3" Margin="0,8,0,0">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                    <Ellipse x:Name="ConnectionDot" Width="5" Height="5" Fill="#E7B74E" VerticalAlignment="Center" />
+                    <TextBlock x:Name="ConnectionLabel" Grid.Column="1" Text="ĐANG KHỞI TẠO" Foreground="#64827A" FontFamily="Bahnschrift SemiCondensed" FontSize="8" Margin="6,0,0,0" />
+                    <TextBlock x:Name="UpdatedLabel" Grid.Column="2" Text="—" Foreground="#64827A" FontFamily="Bahnschrift" FontSize="8" />
+                </Grid>
+            </Grid>
+        </Border>
+
+        <Border x:Name="HotkeyGuide" Grid.Row="4" BorderBrush="#513E625B" BorderThickness="1" CornerRadius="4" Padding="10,8" Background="#A8071717">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Grid>
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                    <TextBlock Text="GLOBAL SHORTCUTS" Foreground="#789A92" FontFamily="Bahnschrift SemiCondensed" FontSize="8" />
+                    <TextBlock Grid.Column="1" Text="ALT + ]  HIDE" Foreground="#607E76" FontFamily="Bahnschrift" FontSize="8" />
+                </Grid>
+                <Grid Grid.Row="1" Margin="0,7,0,0">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="82" /><ColumnDefinition Width="*" /><ColumnDefinition Width="94" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                    <TextBlock Text="ALT + WHEEL" Foreground="#D7E6E0" FontFamily="Bahnschrift SemiCondensed" FontSize="9" />
+                    <TextBlock Grid.Column="1" Text="ZOOM" Foreground="#65867D" FontFamily="Bahnschrift" FontSize="8" />
+                    <TextBlock Grid.Column="2" Text="ALT + MIDDLE" Foreground="#D7E6E0" FontFamily="Bahnschrift SemiCondensed" FontSize="9" />
+                    <TextBlock Grid.Column="3" Text="MAP" Foreground="#65867D" FontFamily="Bahnschrift" FontSize="8" />
+                </Grid>
+                <Grid Grid.Row="2" Margin="0,5,0,0">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="82" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                    <TextBlock Text="CTRL+SHIFT+O" Foreground="#D7E6E0" FontFamily="Bahnschrift SemiCondensed" FontSize="9" />
+                    <TextBlock Grid.Column="1" Text="MOVE / EDIT OVERLAY" Foreground="#65867D" FontFamily="Bahnschrift" FontSize="8" />
+                </Grid>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

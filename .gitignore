@@ -1,0 +1,11 @@
+bin/
+obj/
+.vs/
+.idea/
+*.user
+*.suo
+.env
+artifacts/
+screenshots/
+*.WebView2/
+src/TheIsleOverlay.App/Assets/*.png

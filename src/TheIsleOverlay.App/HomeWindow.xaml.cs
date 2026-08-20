@@ -1,0 +1,177 @@
+using System.Diagnostics;
+using System.Net.Http;
+using System.Reflection;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
+
+namespace TheIsleOverlay.App;
+
+public partial class HomeWindow : Window
+{
+    private readonly CancellationTokenSource _shutdown = new();
+    private readonly GitHubUpdateService _updateService = new();
+    private bool _connecting;
+
+    public HomeWindow()
+    {
+        InitializeComponent();
+    }
+
+    private async void Window_Loaded(object sender, RoutedEventArgs e)
+    {
+        if (string.Equals(
+                Environment.GetEnvironmentVariable("ISLELIVEMAP_DEV_AUTO_CONNECT"),
+                "1",
+                StringComparison.Ordinal))
+        {
+            var overlay = new MainWindow();
+            Application.Current.MainWindow = overlay;
+            overlay.Show();
+            Close();
+            return;
+        }
+
+        await CheckForUpdatesAsync();
+    }
+
+    private async Task CheckForUpdatesAsync()
+    {
+        var result = await _updateService.PrepareUpdateAsync(
+            progress => Dispatcher.Invoke(() => UpdateStatusLabel.Text = $"ĐANG TẢI BẢN MỚI · {progress}%"),
+            _shutdown.Token);
+
+        switch (result.State)
+        {
+            case UpdatePreparationState.Ready:
+                UpdateStatusLabel.Text = $"BẢN {result.Version} ĐÃ SẴN SÀNG";
+                ApplyUpdateButton.Visibility = Visibility.Visible;
+                break;
+            case UpdatePreparationState.DevelopmentBuild:
+                UpdateStatusLabel.Text = $"DEV BUILD · v{CurrentVersion()} · UPDATE OFF";
+                break;
+            case UpdatePreparationState.Unavailable:
+                UpdateStatusLabel.Text = $"v{CurrentVersion()} · KHÔNG KIỂM TRA ĐƯỢC UPDATE";
+                break;
+            default:
+                UpdateStatusLabel.Text = $"v{CurrentVersion()} · ĐÃ CẬP NHẬT";
+                break;
+        }
+    }
+
+    private async void SourceButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_connecting || sender is not Button { Tag: string sourceId })
+        {
+            return;
+        }
+
+        var source = TelemetrySourceDefinition.FromId(sourceId);
+        if (source is null)
+        {
+            return;
+        }
+
+        _connecting = true;
+        SetSourceButtonsEnabled(false);
+        SourceStatusLabel.Text = $"ĐANG MỞ PHIÊN {source.DisplayName.ToUpperInvariant()}…";
+
+        try
+        {
+            var loginWindow = new LoginWindow(source, (cookie, token) => ValidateSessionAsync(source, cookie, token))
+            {
+                Owner = this
+            };
+            if (loginWindow.ShowDialog() != true || string.IsNullOrWhiteSpace(loginWindow.CookieValue))
+            {
+                SourceStatusLabel.Text = "Chưa nhận được phiên. Đăng nhập trong cửa sổ vừa mở rồi bấm KIỂM TRA PHIÊN.";
+                return;
+            }
+
+            var overlay = new MainWindow(source, loginWindow.CookieValue);
+            Application.Current.MainWindow = overlay;
+            overlay.Show();
+            Close();
+        }
+        catch (OperationCanceledException) when (_shutdown.IsCancellationRequested)
+        {
+        }
+        catch (Exception exception)
+        {
+            SourceStatusLabel.Text = $"Không kết nối được: {FriendlyError(exception)}";
+        }
+        finally
+        {
+            _connecting = false;
+            SetSourceButtonsEnabled(true);
+        }
+    }
+
+    private static async Task<bool> ValidateSessionAsync(
+        TelemetrySourceDefinition source,
+        string cookie,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var validationClient = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
+            var provider = source.CreateProvider(validationClient, cookie);
+            var snapshot = await provider.GetSnapshotAsync(cancellationToken);
+            return snapshot.Success;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private void SetSourceButtonsEnabled(bool enabled)
+    {
+        EraSourceButton.IsEnabled = enabled;
+        DinoSourceButton.IsEnabled = enabled;
+        PremiumSourceButton.IsEnabled = enabled;
+    }
+
+    private static string FriendlyError(Exception exception) => exception switch
+    {
+        Microsoft.Web.WebView2.Core.WebView2RuntimeNotFoundException => "Máy chưa có Microsoft Edge WebView2 Runtime.",
+        HttpRequestException => "website/API không phản hồi.",
+        _ => exception.Message
+    };
+
+    private static string CurrentVersion() =>
+        Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.0.0";
+
+    private static void OpenExternal(string url) => Process.Start(new ProcessStartInfo(url)
+    {
+        UseShellExecute = true
+    });
+
+    private void OpenLink_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button { Tag: string url })
+        {
+            OpenExternal(url);
+        }
+    }
+
+    private void ApplyUpdateButton_Click(object sender, RoutedEventArgs e) => _updateService.ApplyAndRestart();
+
+    private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (e.ButtonState == MouseButtonState.Pressed)
+        {
+            DragMove();
+        }
+    }
+
+    private void MinimizeButton_Click(object sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
+
+    private void CloseButton_Click(object sender, RoutedEventArgs e) => Close();
+
+    private void Window_Closed(object? sender, EventArgs e)
+    {
+        _shutdown.Cancel();
+        _shutdown.Dispose();
+    }
+}
