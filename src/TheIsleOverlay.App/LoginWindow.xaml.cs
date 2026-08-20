@@ -7,13 +7,13 @@ namespace TheIsleOverlay.App;
 public partial class LoginWindow : Window
 {
     private readonly TelemetrySourceDefinition _source;
-    private readonly Func<string, CancellationToken, Task<bool>>? _sessionValidator;
+    private readonly Func<string, CancellationToken, Task<LoginSessionValidationState>>? _sessionValidator;
     private bool _checkingCookie;
     private bool _closingWithCookie;
 
     public LoginWindow(
         TelemetrySourceDefinition source,
-        Func<string, CancellationToken, Task<bool>>? sessionValidator = null)
+        Func<string, CancellationToken, Task<LoginSessionValidationState>>? sessionValidator = null)
     {
         _source = source;
         _sessionValidator = sessionValidator;
@@ -95,7 +95,9 @@ public partial class LoginWindow : Window
             if (_sessionValidator is not null)
             {
                 LoginStatusLabel.Text = "ĐÃ THẤY COOKIE · ĐANG XÁC MINH VỚI API…";
-                if (!await _sessionValidator(sessionCookie.Value, CancellationToken.None))
+                using var validationTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+                var validation = await _sessionValidator(sessionCookie.Value, validationTimeout.Token);
+                if (validation == LoginSessionValidationState.Invalid)
                 {
                     LoginBrowser.CoreWebView2.CookieManager.DeleteCookie(sessionCookie);
                     LoginStatusLabel.Text = "Phiên cũ không còn hợp lệ. Hãy đăng nhập lại trên website.";
@@ -105,6 +107,11 @@ public partial class LoginWindow : Window
                     }
 
                     return false;
+                }
+
+                if (validation == LoginSessionValidationState.Unavailable)
+                {
+                    LoginStatusLabel.Text = "ĐÃ THẤY COOKIE · API ĐANG CHẬM, TIẾP TỤC KẾT NỐI…";
                 }
             }
 
@@ -143,4 +150,11 @@ public partial class LoginWindow : Window
 
         LoginBrowser.Dispose();
     }
+}
+
+public enum LoginSessionValidationState
+{
+    Valid,
+    Invalid,
+    Unavailable
 }

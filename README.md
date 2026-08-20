@@ -11,11 +11,12 @@
 - EraGaming — `https://eragamingvn.net`
 - DinoVietNam — `https://dinovietnam.islepilot.eu`
 - DinoVietNam Premium — `https://dinovietnampremium.islepilot.eu`
+- HoHo — `https://hoho.islepilot.eu`
 
 ## Tính năng
 
 - Minimap Gateway độc lập với website, marker luôn giữ giữa viewport.
-- Yaw server cho hai nguồn IslePilot; EraGaming suy hướng di chuyển từ các mẫu tọa độ.
+- Yaw server cho các nguồn IslePilot; EraGaming suy hướng di chuyển từ các mẫu tọa độ.
 - Growth, Health, Stamina, Hunger và Water khi nguồn cung cấp trường tương ứng.
 - Home chọn nguồn và cửa sổ đăng nhập WebView2 riêng của ứng dụng.
 - Cookie do WebView2 lưu trong profile người dùng; source code không chứa cookie và app không đọc kho cookie Chrome/Edge.

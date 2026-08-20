@@ -9,6 +9,9 @@ public sealed class IslePilotTelemetryProvider : ITelemetryProvider
 {
     public static readonly Uri GatewayMapUri = new("https://dinovietnam.islepilot.eu/maps/gateway-v0.21/base.webp");
 
+    private static readonly IslePilotPlayerPage EmptyStats = new(
+        null, false, null, null, null, null, null, null, null);
+
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
         PropertyNameCaseInsensitive = true
@@ -49,7 +52,7 @@ public sealed class IslePilotTelemetryProvider : ITelemetryProvider
         {
             // Only the first snapshot waits for /me. Afterwards marker/yaw updates
             // must never be held up by the slower player-page endpoint.
-            stats = await GetPlayerStatsAsync(cancellationToken);
+            stats = await GetInitialPlayerStatsOrFallbackAsync(cancellationToken);
         }
         else
         {
@@ -92,6 +95,30 @@ public sealed class IslePilotTelemetryProvider : ITelemetryProvider
                 }
                 : null
         };
+    }
+
+    private async Task<IslePilotPlayerPage> GetInitialPlayerStatsOrFallbackAsync(
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await GetPlayerStatsAsync(cancellationToken);
+        }
+        catch (IslePilotAuthenticationException)
+        {
+            throw;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception) when (exception is HttpRequestException or InvalidDataException or ArgumentException or OperationCanceledException)
+        {
+            // /me is secondary telemetry. Keep markers and yaw usable while the
+            // player page is slow, temporarily unavailable, or changes shape.
+            WriteStatsState(EmptyStats, DateTimeOffset.UtcNow + TimeSpan.FromSeconds(3));
+            return EmptyStats;
+        }
     }
 
     private async Task<IslePilotMarkersResponse> GetMarkersAsync(CancellationToken cancellationToken)

@@ -79,8 +79,13 @@ public sealed class IslePilotTelemetryProviderTests
         }
     }
 
-    [Fact]
-    public async Task GetSnapshotAsync_UsesPremiumHostSlugAndDisplayNameFromOptions()
+    [Theory]
+    [InlineData("https://dinovietnampremium.islepilot.eu/", "dinovietnampremium", "DinoVietNam Premium")]
+    [InlineData("https://hoho.islepilot.eu/", "hoho", "HoHo")]
+    public async Task GetSnapshotAsync_UsesConfiguredHostSlugAndDisplayName(
+        string baseUri,
+        string serverSlug,
+        string displayName)
     {
         const string markers = """
             {"ok":true,"markers":[]}
@@ -91,17 +96,41 @@ public sealed class IslePilotTelemetryProviderTests
             new HttpClient(handler),
             new IslePilotOptions
             {
-                BaseUri = new Uri("https://dinovietnampremium.islepilot.eu/"),
-                ServerSlug = "dinovietnampremium",
-                DisplayName = "DinoVietNam Premium",
+                BaseUri = new Uri(baseUri),
+                ServerSlug = serverSlug,
+                DisplayName = displayName,
                 PlayerCookie = "test-cookie"
             });
 
         var snapshot = await provider.GetSnapshotAsync();
 
-        Assert.Equal("DinoVietNam Premium", snapshot.Source);
-        Assert.Equal("dinovietnampremium.islepilot.eu", handler.LastHost);
-        Assert.Contains("/api/p/dinovietnampremium/map/markers", handler.RequestPaths);
+        Assert.Equal(displayName, snapshot.Source);
+        Assert.Equal(new Uri(baseUri).Host, handler.LastHost);
+        Assert.Contains($"/api/p/{serverSlug}/map/markers", handler.RequestPaths);
+    }
+
+    [Fact]
+    public async Task GetSnapshotAsync_KeepsMarkersWhenPlayerPageIsUnavailable()
+    {
+        const string markers = """
+            {"ok":true,"markers":[{"steamId":"1","label":"You","x":1234,"y":-5678,"yaw":90,"self":true}]}
+            """;
+        var handler = new FailingStatsHandler(markers);
+        var provider = new IslePilotTelemetryProvider(
+            new HttpClient(handler),
+            new IslePilotOptions { PlayerCookie = "test-cookie" });
+
+        var first = await provider.GetSnapshotAsync();
+        var second = await provider.GetSnapshotAsync();
+
+        Assert.True(first.Success);
+        Assert.True(first.PlayerOnline);
+        Assert.Equal(1234, first.Player?.Location?.X);
+        Assert.Equal(180, first.Player?.ExactMapHeadingDegrees);
+        Assert.Null(first.Player?.ExactVitals?.Health);
+        Assert.Equal(2, handler.MarkerRequests);
+        Assert.Equal(1, handler.PlayerPageRequests);
+        Assert.True(second.Success);
     }
 
     private sealed class IslePilotHandler(string markers, string page) : HttpMessageHandler
@@ -173,5 +202,31 @@ public sealed class IslePilotTelemetryProviderTests
         {
             Content = new StringContent(content, Encoding.UTF8, mediaType)
         };
+    }
+
+    private sealed class FailingStatsHandler(string markers) : HttpMessageHandler
+    {
+        private int _markerRequests;
+        private int _playerPageRequests;
+
+        public int MarkerRequests => _markerRequests;
+        public int PlayerPageRequests => _playerPageRequests;
+
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            if (request.RequestUri?.AbsolutePath.EndsWith("/map/markers", StringComparison.Ordinal) == true)
+            {
+                Interlocked.Increment(ref _markerRequests);
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(markers, Encoding.UTF8, "application/json")
+                });
+            }
+
+            Interlocked.Increment(ref _playerPageRequests);
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.ServiceUnavailable));
+        }
     }
 }

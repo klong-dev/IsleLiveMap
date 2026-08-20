@@ -2,7 +2,7 @@
 
 **1. Cài đặt:** Tải bản mới nhất tại [GitHub Releases](https://github.com/klong-dev/IsleLiveMap/releases/latest), mở file `.exe` và cài đặt.
 
-**2. Kết nối:** Mở app → chọn đúng nguồn server: **EraGaming**, **DinoVietNam** hoặc **DinoVietNam Premium**.
+**2. Kết nối:** Mở app → chọn đúng server: **EraGaming**, **DinoVietNam**, **DinoVietNam Premium** hoặc **HoHo**.
 
 **3. Đăng nhập:** Nếu website yêu cầu đăng nhập, hãy đăng nhập ngay trong cửa sổ vừa mở rồi bấm **KIỂM TRA PHIÊN**. Vào đúng server trong game, map và status sẽ tự cập nhật.
 

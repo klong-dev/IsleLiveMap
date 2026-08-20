@@ -4,6 +4,8 @@ using System.Reflection;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using TheIsleOverlay.EraGaming;
+using TheIsleOverlay.IslePilot;
 
 namespace TheIsleOverlay.App;
 
@@ -107,21 +109,33 @@ public partial class HomeWindow : Window
         }
     }
 
-    private static async Task<bool> ValidateSessionAsync(
+    private static async Task<LoginSessionValidationState> ValidateSessionAsync(
         TelemetrySourceDefinition source,
         string cookie,
         CancellationToken cancellationToken)
     {
         try
         {
-            using var validationClient = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
+            using var validationClient = new HttpClient { Timeout = Timeout.InfiniteTimeSpan };
             var provider = source.CreateProvider(validationClient, cookie);
             var snapshot = await provider.GetSnapshotAsync(cancellationToken);
-            return snapshot.Success;
+            return snapshot.Success
+                ? LoginSessionValidationState.Valid
+                : LoginSessionValidationState.Invalid;
+        }
+        catch (EraGamingAuthenticationException)
+        {
+            return LoginSessionValidationState.Invalid;
+        }
+        catch (IslePilotAuthenticationException)
+        {
+            return LoginSessionValidationState.Invalid;
         }
         catch
         {
-            return false;
+            // A slow or temporarily unavailable API must not destroy a valid
+            // browser session. The overlay will keep retrying telemetry.
+            return LoginSessionValidationState.Unavailable;
         }
     }
 
@@ -130,6 +144,7 @@ public partial class HomeWindow : Window
         EraSourceButton.IsEnabled = enabled;
         DinoSourceButton.IsEnabled = enabled;
         PremiumSourceButton.IsEnabled = enabled;
+        HoHoSourceButton.IsEnabled = enabled;
     }
 
     private static string FriendlyError(Exception exception) => exception switch

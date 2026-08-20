@@ -119,6 +119,8 @@ public partial class MainWindow : Window
             "era" => Environment.GetEnvironmentVariable("ERA_SESSION"),
             "dinovietnampremium" => Environment.GetEnvironmentVariable("ISLEPILOT_PREMIUM_PLAYER") ??
                                       Environment.GetEnvironmentVariable("ISLEPILOT_PLAYER"),
+            "hoho" => Environment.GetEnvironmentVariable("ISLEPILOT_HOHO_PLAYER") ??
+                      Environment.GetEnvironmentVariable("ISLEPILOT_PLAYER"),
             "dinovietnam" => Environment.GetEnvironmentVariable("ISLEPILOT_PLAYER"),
             _ => null
         };
@@ -193,17 +195,15 @@ public partial class MainWindow : Window
         }
         catch (EraGamingAuthenticationException exception)
         {
-            SetConnectionState("PHIÊN ĐÃ HẾT HẠN", ErrorBrush);
-            PlayerNameLabel.Text = exception.Message;
+            ShowTelemetryUnavailable("PHIÊN ĐÃ HẾT HẠN", exception.Message);
         }
         catch (IslePilotAuthenticationException exception)
         {
-            SetConnectionState("PHIÊN ĐÃ HẾT HẠN", ErrorBrush);
-            PlayerNameLabel.Text = exception.Message;
+            ShowTelemetryUnavailable("PHIÊN ĐÃ HẾT HẠN", exception.Message);
         }
         catch (Exception)
         {
-            SetConnectionState("MẤT KẾT NỐI · RETRY 5S", ErrorBrush);
+            ShowTelemetryUnavailable("MẤT KẾT NỐI · RETRY 5S", "API telemetry chưa phản hồi");
         }
         finally
         {
@@ -215,7 +215,7 @@ public partial class MainWindow : Window
     {
         if (!snapshot.Success || !snapshot.ServerOnline)
         {
-            SetConnectionState("SERVER OFFLINE", ErrorBrush);
+            ShowTelemetryUnavailable("SERVER OFFLINE", "Nguồn telemetry đang ngoại tuyến");
             return;
         }
 
@@ -354,6 +354,19 @@ public partial class MainWindow : Window
         GrowthLabel.Text = "—";
         CoordinateLabel.Text = "X —  Y —  Z —";
         UpdatedLabel.Text = "—";
+    }
+
+    private void ShowTelemetryUnavailable(string connectionState, string detail)
+    {
+        SetConnectionState(connectionState, ErrorBrush);
+        SpeciesLabel.Text = "TELEMETRY UNAVAILABLE";
+        PlayerNameLabel.Text = detail;
+        _location = null;
+        _previousLocation = null;
+        _hasMovementHeading = false;
+        PlayerMarker.Visibility = Visibility.Collapsed;
+        HeadingModeLabel.Text = "COURSE · WAITING";
+        ClearVitals();
     }
 
     private void PositionMap()

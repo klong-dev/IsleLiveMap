@@ -82,11 +82,25 @@ public sealed record TelemetrySourceDefinition
         ServerSlug = "dinovietnampremium"
     };
 
+    public static TelemetrySourceDefinition HoHo { get; } = new()
+    {
+        Id = "hoho",
+        DisplayName = "HoHo",
+        ShortName = "HOHO",
+        Kind = TelemetrySourceKind.IslePilot,
+        BaseUri = new Uri("https://hoho.islepilot.eu/"),
+        LoginUri = new Uri("https://hoho.islepilot.eu/map"),
+        MapUri = new Uri("https://hoho.islepilot.eu/maps/gateway-v0.21/base.webp"),
+        CookieName = "islepilot_player",
+        ServerSlug = "hoho"
+    };
+
     public static IReadOnlyList<TelemetrySourceDefinition> All { get; } =
     [
         EraGaming,
         DinoVietnam,
-        DinoVietnamPremium
+        DinoVietnamPremium,
+        HoHo
     ];
 
     public static TelemetrySourceDefinition? FromId(string? id) =>
