@@ -19,7 +19,6 @@ public sealed record TelemetrySourceDefinition
     public required TelemetrySourceKind Kind { get; init; }
     public required Uri BaseUri { get; init; }
     public required Uri LoginUri { get; init; }
-    public required Uri MapUri { get; init; }
     public required string CookieName { get; init; }
     public string? ServerSlug { get; init; }
 
@@ -52,7 +51,6 @@ public sealed record TelemetrySourceDefinition
         Kind = TelemetrySourceKind.EraGaming,
         BaseUri = new Uri("https://eragamingvn.net/"),
         LoginUri = new Uri("https://eragamingvn.net/live-map"),
-        MapUri = EraGamingTelemetryProvider.GatewayMapUri,
         CookieName = "era_session"
     };
 
@@ -64,7 +62,6 @@ public sealed record TelemetrySourceDefinition
         Kind = TelemetrySourceKind.IslePilot,
         BaseUri = new Uri("https://dinovietnam.islepilot.eu/"),
         LoginUri = new Uri("https://dinovietnam.islepilot.eu/map"),
-        MapUri = new Uri("https://dinovietnam.islepilot.eu/maps/gateway-v0.21/base.webp"),
         CookieName = "islepilot_player",
         ServerSlug = "dinovietnam"
     };
@@ -77,7 +74,6 @@ public sealed record TelemetrySourceDefinition
         Kind = TelemetrySourceKind.IslePilot,
         BaseUri = new Uri("https://dinovietnampremium.islepilot.eu/"),
         LoginUri = new Uri("https://dinovietnampremium.islepilot.eu/map"),
-        MapUri = new Uri("https://dinovietnampremium.islepilot.eu/maps/gateway-v0.21/base.webp"),
         CookieName = "islepilot_player",
         ServerSlug = "dinovietnampremium"
     };
@@ -90,7 +86,6 @@ public sealed record TelemetrySourceDefinition
         Kind = TelemetrySourceKind.IslePilot,
         BaseUri = new Uri("https://hoho.islepilot.eu/"),
         LoginUri = new Uri("https://hoho.islepilot.eu/map"),
-        MapUri = new Uri("https://hoho.islepilot.eu/maps/gateway-v0.21/base.webp"),
         CookieName = "islepilot_player",
         ServerSlug = "hoho"
     };

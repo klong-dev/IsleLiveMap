@@ -6,8 +6,6 @@ namespace TheIsleOverlay.EraGaming;
 
 public sealed class EraGamingTelemetryProvider : ITelemetryProvider
 {
-    public static readonly Uri GatewayMapUri = new("https://myislemap.com/assets/gateway-map.webp?v=20260809v1");
-
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
         PropertyNameCaseInsensitive = true

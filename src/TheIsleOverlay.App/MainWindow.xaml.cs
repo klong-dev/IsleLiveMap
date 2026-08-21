@@ -1,4 +1,3 @@
-using System.IO;
 using System.Net.Http;
 using System.Runtime.InteropServices;
 using System.Windows;
@@ -18,6 +17,7 @@ namespace TheIsleOverlay.App;
 public partial class MainWindow : Window
 {
     private static readonly TimeSpan TelemetryRefreshInterval = TimeSpan.FromSeconds(2);
+    private static readonly Uri GatewayMapResourceUri = new("Assets/GatewayMap.webp", UriKind.Relative);
 
     private const int EditHotkeyId = 0x714;
     private const int HideGuideHotkeyId = 0x715;
@@ -41,7 +41,6 @@ public partial class MainWindow : Window
     private readonly TelemetrySourceDefinition? _requestedSource;
     private readonly string? _providedCookie;
     private ITelemetryProvider? _telemetryProvider;
-    private Uri _mapUri = EraGamingTelemetryProvider.GatewayMapUri;
     private string _configuredSource = "ERA";
     private WorldLocation? _location;
     private WorldLocation? _previousLocation;
@@ -95,7 +94,8 @@ public partial class MainWindow : Window
             return;
         }
 
-        await Task.WhenAll(LoadMapAsync(), RefreshTelemetryAsync());
+        LoadMap();
+        await RefreshTelemetryAsync();
         _refreshTimer.Start();
     }
 
@@ -137,7 +137,6 @@ public partial class MainWindow : Window
     private void ConfigureTelemetryProvider(TelemetrySourceDefinition source, string cookieValue)
     {
         _telemetryProvider = source.CreateProvider(_httpClient, cookieValue);
-        _mapUri = source.MapUri;
         _configuredSource = source.ShortName;
     }
 
@@ -150,12 +149,13 @@ public partial class MainWindow : Window
         _mouseShortcuts.Install();
     }
 
-    private async Task LoadMapAsync()
+    private void LoadMap()
     {
         try
         {
-            var bytes = await _httpClient.GetByteArrayAsync(_mapUri, _shutdown.Token);
-            using var stream = new MemoryStream(bytes);
+            var resource = Application.GetResourceStream(GatewayMapResourceUri)
+                ?? throw new InvalidOperationException("Bundled Gateway map resource was not found.");
+            using var stream = resource.Stream;
             var image = new BitmapImage();
             image.BeginInit();
             image.CacheOption = BitmapCacheOption.OnLoad;
@@ -166,12 +166,9 @@ public partial class MainWindow : Window
             MapStateLabel.Visibility = Visibility.Collapsed;
             PositionMap();
         }
-        catch (OperationCanceledException) when (_shutdown.IsCancellationRequested)
-        {
-        }
         catch
         {
-            MapStateLabel.Text = "KHÔNG TẢI ĐƯỢC BẢN ĐỒ";
+            MapStateLabel.Text = "KHÔNG ĐỌC ĐƯỢC BẢN ĐỒ";
         }
     }
 

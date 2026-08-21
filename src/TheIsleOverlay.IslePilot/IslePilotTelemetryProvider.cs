@@ -7,8 +7,6 @@ namespace TheIsleOverlay.IslePilot;
 
 public sealed class IslePilotTelemetryProvider : ITelemetryProvider
 {
-    public static readonly Uri GatewayMapUri = new("https://dinovietnam.islepilot.eu/maps/gateway-v0.21/base.webp");
-
     private static readonly IslePilotPlayerPage EmptyStats = new(
         null, false, null, null, null, null, null, null, null);
 
