@@ -1,6 +1,6 @@
 # Isle Live Map
 
-Ứng dụng overlay miễn phí, mã nguồn mở cho **The Isle Evrima**. Isle Live Map chạy ngoài process game, luôn nổi trên màn hình và hiển thị minimap Gateway cùng telemetry cá nhân do IslePilot cung cấp.
+Ứng dụng overlay miễn phí, mã nguồn mở cho **The Isle Evrima**. Isle Live Map chạy ngoài process game, luôn nổi trên màn hình và hiển thị minimap Gateway, telemetry cá nhân cùng vị trí/status của nhóm bạn do IslePilot cung cấp.
 
 [Facebook K-Long.dev](https://www.facebook.com/klong.dev) · [YouTube Long Hoàng Kim](https://www.youtube.com/@longhoangkim2246) · [GitHub](https://github.com/klong-dev/IsleLiveMap)
 
@@ -20,11 +20,21 @@ Texture Gateway dùng bản EraGaming/MyIsleMap đóng gói trong app. Đây ch�
 - Marker luôn giữ giữa viewport và dùng chung map Gateway cho mọi server Evrima tương thích.
 - Tọa độ, yaw và status realtime từ WebSocket `/ows`; `/api/overlay/me` và `/api/overlay/map` làm baseline/fallback.
 - Growth, Health, Stamina, Hunger và Water khi nguồn cung cấp trường tương ứng.
+- Tạo nhóm tạm thời bằng mã mời 6 ký tự; đồng đội cùng server xuất hiện trên minimap với tên và hướng quay.
+- Mỗi đồng đội có một hàng HP, Đói và Nước; người mất tín hiệu hoặc đang ở server khác được đánh dấu riêng.
 - Home chỉ có một Steam Login và tự nhận server IslePilot đang chơi.
 - Token overlay được mã hóa bằng Windows DPAPI cho tài khoản Windows hiện tại; không lưu plaintext.
 - Tự reconnect với backoff, giữ snapshot cuối và báo `RECONNECTING`/`DATA STALE` khi mạng yếu.
 - HUD dọc, nền ngoài trong suốt, always-on-top, click-through và hỗ trợ phím tắt toàn cục.
 - Auto-update qua GitHub Releases bằng Velopack.
+
+## Nhóm sinh tồn
+
+1. Nhập tên hiển thị rồi bấm **TẠO NHÓM**.
+2. Gửi mã mời 6 ký tự cho bạn bè. Người nhận nhập tên + mã rồi bấm **NHẬP MÃ**.
+3. Mở overlay như bình thường. Vị trí, hướng quay và status sẽ tự đồng bộ khi mọi người cùng server.
+
+Nhóm không phải tài khoản cố định: mã, thành viên và telemetry chỉ nằm trong RAM của app/relay. Khi app đóng hoặc cả nhóm ngừng gửi heartbeat, phiên tự hết hạn và không thể khôi phục; lần sau cần tạo/nhập lại mã. Client chỉ kết nối endpoint cố định `https://isle-relay.klong.dev` và không ghi member token xuống ổ đĩa.
 
 ## Phím tắt toàn cục
 
@@ -77,7 +87,7 @@ dotnet build .\TheIsleOverlay.sln --configuration Release
 Build installer/update package:
 
 ```powershell
-.\scripts\Package-Release.ps1 -Version 1.0.0
+.\scripts\Package-Release.ps1 -Version 1.1.0
 ```
 
 Output nằm trong `artifacts/distribution`.
@@ -89,6 +99,7 @@ TheIsleOverlay.App        Home, Steam WebView2 login, WPF overlay, updater, glob
 TheIsleOverlay.Core       Telemetry session contract, reducer support, projection và heading
 TheIsleOverlay.EraGaming  Adapter JSON API EraGaming
 TheIsleOverlay.IslePilot  Bearer REST, WebSocket realtime, auth, reducer và DPAPI credential store
+TheIsleOverlay.TeamRelay  REST + SignalR cho nhóm tạm thời, heartbeat, reconnect và relay telemetry
 TheIsleOverlay.Tests      Unit/integration tests auth, transport, reducer, projection và heading
 ```
 
@@ -99,6 +110,8 @@ Texture nền Gateway được nhúng vào ứng dụng. Các provider chỉ l�
 ## Giới hạn
 
 - Realtime chỉ hoạt động trên server đã cài và bật plugin IslePilot.
+- Marker nhóm chỉ được vẽ khi hai người đang ở cùng server; status khác server vẫn hiện trong danh sách.
+- Nhóm là phiên tạm thời, tối đa 10 người và phải tạo lại sau khi đóng app.
 - Mất Internet không ảnh hưởng texture map local nhưng telemetry sẽ chuyển `RECONNECTING` hoặc `DATA STALE`.
 - IslePilot thay đổi endpoint, callback hoặc payload có thể yêu cầu cập nhật client.
 - Texture Gateway local được cập nhật theo từng bản phát hành của ứng dụng khi map game thay đổi.

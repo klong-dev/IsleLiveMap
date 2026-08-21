@@ -6,6 +6,10 @@
 
 **3. Vào game:** Join một server đã cài plugin IslePilot. Tool tự nhận server và cập nhật tọa độ, hướng quay cùng status dino; không cần chọn DinoVietNam/Premium/HoHo thủ công.
 
+**4. Chơi nhóm (tùy chọn):** Ở Home, nhập tên → **TẠO NHÓM** → gửi mã 6 ký tự. Bạn bè nhập tên + mã → **NHẬP MÃ**. Khi cùng server, overlay sẽ hiện vị trí, hướng quay, HP, Đói và Nước của nhau.
+
+> Nhóm chỉ tồn tại trong phiên. Đóng app thì lần sau phải tạo/nhập mã lại; tool không lưu lịch sử nhóm.
+
 > Texture Gateway đã nằm sẵn trong app. Mạng yếu chỉ làm telemetry chuyển trạng thái reconnect, không phải tải lại ảnh map.
 
 ### ⌨️ PHÍM TẮT

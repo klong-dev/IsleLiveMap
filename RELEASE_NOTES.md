@@ -1,12 +1,10 @@
-# Chưa phát hành
+# Isle Live Map 1.1.0
 
-- Thay login cookie theo từng server trên Home bằng một Steam Login IslePilot.
-- Tự nhận server hỗ trợ và nhận tọa độ, yaw, vitals qua `/me`, `/map` và WebSocket `/ows`.
-- Lưu overlay token bằng Windows DPAPI CurrentUser; không đăng ký protocol `isle-overlay` trong Windows.
-- Tự reconnect, phát hiện dữ liệu stale sau bốn giây và xóa token khi API trả 401/403.
-
-# Isle Live Map 1.0.3
-
-- Dùng texture Gateway EraGaming/MyIsleMap đóng gói local cho toàn bộ nguồn telemetry.
-- Loại bỏ việc tải texture map online khi mở overlay, tránh lỗi bản đồ trên kết nối mạng yếu.
-- Giữ nguyên API tọa độ, marker, yaw và status của EraGaming, DinoVietNam, DinoVietNam Premium và HoHo.
+- Thêm **Nhóm sinh tồn** bằng mã mời 6 ký tự, không cần tài khoản nhóm và không lưu dữ liệu phiên.
+- Hiển thị marker, tên và hướng quay của đồng đội đang ở cùng server trên minimap.
+- Thêm hàng status HP, Đói và Nước cho từng đồng đội; nhận biết mất tín hiệu/khác server.
+- Dùng relay realtime tại `isle-relay.klong.dev`, tự heartbeat và reconnect; member token chỉ giữ trong RAM.
+- Thay login cookie từng server bằng một Steam Login IslePilot và tự nhận server đang chơi.
+- Nhận tọa độ, yaw và vitals realtime qua WebSocket `/ows`; tự phát hiện stale và reconnect.
+- Dùng texture Gateway đóng gói local, không tải ảnh map khi mở overlay.
+- Mã hóa overlay token bằng Windows DPAPI CurrentUser và tự xóa khi phiên IslePilot hết hạn.
