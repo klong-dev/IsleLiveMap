@@ -9,14 +9,11 @@ using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using TheIsleOverlay.Core;
-using TheIsleOverlay.EraGaming;
-using TheIsleOverlay.IslePilot;
 
 namespace TheIsleOverlay.App;
 
 public partial class MainWindow : Window
 {
-    private static readonly TimeSpan TelemetryRefreshInterval = TimeSpan.FromSeconds(2);
     private static readonly Uri GatewayMapResourceUri = new("Assets/GatewayMap.webp", UriKind.Relative);
 
     private const int EditHotkeyId = 0x714;
@@ -37,37 +34,60 @@ public partial class MainWindow : Window
 
     private readonly HttpClient _httpClient = new() { Timeout = TimeSpan.FromSeconds(12) };
     private readonly CancellationTokenSource _shutdown = new();
-    private readonly DispatcherTimer _refreshTimer;
     private readonly TelemetrySourceDefinition? _requestedSource;
     private readonly string? _providedCookie;
-    private ITelemetryProvider? _telemetryProvider;
+    private readonly ITelemetrySession? _providedSession;
+    private ITelemetrySession? _telemetrySession;
+    private Task? _telemetryWatchTask;
     private string _configuredSource = "ERA";
     private WorldLocation? _location;
+    private MapPoint? _mapLocation;
     private WorldLocation? _previousLocation;
     private GlobalMouseShortcutHook? _mouseShortcuts;
     private HwndSource? _windowSource;
     private double _mapZoom = 2.25d;
     private double _headingDegrees;
-    private bool _refreshing;
     private bool _clickThrough;
     private bool _hasMovementHeading;
     private bool _editHotkeyRegistered;
     private bool _hideGuideHotkeyRegistered;
 
-    public MainWindow() : this(null, null)
+    public MainWindow() : this(null, null, null, null)
     {
     }
 
     public MainWindow(TelemetrySourceDefinition? source, string? cookieValue)
+        : this(source, cookieValue, null, null)
+    {
+    }
+
+    public MainWindow(ITelemetrySession telemetrySession, string displayName)
+        : this(
+            null,
+            null,
+            telemetrySession ?? throw new ArgumentNullException(nameof(telemetrySession)),
+            displayName)
+    {
+    }
+
+    private MainWindow(
+        TelemetrySourceDefinition? source,
+        string? cookieValue,
+        ITelemetrySession? telemetrySession,
+        string? displayName)
     {
         _requestedSource = source;
         _providedCookie = cookieValue;
+        _providedSession = telemetrySession;
+        if (!string.IsNullOrWhiteSpace(displayName))
+        {
+            _configuredSource = displayName;
+        }
+
         InitializeComponent();
-        _refreshTimer = new DispatcherTimer { Interval = TelemetryRefreshInterval };
-        _refreshTimer.Tick += RefreshTimer_Tick;
     }
 
-    private async void Window_Loaded(object sender, RoutedEventArgs e)
+    private void Window_Loaded(object sender, RoutedEventArgs e)
     {
         var area = SystemParameters.WorkArea;
         Left = Math.Max(area.Left, area.Right - ActualWidth - 24);
@@ -86,7 +106,7 @@ public partial class MainWindow : Window
             SetClickThrough(true);
         }
 
-        if (!TryConfigureTelemetryProvider())
+        if (!TryConfigureTelemetrySession())
         {
             SetConnectionState("CHƯA CẤU HÌNH NGUỒN", ErrorBrush);
             PlayerNameLabel.Text = "Set cookie cho Era hoặc DinoVietnam";
@@ -95,15 +115,20 @@ public partial class MainWindow : Window
         }
 
         LoadMap();
-        await RefreshTelemetryAsync();
-        _refreshTimer.Start();
+        _telemetryWatchTask = WatchTelemetryAsync();
     }
 
-    private bool TryConfigureTelemetryProvider()
+    private bool TryConfigureTelemetrySession()
     {
+        if (_providedSession is not null)
+        {
+            _telemetrySession = _providedSession;
+            return true;
+        }
+
         if (_requestedSource is not null && !string.IsNullOrWhiteSpace(_providedCookie))
         {
-            ConfigureTelemetryProvider(_requestedSource, _providedCookie);
+            ConfigureTelemetrySession(_requestedSource, _providedCookie);
             return true;
         }
 
@@ -127,16 +152,17 @@ public partial class MainWindow : Window
 
         if (source is not null && !string.IsNullOrWhiteSpace(cookie))
         {
-            ConfigureTelemetryProvider(source, cookie);
+            ConfigureTelemetrySession(source, cookie);
             return true;
         }
 
         return false;
     }
 
-    private void ConfigureTelemetryProvider(TelemetrySourceDefinition source, string cookieValue)
+    private void ConfigureTelemetrySession(TelemetrySourceDefinition source, string cookieValue)
     {
-        _telemetryProvider = source.CreateProvider(_httpClient, cookieValue);
+        var provider = source.CreateProvider(_httpClient, cookieValue);
+        _telemetrySession = new PollingTelemetrySession(provider, source: source.ShortName);
         _configuredSource = source.ShortName;
     }
 
@@ -172,44 +198,48 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void RefreshTimer_Tick(object? sender, EventArgs e) => await RefreshTelemetryAsync();
-
-    private async Task RefreshTelemetryAsync()
+    private async Task WatchTelemetryAsync()
     {
-        if (_refreshing || _telemetryProvider is null)
+        if (_telemetrySession is null)
         {
             return;
         }
 
-        _refreshing = true;
         try
         {
-            var snapshot = await _telemetryProvider.GetSnapshotAsync(_shutdown.Token);
-            RenderSnapshot(snapshot);
+            await foreach (var snapshot in _telemetrySession
+                               .WatchAsync(_shutdown.Token)
+                               .ConfigureAwait(false))
+            {
+                await Dispatcher.InvokeAsync(() => RenderSnapshot(snapshot));
+            }
         }
         catch (OperationCanceledException) when (_shutdown.IsCancellationRequested)
         {
         }
-        catch (EraGamingAuthenticationException exception)
-        {
-            ShowTelemetryUnavailable("PHIÊN ĐÃ HẾT HẠN", exception.Message);
-        }
-        catch (IslePilotAuthenticationException exception)
-        {
-            ShowTelemetryUnavailable("PHIÊN ĐÃ HẾT HẠN", exception.Message);
-        }
         catch (Exception)
         {
-            ShowTelemetryUnavailable("MẤT KẾT NỐI · RETRY 5S", "API telemetry chưa phản hồi");
-        }
-        finally
-        {
-            _refreshing = false;
+            await Dispatcher.InvokeAsync(() =>
+                ShowTelemetryUnavailable("MẤT KẾT NỐI", "Telemetry session đã dừng"));
         }
     }
 
     private void RenderSnapshot(TelemetrySnapshot snapshot)
     {
+        if (snapshot.SessionState == TelemetrySessionState.AuthenticationRequired)
+        {
+            ShowTelemetryUnavailable("PHIÊN ĐÃ HẾT HẠN", "Đăng nhập Steam lại để tiếp tục");
+            return;
+        }
+
+        if (snapshot.SessionState == TelemetrySessionState.UnsupportedServer)
+        {
+            ShowNoActiveDinosaur(
+                snapshot.StatusMessage ?? "ISLEPILOT · CHƯA VÀO SERVER HỖ TRỢ",
+                "Server hiện tại chưa cài IslePilot");
+            return;
+        }
+
         if (!snapshot.Success || !snapshot.ServerOnline)
         {
             ShowTelemetryUnavailable("SERVER OFFLINE", "Nguồn telemetry đang ngoại tuyến");
@@ -218,22 +248,24 @@ public partial class MainWindow : Window
 
         if (!snapshot.PlayerOnline || snapshot.Player is null)
         {
-            SetConnectionState($"{_configuredSource} ONLINE · CHƯA VÀO GAME", WaitingBrush);
-            SpeciesLabel.Text = "NO ACTIVE DINOSAUR";
-            PlayerNameLabel.Text = $"Join server {_configuredSource} để nhận telemetry";
-            _location = null;
-            _previousLocation = null;
-            _hasMovementHeading = false;
-            PlayerMarker.Visibility = Visibility.Collapsed;
-            HeadingModeLabel.Text = "COURSE · WAITING";
-            ClearVitals();
+            var state = ConnectionText(snapshot.SessionState);
+            var detail = snapshot.SessionState switch
+            {
+                TelemetrySessionState.Connecting => "Đang khởi tạo phiên telemetry",
+                TelemetrySessionState.Reconnecting => "Mất kết nối, đang thử lại",
+                TelemetrySessionState.Stale => "Dữ liệu realtime đã quá hạn",
+                _ => $"Join server {_configuredSource} để nhận telemetry"
+            };
+            ShowNoActiveDinosaur(state, detail);
             return;
         }
 
         var player = snapshot.Player;
         var exact = player.ExactVitals;
 
-        SetConnectionState($"{_configuredSource} · POLL 2S", OnlineBrush);
+        var degraded = snapshot.SessionState is TelemetrySessionState.Reconnecting or TelemetrySessionState.Stale;
+        SetTelemetryOpacity(degraded ? 0.58d : 1d);
+        SetConnectionState(ConnectionText(snapshot.SessionState), degraded ? WaitingBrush : OnlineBrush);
         SpeciesLabel.Text = FriendlySpecies(player.Class);
         PlayerNameLabel.Text = string.IsNullOrWhiteSpace(player.Name) ? "ACTIVE PLAYER" : player.Name;
 
@@ -250,6 +282,7 @@ public partial class MainWindow : Window
 
         UpdateHeading(player);
         _location = player.Location;
+        _mapLocation = player.MapLocation;
         if (_location is not null)
         {
             var altitude = _location.Z is null ? "—" : $"{_location.Z.Value / 1000d:0.0}";
@@ -355,15 +388,49 @@ public partial class MainWindow : Window
 
     private void ShowTelemetryUnavailable(string connectionState, string detail)
     {
+        SetTelemetryOpacity(1d);
         SetConnectionState(connectionState, ErrorBrush);
         SpeciesLabel.Text = "TELEMETRY UNAVAILABLE";
         PlayerNameLabel.Text = detail;
         _location = null;
+        _mapLocation = null;
         _previousLocation = null;
         _hasMovementHeading = false;
         PlayerMarker.Visibility = Visibility.Collapsed;
         HeadingModeLabel.Text = "COURSE · WAITING";
         ClearVitals();
+    }
+
+    private void ShowNoActiveDinosaur(string connectionState, string detail)
+    {
+        SetTelemetryOpacity(1d);
+        SetConnectionState(connectionState, WaitingBrush);
+        SpeciesLabel.Text = "NO ACTIVE DINOSAUR";
+        PlayerNameLabel.Text = detail;
+        _location = null;
+        _mapLocation = null;
+        _previousLocation = null;
+        _hasMovementHeading = false;
+        PlayerMarker.Visibility = Visibility.Collapsed;
+        HeadingModeLabel.Text = "COURSE · WAITING";
+        ClearVitals();
+    }
+
+    private string ConnectionText(TelemetrySessionState state) => state switch
+    {
+        TelemetrySessionState.Live => $"{_configuredSource} · LIVE",
+        TelemetrySessionState.Reconnecting => $"{_configuredSource} · RECONNECTING",
+        TelemetrySessionState.Stale => $"{_configuredSource} · DATA STALE",
+        TelemetrySessionState.Polling => $"{_configuredSource} · POLL 2S",
+        _ => $"{_configuredSource} · {state.ToString().ToUpperInvariant()}"
+    };
+
+    private void SetTelemetryOpacity(double opacity)
+    {
+        PlayerMarker.Opacity = opacity;
+        HealthBar.Opacity = StaminaBar.Opacity = HungerBar.Opacity = WaterBar.Opacity = opacity;
+        HealthValue.Opacity = StaminaValue.Opacity = HungerValue.Opacity = WaterValue.Opacity = opacity;
+        GrowthLabel.Opacity = CoordinateLabel.Opacity = opacity;
     }
 
     private void PositionMap()
@@ -389,7 +456,8 @@ public partial class MainWindow : Window
         MapImage.Width = imageWidth;
         MapImage.Height = imageHeight;
 
-        var point = _location is null ? new MapPoint(0.5d, 0.5d) : GatewayMapProjection.Project(_location);
+        var point = _mapLocation ??
+            (_location is null ? new MapPoint(0.5d, 0.5d) : GatewayMapProjection.Project(_location));
         var desiredLeft = viewportWidth / 2d - point.Left * imageWidth;
         var desiredTop = viewportHeight / 2d - point.Top * imageHeight;
         var left = ClampImageOffset(desiredLeft, viewportWidth, imageWidth);
@@ -518,10 +586,19 @@ public partial class MainWindow : Window
 
     private void CloseButton_Click(object sender, RoutedEventArgs e) => Close();
 
-    private void Window_Closed(object? sender, EventArgs e)
+    private async void Window_Closed(object? sender, EventArgs e)
     {
-        _refreshTimer.Stop();
         _shutdown.Cancel();
+        if (_telemetryWatchTask is not null)
+        {
+            await _telemetryWatchTask;
+        }
+
+        if (_telemetrySession is not null)
+        {
+            await _telemetrySession.DisposeAsync();
+        }
+
         var handle = new WindowInteropHelper(this).Handle;
         if (_editHotkeyRegistered) UnregisterHotKey(handle, EditHotkeyId);
         if (_hideGuideHotkeyRegistered) UnregisterHotKey(handle, HideGuideHotkeyId);
