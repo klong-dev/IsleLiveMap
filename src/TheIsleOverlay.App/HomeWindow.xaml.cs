@@ -22,6 +22,8 @@ public partial class HomeWindow : Window
 
     private async void Window_Loaded(object sender, RoutedEventArgs e)
     {
+        InitializeTeamPanel();
+
         if (string.Equals(
                 Environment.GetEnvironmentVariable("ISLELIVEMAP_DEV_AUTO_CONNECT"),
                 "1",
@@ -186,6 +188,7 @@ public partial class HomeWindow : Window
 
     private void Window_Closed(object? sender, EventArgs e)
     {
+        DetachTeamPanel();
         _shutdown.Cancel();
         _shutdown.Dispose();
     }

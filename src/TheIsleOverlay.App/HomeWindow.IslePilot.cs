@@ -145,6 +145,11 @@ public partial class HomeWindow
     private void ApplySteamLoginState(IslePilotOverlayAuthResult? credentials)
     {
         var authenticated = credentials is not null;
+        if (authenticated)
+        {
+            SuggestTeamDisplayName(credentials!.SteamId[^4..]);
+        }
+
         SteamAccountLabel.Text = authenticated
             ? $"STEAM · ••••{credentials!.SteamId[^4..]}"
             : "CHƯA ĐĂNG NHẬP STEAM";

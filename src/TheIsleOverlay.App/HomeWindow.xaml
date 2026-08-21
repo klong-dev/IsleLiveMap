@@ -59,6 +59,28 @@
             <Setter Property="Background" Value="#C50B2421" />
             <Setter Property="BorderBrush" Value="#486C64" />
         </Style>
+
+        <Style x:Key="TeamInput" TargetType="TextBox">
+            <Setter Property="Foreground" Value="#E9F4EE" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="CaretBrush" Value="#37D4C6" />
+            <Setter Property="SelectionBrush" Value="#6A37D4C6" />
+            <Setter Property="FontFamily" Value="Bahnschrift" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Padding" Value="10,7" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+
+        <Style x:Key="TeamPrimaryButton" TargetType="Button" BasedOn="{StaticResource HomeChromeButton}">
+            <Setter Property="Height" Value="38" />
+            <Setter Property="Padding" Value="13,0" />
+            <Setter Property="Foreground" Value="#E8FFFA" />
+            <Setter Property="Background" Value="#C5193E38" />
+            <Setter Property="BorderBrush" Value="#478D82" />
+            <Setter Property="FontSize" Value="11.5" />
+        </Style>
     </Window.Resources>
 
     <Border Margin="12" Background="#F2071716" BorderBrush="#6A58736C" BorderThickness="1" CornerRadius="7">
@@ -150,6 +172,110 @@
                             </StackPanel>
                             <Button Grid.Column="1" Style="{StaticResource HomeChromeButton}" Tag="https://github.com/klong-dev/IsleLiveMap" Click="OpenLink_Click"
                                     Content="GITHUB  ★" Foreground="#E7B74E" BorderBrush="#756A3A" Padding="12,8" VerticalAlignment="Center" Margin="12,0,0,0" />
+                        </Grid>
+                    </Border>
+
+                    <TextBlock Text="NHÓM SINH TỒN" Foreground="#A8BDB7" FontSize="11.5" FontWeight="SemiBold" Margin="0,0,0,9" />
+
+                    <Border x:Name="TeamCard" Background="#C00A211E" BorderBrush="#4D746B" BorderThickness="1"
+                            CornerRadius="3" Padding="14,12" Margin="0,0,0,18">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <Border Width="29" Height="29" CornerRadius="15" BorderBrush="#3F766D" BorderThickness="1">
+                                    <Grid>
+                                        <Ellipse Width="12" Height="12" Stroke="#37D4C6" StrokeThickness="1" />
+                                        <Ellipse Width="4" Height="4" Fill="#E7B74E" />
+                                    </Grid>
+                                </Border>
+                                <StackPanel Grid.Column="1" Margin="10,0,0,0">
+                                    <TextBlock Text="TEAM LINK / TẠM THỜI" Foreground="{StaticResource HomeBone}"
+                                               FontFamily="Bahnschrift SemiCondensed" FontSize="13" FontWeight="SemiBold" />
+                                    <TextBlock Text="Tắt app là nhóm tự hủy · Không lưu dữ liệu"
+                                               Foreground="#7F9A92" FontSize="10.5" FontWeight="Medium" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Ellipse x:Name="TeamStateDot" Width="6" Height="6" Fill="#607E76" Margin="0,0,6,0" />
+                                    <TextBlock x:Name="TeamStateLabel" Text="CHƯA VÀO NHÓM" Foreground="#8DA69F"
+                                               FontFamily="Bahnschrift SemiCondensed" FontSize="9.5" FontWeight="SemiBold" />
+                                </StackPanel>
+                            </Grid>
+
+                            <StackPanel x:Name="TeamInactivePanel" Grid.Row="1" Margin="0,13,0,0">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <Border Background="#A5071716" BorderBrush="#31514B" BorderThickness="1" CornerRadius="2" Margin="0,0,8,0">
+                                        <TextBox x:Name="TeamDisplayNameTextBox" Style="{StaticResource TeamInput}"
+                                                 Text="Survivor" MaxLength="32" ToolTip="Tên đồng đội sẽ nhìn thấy" />
+                                    </Border>
+                                    <Button x:Name="CreateTeamButton" Grid.Column="1" Style="{StaticResource TeamPrimaryButton}"
+                                            Content="TẠO NHÓM" Click="CreateTeamButton_Click" />
+                                </Grid>
+
+                                <Grid Margin="0,8,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <Border Background="#A5071716" BorderBrush="#5D5936" BorderThickness="1" CornerRadius="2" Margin="0,0,8,0">
+                                        <TextBox x:Name="InviteCodeTextBox" Style="{StaticResource TeamInput}"
+                                                 Text="" MaxLength="6" CharacterCasing="Upper"
+                                                 TextChanged="InviteCodeTextBox_TextChanged"
+                                                 ToolTip="Nhập mã mời 6 ký tự" />
+                                    </Border>
+                                    <Button x:Name="JoinTeamButton" Grid.Column="1" Style="{StaticResource TeamPrimaryButton}"
+                                            Content="NHẬP MÃ" BorderBrush="#786E3D" Foreground="#FFE7A0"
+                                            Click="JoinTeamButton_Click" />
+                                </Grid>
+                            </StackPanel>
+
+                            <StackPanel x:Name="TeamActivePanel" Grid.Row="1" Margin="0,13,0,0" Visibility="Collapsed">
+                                <Border Background="#C40B1817" BorderBrush="#6D6741" BorderThickness="1" CornerRadius="2" Padding="11,8">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="4" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <Rectangle Fill="#E7B74E" RadiusX="1" RadiusY="1" />
+                                        <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center">
+                                            <TextBlock Text="MÃ MỜI" Foreground="#879D96" FontFamily="Bahnschrift SemiCondensed" FontSize="9" />
+                                            <TextBlock x:Name="ActiveInviteCodeLabel" Text="— — — — — —" Foreground="#FFE18A"
+                                                       FontFamily="Bahnschrift" FontSize="19" FontWeight="Bold" />
+                                        </StackPanel>
+                                        <TextBlock x:Name="TeamMemberCountLabel" Grid.Column="2" Text="1 / 10 NGƯỜI"
+                                                   Foreground="#91AAA3" FontFamily="Bahnschrift SemiCondensed" FontSize="10"
+                                                   VerticalAlignment="Center" HorizontalAlignment="Right" Margin="8,0" />
+                                        <Button Grid.Column="3" Style="{StaticResource HomeChromeButton}" Content="COPY"
+                                                Padding="10,6" Click="CopyInviteCodeButton_Click" />
+                                        <Button x:Name="LeaveTeamButton" Grid.Column="4" Style="{StaticResource HomeChromeButton}"
+                                                Content="RỜI" Foreground="#E9918D" BorderBrush="#704441"
+                                                Padding="10,6" Margin="6,0,0,0" Click="LeaveTeamButton_Click" />
+                                    </Grid>
+                                </Border>
+                                <TextBlock Text="Gửi mã cho bạn bè. Minimap và HP / Đói / Nước sẽ tự đồng bộ khi cùng server."
+                                           Foreground="#8FA79F" FontSize="10.5" FontWeight="Medium"
+                                           TextWrapping="Wrap" Margin="0,7,0,0" />
+                            </StackPanel>
+
+                            <TextBlock x:Name="TeamErrorLabel" Grid.Row="2" Text="Tạo nhóm mới hoặc nhập mã mời từ bạn bè."
+                                       Foreground="#839C95" FontSize="10.5" FontWeight="Medium"
+                                       TextWrapping="Wrap" Margin="0,9,0,0" />
                         </Grid>
                     </Border>
 
