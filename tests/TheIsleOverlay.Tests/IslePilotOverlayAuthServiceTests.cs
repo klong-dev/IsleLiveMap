@@ -15,6 +15,7 @@ public sealed class IslePilotOverlayAuthServiceTests
     }
 
     [Theory]
+    [InlineData("isle-overlay://?sid=76561198000000000&token=header.payload.signature")]
     [InlineData("isle-overlay://callback?sid=76561198000000000&token=header.payload.signature")]
     [InlineData("isle-overlay://auth/?token=abc%2B123%2Fxyz&sid=76561198000000000")]
     public void TryParseCallback_AcceptsTheReadOnlyOverlayToken(string callback)
