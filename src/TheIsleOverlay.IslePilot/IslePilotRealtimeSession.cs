@@ -14,6 +14,7 @@ public sealed class IslePilotRealtimeSession : ITelemetrySession
     private readonly IslePilotReconnectBackoff _backoff;
     private readonly Func<TimeSpan, CancellationToken, Task> _reconnectDelay;
     private readonly Func<DateTimeOffset> _utcNow;
+    private readonly IDisposable? _ownedResource;
     private readonly IslePilotOverlayStateReducer _reducer;
     private readonly Channel<TelemetrySnapshot> _snapshots;
     private readonly CancellationTokenSource _disposeCancellation = new();
@@ -37,13 +38,36 @@ public sealed class IslePilotRealtimeSession : ITelemetrySession
     {
     }
 
+    public static IslePilotRealtimeSession Create(IslePilotOverlayOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(12) };
+        try
+        {
+            return new IslePilotRealtimeSession(
+                new IslePilotOverlayApiClient(httpClient, options),
+                options,
+                static () => new IslePilotOverlayWebSocket(),
+                new IslePilotReconnectBackoff(),
+                static (delay, cancellationToken) => Task.Delay(delay, cancellationToken),
+                static () => DateTimeOffset.UtcNow,
+                httpClient);
+        }
+        catch
+        {
+            httpClient.Dispose();
+            throw;
+        }
+    }
+
     internal IslePilotRealtimeSession(
         IIslePilotOverlayApiClient apiClient,
         IslePilotOverlayOptions options,
         Func<IIslePilotOverlayWebSocket> socketFactory,
         IslePilotReconnectBackoff backoff,
         Func<TimeSpan, CancellationToken, Task> reconnectDelay,
-        Func<DateTimeOffset> utcNow)
+        Func<DateTimeOffset> utcNow,
+        IDisposable? ownedResource = null)
     {
         _apiClient = apiClient ?? throw new ArgumentNullException(nameof(apiClient));
         _options = options ?? throw new ArgumentNullException(nameof(options));
@@ -51,6 +75,7 @@ public sealed class IslePilotRealtimeSession : ITelemetrySession
         _backoff = backoff ?? throw new ArgumentNullException(nameof(backoff));
         _reconnectDelay = reconnectDelay ?? throw new ArgumentNullException(nameof(reconnectDelay));
         _utcNow = utcNow ?? throw new ArgumentNullException(nameof(utcNow));
+        _ownedResource = ownedResource;
 
         ValidateOptions(options);
         _reducer = new IslePilotOverlayStateReducer(options.LiveDataLifetime);
@@ -122,20 +147,26 @@ public sealed class IslePilotRealtimeSession : ITelemetrySession
             return;
         }
 
-        _disposeCancellation.Cancel();
-        var runTask = Volatile.Read(ref _runTask);
-        if (runTask is not null)
+        try
         {
-            try
+            _disposeCancellation.Cancel();
+            var runTask = Volatile.Read(ref _runTask);
+            if (runTask is not null)
             {
-                await runTask;
-            }
-            catch (OperationCanceledException) when (_disposeCancellation.IsCancellationRequested)
-            {
+                try
+                {
+                    await runTask;
+                }
+                catch (OperationCanceledException) when (_disposeCancellation.IsCancellationRequested)
+                {
+                }
             }
         }
-
-        _disposeCancellation.Dispose();
+        finally
+        {
+            _ownedResource?.Dispose();
+            _disposeCancellation.Dispose();
+        }
     }
 
     private async Task RunAsync(CancellationToken cancellationToken)

@@ -136,6 +136,25 @@ public sealed class IslePilotRealtimeSessionTests
         Assert.True(socket.Disposed);
     }
 
+    [Fact]
+    public async Task DisposeAsync_DisposesTheOwnedHttpResourceExactlyOnce()
+    {
+        var ownedResource = new TrackingDisposable();
+        var session = new IslePilotRealtimeSession(
+            new FakeApiClient(),
+            Options(),
+            () => new FakeWebSocket([]),
+            new IslePilotReconnectBackoff(() => 0.5),
+            static (_, _) => Task.CompletedTask,
+            static () => DateTimeOffset.UtcNow,
+            ownedResource);
+
+        await session.DisposeAsync();
+        await session.DisposeAsync();
+
+        Assert.Equal(1, ownedResource.DisposeCalls);
+    }
+
     private static IslePilotRealtimeSession CreateSession(
         IIslePilotOverlayApiClient api,
         Func<IIslePilotOverlayWebSocket> socketFactory) => new(
@@ -267,5 +286,12 @@ public sealed class IslePilotRealtimeSessionTests
             Disposed = true;
             return ValueTask.CompletedTask;
         }
+    }
+
+    private sealed class TrackingDisposable : IDisposable
+    {
+        public int DisposeCalls { get; private set; }
+
+        public void Dispose() => DisposeCalls++;
     }
 }
