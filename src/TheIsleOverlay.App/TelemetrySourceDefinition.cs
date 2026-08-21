@@ -2,13 +2,15 @@ using System.Net.Http;
 using TheIsleOverlay.Core;
 using TheIsleOverlay.EraGaming;
 using TheIsleOverlay.IslePilot;
+using TheIsleOverlay.Pandora;
 
 namespace TheIsleOverlay.App;
 
 public enum TelemetrySourceKind
 {
     EraGaming,
-    IslePilot
+    IslePilot,
+    Pandora
 }
 
 public sealed record TelemetrySourceDefinition
@@ -21,6 +23,7 @@ public sealed record TelemetrySourceDefinition
     public required Uri LoginUri { get; init; }
     public required string CookieName { get; init; }
     public string? ServerSlug { get; init; }
+    public bool CaptureAllHostCookies { get; init; }
 
     public ITelemetryProvider CreateProvider(HttpClient httpClient, string cookieValue) => Kind switch
     {
@@ -39,6 +42,13 @@ public sealed record TelemetrySourceDefinition
                 ServerSlug = ServerSlug ?? throw new InvalidOperationException("IslePilot source requires a server slug."),
                 DisplayName = DisplayName,
                 PlayerCookie = cookieValue
+            }),
+        TelemetrySourceKind.Pandora => new PandoraTelemetryProvider(
+            httpClient,
+            new PandoraOptions
+            {
+                BaseUri = BaseUri,
+                SessionCookieHeader = cookieValue
             }),
         _ => throw new ArgumentOutOfRangeException()
     };
@@ -90,12 +100,25 @@ public sealed record TelemetrySourceDefinition
         ServerSlug = "hoho"
     };
 
+    public static TelemetrySourceDefinition Pandora { get; } = new()
+    {
+        Id = "pandora",
+        DisplayName = "PANDORA",
+        ShortName = "PANDORA",
+        Kind = TelemetrySourceKind.Pandora,
+        BaseUri = new Uri("https://islapandora.eu/"),
+        LoginUri = new Uri("https://islapandora.eu/live-map"),
+        CookieName = "website session",
+        CaptureAllHostCookies = true
+    };
+
     public static IReadOnlyList<TelemetrySourceDefinition> All { get; } =
     [
         EraGaming,
         DinoVietnam,
         DinoVietnamPremium,
-        HoHo
+        HoHo,
+        Pandora
     ];
 
     public static TelemetrySourceDefinition? FromId(string? id) =>

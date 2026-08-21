@@ -20,7 +20,9 @@ public partial class LoginWindow : Window
         InitializeComponent();
         SourceTitleLabel.Text = $"KẾT NỐI {_source.DisplayName.ToUpperInvariant()}";
         HostLabel.Text = _source.BaseUri.Host;
-        CookieScopeLabel.Text = $"CHỈ ĐỌC {_source.CookieName} @ {_source.BaseUri.Host}";
+        CookieScopeLabel.Text = _source.CaptureAllHostCookies
+            ? $"CHỈ ĐỌC PHIÊN ĐĂNG NHẬP @ {_source.BaseUri.Host}"
+            : $"CHỈ ĐỌC {_source.CookieName} @ {_source.BaseUri.Host}";
     }
 
     public string? CookieValue { get; private set; }
@@ -82,25 +84,51 @@ public partial class LoginWindow : Window
         {
             var cookieUri = _source.BaseUri.GetLeftPart(UriPartial.Authority);
             var cookies = await LoginBrowser.CoreWebView2.CookieManager.GetCookiesAsync(cookieUri);
-            var sessionCookie = cookies.FirstOrDefault(cookie =>
-                string.Equals(cookie.Name, _source.CookieName, StringComparison.OrdinalIgnoreCase) &&
-                !string.IsNullOrWhiteSpace(cookie.Value));
+            var sessionCookies = _source.CaptureAllHostCookies
+                ? cookies
+                    .Where(cookie =>
+                        !string.IsNullOrWhiteSpace(cookie.Name) &&
+                        !string.IsNullOrWhiteSpace(cookie.Value))
+                    .OrderBy(cookie => cookie.Name, StringComparer.Ordinal)
+                    .ToArray()
+                : cookies
+                    .Where(cookie =>
+                        string.Equals(cookie.Name, _source.CookieName, StringComparison.OrdinalIgnoreCase) &&
+                        !string.IsNullOrWhiteSpace(cookie.Value))
+                    .Take(1)
+                    .ToArray();
 
-            if (sessionCookie is null)
+            if (sessionCookies.Length == 0)
             {
                 LoginStatusLabel.Text = "Chưa thấy phiên đăng nhập. Hoàn tất đăng nhập rồi bấm KIỂM TRA PHIÊN.";
                 return false;
             }
 
+            var sessionValue = _source.CaptureAllHostCookies
+                ? string.Join("; ", sessionCookies.Select(cookie => $"{cookie.Name}={cookie.Value}"))
+                : sessionCookies[0].Value;
+
             if (_sessionValidator is not null)
             {
                 LoginStatusLabel.Text = "ĐÃ THẤY COOKIE · ĐANG XÁC MINH VỚI API…";
                 using var validationTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(3));
-                var validation = await _sessionValidator(sessionCookie.Value, validationTimeout.Token);
+                var validation = await _sessionValidator(sessionValue, validationTimeout.Token);
                 if (validation == LoginSessionValidationState.Invalid)
                 {
-                    LoginBrowser.CoreWebView2.CookieManager.DeleteCookie(sessionCookie);
-                    LoginStatusLabel.Text = "Phiên cũ không còn hợp lệ. Hãy đăng nhập lại trên website.";
+                    // OAuth sites may create an anonymous Express session before
+                    // authentication and reuse it for the callback state. Keep that
+                    // host session intact so the user can finish Discord/Steam login.
+                    if (!_source.CaptureAllHostCookies)
+                    {
+                        foreach (var sessionCookie in sessionCookies)
+                        {
+                            LoginBrowser.CoreWebView2.CookieManager.DeleteCookie(sessionCookie);
+                        }
+                    }
+
+                    LoginStatusLabel.Text = _source.CaptureAllHostCookies
+                        ? "Đã thấy phiên website nhưng chưa đăng nhập. Hãy hoàn tất đăng nhập rồi bấm KIỂM TRA PHIÊN."
+                        : "Phiên cũ không còn hợp lệ. Hãy đăng nhập lại trên website.";
                     if (LoginBrowser.Source != _source.LoginUri)
                     {
                         LoginBrowser.Source = _source.LoginUri;
@@ -115,7 +143,7 @@ public partial class LoginWindow : Window
                 }
             }
 
-            CookieValue = sessionCookie.Value;
+            CookieValue = sessionValue;
             _closingWithCookie = true;
             DialogResult = true;
             Close();

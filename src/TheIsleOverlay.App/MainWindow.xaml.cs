@@ -158,6 +158,7 @@ public partial class MainWindow : Window
             "hoho" => Environment.GetEnvironmentVariable("ISLEPILOT_HOHO_PLAYER") ??
                       Environment.GetEnvironmentVariable("ISLEPILOT_PLAYER"),
             "dinovietnam" => Environment.GetEnvironmentVariable("ISLEPILOT_PLAYER"),
+            "pandora" => Environment.GetEnvironmentVariable("PANDORA_SESSION"),
             _ => null
         };
 
@@ -173,7 +174,13 @@ public partial class MainWindow : Window
     private void ConfigureTelemetrySession(TelemetrySourceDefinition source, string cookieValue)
     {
         var provider = source.CreateProvider(_httpClient, cookieValue);
-        _telemetrySession = new PollingTelemetrySession(provider, source: source.ShortName);
+        var interval = source.Kind == TelemetrySourceKind.Pandora
+            ? TimeSpan.FromSeconds(5)
+            : (TimeSpan?)null;
+        _telemetrySession = new PollingTelemetrySession(
+            provider,
+            interval,
+            source: source.ShortName);
         _configuredSource = source.ShortName;
     }
 
@@ -241,7 +248,7 @@ public partial class MainWindow : Window
         {
             if (snapshot.SessionState == TelemetrySessionState.AuthenticationRequired)
             {
-                ShowTelemetryUnavailable("PHIÊN ĐÃ HẾT HẠN", "Đăng nhập Steam lại để tiếp tục");
+                ShowTelemetryUnavailable("PHIÊN ĐÃ HẾT HẠN", "Đăng nhập lại đúng website nguồn để tiếp tục");
                 return;
             }
 

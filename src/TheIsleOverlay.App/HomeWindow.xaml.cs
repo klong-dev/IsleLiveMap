@@ -6,6 +6,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using TheIsleOverlay.EraGaming;
 using TheIsleOverlay.IslePilot;
+using TheIsleOverlay.Pandora;
 
 namespace TheIsleOverlay.App;
 
@@ -142,6 +143,10 @@ public partial class HomeWindow : Window
         {
             return LoginSessionValidationState.Invalid;
         }
+        catch (PandoraAuthenticationException)
+        {
+            return LoginSessionValidationState.Invalid;
+        }
         catch
         {
             // A slow or temporarily unavailable API must not destroy a valid
@@ -153,9 +158,7 @@ public partial class HomeWindow : Window
     private void SetSourceButtonsEnabled(bool enabled)
     {
         EraSourceButton.IsEnabled = enabled;
-        DinoSourceButton.IsEnabled = enabled;
-        PremiumSourceButton.IsEnabled = enabled;
-        HoHoSourceButton.IsEnabled = enabled;
+        PandoraSourceButton.IsEnabled = enabled;
     }
 
     private static string FriendlyError(Exception exception) => exception switch
