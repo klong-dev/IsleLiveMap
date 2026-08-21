@@ -2,9 +2,11 @@
 
 **1. Cài đặt:** Tải bản mới nhất tại [GitHub Releases](https://github.com/klong-dev/IsleLiveMap/releases/latest), mở file `.exe` và cài đặt.
 
-**2. Kết nối:** Mở app → chọn đúng server: **EraGaming**, **DinoVietNam**, **DinoVietNam Premium** hoặc **HoHo**.
+**2. Kết nối:** Mở app → bấm **ĐĂNG NHẬP STEAM** → hoàn tất đăng nhập IslePilot/Steam trong cửa sổ vừa mở.
 
-**3. Đăng nhập:** Nếu website yêu cầu đăng nhập, hãy đăng nhập ngay trong cửa sổ vừa mở rồi bấm **KIỂM TRA PHIÊN**. Vào đúng server trong game, map và status sẽ tự cập nhật.
+**3. Vào game:** Join một server đã cài plugin IslePilot. Tool tự nhận server và cập nhật tọa độ, hướng quay cùng status dino; không cần chọn DinoVietNam/Premium/HoHo thủ công.
+
+> Texture Gateway đã nằm sẵn trong app. Mạng yếu chỉ làm telemetry chuyển trạng thái reconnect, không phải tải lại ảnh map.
 
 ### ⌨️ PHÍM TẮT
 
