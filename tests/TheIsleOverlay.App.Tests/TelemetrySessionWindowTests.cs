@@ -16,4 +16,15 @@ public sealed class TelemetrySessionWindowTests
         Assert.Equal(typeof(ITelemetrySession), sessionField.FieldType);
         Assert.NotNull(typeof(MainWindow).GetConstructor([typeof(ITelemetrySession), typeof(string)]));
     }
+
+    [Fact]
+    public void LiveServerHeading_AnimatesWithinOneFastVisualResponseWindow()
+    {
+        var durationField = typeof(MainWindow).GetField(
+            "LiveHeadingAnimationDuration",
+            BindingFlags.Static | BindingFlags.NonPublic);
+        var duration = Assert.IsType<TimeSpan>(durationField?.GetValue(null));
+
+        Assert.InRange(duration.TotalMilliseconds, 1d, 80d);
+    }
 }

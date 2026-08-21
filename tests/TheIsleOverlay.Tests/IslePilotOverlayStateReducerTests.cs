@@ -104,6 +104,32 @@ public sealed class IslePilotOverlayStateReducerTests
         Assert.True(quest.Done);
     }
 
+    [Fact]
+    public void ApplyLive_UpdatesHeadingWhileTheDinosaurIsStationary()
+    {
+        var reducer = new IslePilotOverlayStateReducer();
+        reducer.ApplyMe(Baseline(), Now);
+        reducer.ApplyMap(MapWithSelfMarker(50, 50), Now);
+        reducer.ApplyLive(new IslePilotOverlayLiveDataDto
+        {
+            HasDino = true,
+            Position = new IslePilotOverlayPositionDto { X = 50, Y = 50, Yaw = 0 }
+        }, Now);
+        var firstHeading = reducer.BuildSnapshot(Now).Player?.ExactMapHeadingDegrees;
+
+        reducer.ApplyLive(new IslePilotOverlayLiveDataDto
+        {
+            HasDino = true,
+            Position = new IslePilotOverlayPositionDto { X = 50, Y = 50, Yaw = 90 }
+        }, Now.AddMilliseconds(50));
+        var secondHeading = reducer.BuildSnapshot(Now.AddMilliseconds(50))
+            .Player?.ExactMapHeadingDegrees;
+
+        Assert.NotNull(firstHeading);
+        Assert.NotNull(secondHeading);
+        Assert.NotEqual(firstHeading, secondHeading);
+    }
+
     private static IslePilotOverlayMeDto Baseline() => new()
     {
         HasData = true,

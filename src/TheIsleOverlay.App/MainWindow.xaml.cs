@@ -15,6 +15,8 @@ namespace TheIsleOverlay.App;
 public partial class MainWindow : Window
 {
     private static readonly Uri GatewayMapResourceUri = new("Assets/GatewayMap.webp", UriKind.Relative);
+    private static readonly TimeSpan LiveHeadingAnimationDuration = TimeSpan.FromMilliseconds(70);
+    private static readonly TimeSpan MovementHeadingAnimationDuration = TimeSpan.FromMilliseconds(220);
 
     private const int EditHotkeyId = 0x714;
     private const int HideGuideHotkeyId = 0x715;
@@ -297,7 +299,7 @@ public partial class MainWindow : Window
         if (player.ExactMapHeadingDegrees is not null)
         {
             _headingDegrees = MapHeading.Normalize(player.ExactMapHeadingDegrees.Value);
-            AnimateHeadingTo(_headingDegrees);
+            AnimateHeadingTo(_headingDegrees, LiveHeadingAnimationDuration);
             _hasMovementHeading = true;
             DirectionNeedle.Opacity = 1d;
             HeadingModeLabel.Text = $"HEADING · {_headingDegrees:000}° SERVER";
@@ -321,7 +323,7 @@ public partial class MainWindow : Window
             _headingDegrees = _hasMovementHeading
                 ? MovementHeading.Smooth(_headingDegrees, measuredHeading, 0.72d)
                 : measuredHeading;
-            AnimateHeadingTo(_headingDegrees);
+            AnimateHeadingTo(_headingDegrees, MovementHeadingAnimationDuration);
             _hasMovementHeading = true;
             DirectionNeedle.Opacity = 1d;
             HeadingModeLabel.Text = $"COURSE · {_headingDegrees:000}° / 2S";
@@ -334,7 +336,7 @@ public partial class MainWindow : Window
         _previousLocation = current;
     }
 
-    private void AnimateHeadingTo(double targetDegrees)
+    private void AnimateHeadingTo(double targetDegrees, TimeSpan duration)
     {
         var target = MapHeading.Normalize(targetDegrees);
         if (!_hasMovementHeading)
@@ -351,7 +353,7 @@ public partial class MainWindow : Window
         {
             From = current,
             To = current + shortestDelta,
-            Duration = TimeSpan.FromMilliseconds(220),
+            Duration = duration,
             EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut },
             FillBehavior = FillBehavior.HoldEnd
         };
