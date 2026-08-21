@@ -116,7 +116,7 @@ public partial class MainWindow
         var sameServer = IsSameServer(_localServerKey, telemetry?.ServerKey);
         var status = !member.IsOnline
             ? "MẤT TÍN HIỆU"
-            : telemetry is null
+            : telemetry is null || string.IsNullOrWhiteSpace(telemetry.ServerKey)
                 ? "CHỜ DINO"
                 : string.IsNullOrWhiteSpace(_localServerKey)
                     ? "CHỜ SERVER"

@@ -99,6 +99,52 @@ public sealed class TeamTelemetryMapperTests
     }
 
     [Fact]
+    public void Create_ClearsGameplayFieldsWhenLiveDataIsStale()
+    {
+        var snapshot = new TelemetrySnapshot
+        {
+            Source = "IslePilot",
+            Success = true,
+            ServerOnline = true,
+            PlayerOnline = true,
+            LiveDataStale = true,
+            Player = new PlayerTelemetry
+            {
+                Server = "Premium",
+                HealthPercent = 80,
+                Location = new WorldLocation { X = 12, Y = 34 }
+            }
+        };
+
+        var result = TeamTelemetryMapper.Create(snapshot, 10, 90);
+
+        Assert.Equal("IslePilot", result.Source);
+        Assert.Null(result.ServerKey);
+        Assert.Null(result.HealthPercent);
+        Assert.Null(result.WorldX);
+        Assert.Null(result.HeadingDegrees);
+    }
+
+    [Fact]
+    public void Create_DoesNotReportZeroWhenOnlyMaximumVitalIsKnown()
+    {
+        var snapshot = new TelemetrySnapshot
+        {
+            Success = true,
+            ServerOnline = true,
+            PlayerOnline = true,
+            Player = new PlayerTelemetry
+            {
+                ExactVitals = new ExactVitals { MaxHealth = 100 }
+            }
+        };
+
+        var result = TeamTelemetryMapper.Create(snapshot, 3);
+
+        Assert.Null(result.HealthPercent);
+    }
+
+    [Fact]
     public void Create_DropsCoordinatePairWhenOneValueIsNotFinite()
     {
         var snapshot = new TelemetrySnapshot

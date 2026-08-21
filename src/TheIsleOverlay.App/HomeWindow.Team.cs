@@ -1,6 +1,7 @@
 using System.Net.Http;
 using System.Windows;
 using System.Windows.Media;
+using System.Windows.Threading;
 using TheIsleOverlay.TeamRelay;
 
 namespace TheIsleOverlay.App;
@@ -10,6 +11,9 @@ public partial class HomeWindow
     private bool _teamPanelInitialized;
     private bool _teamChanging;
     private bool _normalizingInviteCode;
+    private TeamRelayState _pendingHomeTeamState = new();
+    private DispatcherTimer? _homeTeamRenderTimer;
+    private volatile bool _homeTeamStateDirty;
 
     private void InitializeTeamPanel()
     {
@@ -20,7 +24,14 @@ public partial class HomeWindow
 
         _teamPanelInitialized = true;
         App.CurrentTeam.StateChanged += TeamCoordinator_StateChanged;
-        ApplyTeamState(App.CurrentTeam.CurrentState);
+        _pendingHomeTeamState = App.CurrentTeam.CurrentState;
+        ApplyTeamState(_pendingHomeTeamState);
+        _homeTeamRenderTimer = new DispatcherTimer(
+            TimeSpan.FromMilliseconds(150),
+            DispatcherPriority.Render,
+            HomeTeamRenderTimer_Tick,
+            Dispatcher);
+        _homeTeamRenderTimer.Start();
     }
 
     private void DetachTeamPanel()
@@ -31,6 +42,8 @@ public partial class HomeWindow
         }
 
         App.CurrentTeam.StateChanged -= TeamCoordinator_StateChanged;
+        _homeTeamRenderTimer?.Stop();
+        _homeTeamRenderTimer = null;
         _teamPanelInitialized = false;
     }
 
@@ -162,14 +175,19 @@ public partial class HomeWindow
 
     private void TeamCoordinator_StateChanged(object? sender, TeamRelayState state)
     {
-        if (Dispatcher.CheckAccess())
+        _pendingHomeTeamState = state;
+        _homeTeamStateDirty = true;
+    }
+
+    private void HomeTeamRenderTimer_Tick(object? sender, EventArgs e)
+    {
+        if (!_homeTeamStateDirty)
         {
-            ApplyTeamState(state);
+            return;
         }
-        else
-        {
-            Dispatcher.BeginInvoke(() => ApplyTeamState(state));
-        }
+
+        _homeTeamStateDirty = false;
+        ApplyTeamState(_pendingHomeTeamState);
     }
 
     private void ApplyTeamState(TeamRelayState state)

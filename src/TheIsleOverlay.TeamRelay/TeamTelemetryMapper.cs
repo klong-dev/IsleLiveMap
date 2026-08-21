@@ -9,7 +9,14 @@ public static class TeamTelemetryMapper
         long sequence,
         double? fallbackHeadingDegrees = null)
     {
-        if (snapshot is not { Success: true, ServerOnline: true, PlayerOnline: true, Player: { } player })
+        if (snapshot is not
+            {
+                Success: true,
+                ServerOnline: true,
+                PlayerOnline: true,
+                LiveDataStale: false,
+                Player: { } player
+            })
         {
             return new TeamTelemetryUpdate
             {
@@ -20,7 +27,7 @@ public static class TeamTelemetryMapper
 
         var exact = player.ExactVitals;
         var worldPoint = FinitePair(player.Location?.X, player.Location?.Y);
-        var mapPoint = FinitePair(player.MapLocation?.Left, player.MapLocation?.Top);
+        var mapPoint = FiniteMapPair(player.MapLocation?.Left, player.MapLocation?.Top);
         var heading = player.ExactMapHeadingDegrees ?? fallbackHeadingDegrees;
         if (heading is { } value)
         {
@@ -48,7 +55,7 @@ public static class TeamTelemetryMapper
 
     private static double? PercentOrNull(double? current, double? maximum, double? fallback)
     {
-        if (current is null && maximum is null && fallback is null)
+        if ((current is null || maximum is not > 0d) && fallback is null)
         {
             return null;
         }
@@ -64,9 +71,18 @@ public static class TeamTelemetryMapper
             ? (firstValue, secondValue)
             : null;
 
+    private static (double First, double Second)? FiniteMapPair(double? first, double? second) =>
+        FinitePair(first, second) is { } pair
+        && pair.First is >= -1d and <= 2d
+        && pair.Second is >= -1d and <= 2d
+            ? pair
+            : null;
+
     private static string? Trim(string? value, int maxLength)
     {
-        var normalized = value?.Trim();
+        var normalized = value is null
+            ? null
+            : new string(value.Where(character => !char.IsControl(character)).ToArray()).Trim();
         if (string.IsNullOrEmpty(normalized))
         {
             return null;
