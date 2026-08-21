@@ -264,7 +264,7 @@ public sealed class IslePilotTelemetryProvider : ITelemetryProvider
         current is not null && maximum is > 0 ? Math.Clamp(current.Value / maximum.Value * 100d, 0d, 100d) : null;
 }
 
-public sealed class IslePilotAuthenticationException(string message) : Exception(message);
+public sealed class IslePilotAuthenticationException(string message) : TelemetryAuthenticationException(message);
 
 public sealed record IslePilotMarkersResponse
 {

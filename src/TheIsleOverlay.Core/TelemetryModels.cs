@@ -8,12 +8,18 @@ public sealed record TelemetrySnapshot
     public bool PlayerOnline { get; init; }
     public DateTimeOffset? UpdatedAt { get; init; }
     public PlayerTelemetry? Player { get; init; }
+    public TelemetrySessionState SessionState { get; init; } = TelemetrySessionState.Polling;
+    public bool LiveDataStale { get; init; }
+    public string? StatusMessage { get; init; }
 }
 
 public sealed record PlayerTelemetry
 {
+    public string? SteamId { get; init; }
     public string? Name { get; init; }
     public string? Class { get; init; }
+    public string? Server { get; init; }
+    public bool? Female { get; init; }
     public double? GrowthPercent { get; init; }
     public double? HealthPercent { get; init; }
     public double? StaminaPercent { get; init; }
@@ -21,6 +27,7 @@ public sealed record PlayerTelemetry
     public double? ThirstPercent { get; init; }
     public ExactVitals? ExactVitals { get; init; }
     public string? ExactVitalsSource { get; init; }
+    public NutritionTelemetry? Nutrition { get; init; }
     public WorldLocation? Location { get; init; }
     public double? ExactMapHeadingDegrees { get; init; }
     public PrimeTelemetry? Prime { get; init; }
@@ -52,4 +59,9 @@ public sealed record PrimeTelemetry
 {
     public bool? IsPrime { get; init; }
     public double? Progress { get; init; }
+    public bool? Elder { get; init; }
+    public bool? Eligible { get; init; }
+    public int? Done { get; init; }
+    public int? Required { get; init; }
+    public IReadOnlyList<PrimeQuestTelemetry> Quests { get; init; } = [];
 }

@@ -60,4 +60,4 @@ public sealed class EraGamingTelemetryProvider : ITelemetryProvider
     }
 }
 
-public sealed class EraGamingAuthenticationException(string message) : Exception(message);
+public sealed class EraGamingAuthenticationException(string message) : TelemetryAuthenticationException(message);
