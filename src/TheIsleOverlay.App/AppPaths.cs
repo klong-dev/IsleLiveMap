@@ -10,4 +10,8 @@ public static class AppPaths
         "IsleLiveMap");
 
     public static string WebView2Profile { get; } = Path.Combine(Root, "WebView2");
+
+    public static string IslePilotCredential { get; } = Path.Combine(
+        Root,
+        "islepilot-overlay.credential");
 }

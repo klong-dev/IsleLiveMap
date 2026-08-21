@@ -153,9 +153,52 @@
                         </Grid>
                     </Border>
 
-                    <TextBlock Text="CHỌN SERVER" Foreground="#A8BDB7" FontSize="11.5" FontWeight="SemiBold" Margin="0,0,0,9" />
+                    <TextBlock Text="ISLEPILOT NETWORK" Foreground="#A8BDB7" FontSize="11.5" FontWeight="SemiBold" Margin="0,0,0,9" />
 
-                    <Button x:Name="EraSourceButton" Style="{StaticResource SourceButton}" Tag="era" Click="SourceButton_Click">
+                    <StackPanel Loaded="SteamLoginPanel_Loaded">
+                        <Button x:Name="SteamLoginButton" Style="{StaticResource SourceButton}"
+                                Height="66" Click="SteamLoginButton_Click" Margin="0,0,0,8">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <Ellipse Width="9" Height="9" Fill="#37D4C6" Stroke="#A3FFF5"
+                                         StrokeThickness="1" VerticalAlignment="Center" />
+                                <StackPanel Grid.Column="1" Margin="14,0,0,0" VerticalAlignment="Center">
+                                    <TextBlock x:Name="SteamAccountLabel" Text="CHƯA ĐĂNG NHẬP STEAM"
+                                               Foreground="{StaticResource HomeBone}"
+                                               FontFamily="Bahnschrift SemiCondensed" FontSize="15"
+                                               FontWeight="SemiBold" />
+                                    <TextBlock x:Name="SteamLoginDetailLabel"
+                                               Text="Một phiên cho mọi server đã cài IslePilot"
+                                               Foreground="#91AAA3" FontSize="10.5" FontWeight="Medium" />
+                                </StackPanel>
+                                <TextBlock x:Name="SteamLoginActionLabel" Grid.Column="2"
+                                           Text="ĐĂNG NHẬP  →" Foreground="#A0D2C8"
+                                           FontFamily="Bahnschrift SemiCondensed" FontSize="10.5"
+                                           FontWeight="SemiBold" VerticalAlignment="Center" Margin="12,0,0,0" />
+                            </Grid>
+                        </Button>
+
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Chỉ đọc tọa độ, hướng quay và status dino. Tự nhận server."
+                                       Foreground="#78938C" FontSize="10.5" TextWrapping="Wrap"
+                                       VerticalAlignment="Center" />
+                            <Button x:Name="LogoutSteamButton" Grid.Column="1"
+                                    Style="{StaticResource HomeChromeButton}" Content="ĐĂNG XUẤT"
+                                    Padding="10,5" Margin="10,0,0,0" Visibility="Collapsed"
+                                    Click="LogoutSteamButton_Click" />
+                        </Grid>
+                    </StackPanel>
+
+                    <Button x:Name="EraSourceButton" Style="{StaticResource SourceButton}" Tag="era"
+                            Click="SourceButton_Click" Visibility="Collapsed">
                         <Grid>
                             <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                             <Ellipse Width="8" Height="8" Fill="#37D4C6" Stroke="#A3FFF5" StrokeThickness="1" VerticalAlignment="Center" />
@@ -167,7 +210,8 @@
                         </Grid>
                     </Button>
 
-                    <Button x:Name="DinoSourceButton" Style="{StaticResource SourceButton}" Tag="dinovietnam" Click="SourceButton_Click">
+                    <Button x:Name="DinoSourceButton" Style="{StaticResource SourceButton}" Tag="dinovietnam"
+                            Click="SourceButton_Click" Visibility="Collapsed">
                         <Grid>
                             <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                             <Ellipse Width="8" Height="8" Fill="#37D4C6" Stroke="#A3FFF5" StrokeThickness="1" VerticalAlignment="Center" />
@@ -179,7 +223,8 @@
                         </Grid>
                     </Button>
 
-                    <Button x:Name="PremiumSourceButton" Style="{StaticResource SourceButton}" Tag="dinovietnampremium" Click="SourceButton_Click">
+                    <Button x:Name="PremiumSourceButton" Style="{StaticResource SourceButton}" Tag="dinovietnampremium"
+                            Click="SourceButton_Click" Visibility="Collapsed">
                         <Grid>
                             <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                             <Ellipse Width="8" Height="8" Fill="#E7B74E" Stroke="#FFE7A0" StrokeThickness="1" VerticalAlignment="Center" />
@@ -191,7 +236,8 @@
                         </Grid>
                     </Button>
 
-                    <Button x:Name="HoHoSourceButton" Style="{StaticResource SourceButton}" Tag="hoho" Click="SourceButton_Click" Margin="0">
+                    <Button x:Name="HoHoSourceButton" Style="{StaticResource SourceButton}" Tag="hoho"
+                            Click="SourceButton_Click" Margin="0" Visibility="Collapsed">
                         <Grid>
                             <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                             <Ellipse Width="8" Height="8" Fill="#8BCB73" Stroke="#D8FFCA" StrokeThickness="1" VerticalAlignment="Center" />
@@ -203,7 +249,10 @@
                         </Grid>
                     </Button>
 
-                    <TextBlock x:Name="SourceStatusLabel" Text="Chọn server. Nếu chưa có phiên, cửa sổ đăng nhập sẽ hướng dẫn bạn." Foreground="#9CB2AC" FontSize="11.5" FontWeight="Medium" TextWrapping="Wrap" Margin="0,12,0,0" />
+                    <TextBlock x:Name="SourceStatusLabel"
+                               Text="Đăng nhập Steam một lần để nhận realtime telemetry từ IslePilot."
+                               Foreground="#9CB2AC" FontSize="11.5" FontWeight="Medium"
+                               TextWrapping="Wrap" Margin="0,12,0,0" />
                 </StackPanel>
             </ScrollViewer>
 

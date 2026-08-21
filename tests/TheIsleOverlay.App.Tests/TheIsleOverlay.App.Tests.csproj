@@ -23,4 +23,10 @@
     <ProjectReference Include="..\..\src\TheIsleOverlay.App\TheIsleOverlay.App.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Content Include="..\..\src\TheIsleOverlay.App\HomeWindow.xaml"
+             Link="TestAssets\HomeWindow.xaml"
+             CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>
