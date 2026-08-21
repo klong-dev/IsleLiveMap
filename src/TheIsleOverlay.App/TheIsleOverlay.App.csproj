@@ -4,6 +4,7 @@
     <ProjectReference Include="..\TheIsleOverlay.Core\TheIsleOverlay.Core.csproj" />
     <ProjectReference Include="..\TheIsleOverlay.EraGaming\TheIsleOverlay.EraGaming.csproj" />
     <ProjectReference Include="..\TheIsleOverlay.IslePilot\TheIsleOverlay.IslePilot.csproj" />
+    <ProjectReference Include="..\TheIsleOverlay.TeamRelay\TheIsleOverlay.TeamRelay.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -22,6 +22,7 @@
     <ProjectReference Include="..\..\src\TheIsleOverlay.Core\TheIsleOverlay.Core.csproj" />
     <ProjectReference Include="..\..\src\TheIsleOverlay.EraGaming\TheIsleOverlay.EraGaming.csproj" />
     <ProjectReference Include="..\..\src\TheIsleOverlay.IslePilot\TheIsleOverlay.IslePilot.csproj" />
+    <ProjectReference Include="..\..\src\TheIsleOverlay.TeamRelay\TheIsleOverlay.TeamRelay.csproj" />
   </ItemGroup>
 
 </Project>
