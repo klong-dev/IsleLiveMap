@@ -231,10 +231,16 @@
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
                                     <Border Background="#A5071716" BorderBrush="#5D5936" BorderThickness="1" CornerRadius="2" Margin="0,0,8,0">
-                                        <TextBox x:Name="InviteCodeTextBox" Style="{StaticResource TeamInput}"
-                                                 Text="" MaxLength="6" CharacterCasing="Upper"
-                                                 TextChanged="InviteCodeTextBox_TextChanged"
-                                                 ToolTip="Nhập mã mời 6 ký tự" />
+                                        <Grid>
+                                            <TextBlock x:Name="InviteCodePlaceholder" Text="MÃ MỜI 6 KÝ TỰ"
+                                                       Foreground="#6F8273" FontFamily="Bahnschrift SemiCondensed"
+                                                       FontSize="10.5" FontWeight="SemiBold" Margin="10,0"
+                                                       VerticalAlignment="Center" IsHitTestVisible="False" />
+                                            <TextBox x:Name="InviteCodeTextBox" Style="{StaticResource TeamInput}"
+                                                     Text="" MaxLength="6" CharacterCasing="Upper"
+                                                     TextChanged="InviteCodeTextBox_TextChanged"
+                                                     ToolTip="Nhập mã mời 6 ký tự" />
+                                        </Grid>
                                     </Border>
                                     <Button x:Name="JoinTeamButton" Grid.Column="1" Style="{StaticResource TeamPrimaryButton}"
                                             Content="NHẬP MÃ" BorderBrush="#786E3D" Foreground="#FFE7A0"

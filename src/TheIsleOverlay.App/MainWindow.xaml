@@ -177,7 +177,7 @@
                             <DataTemplate>
                                 <Border Background="#620D2421" BorderBrush="#303F5E57" BorderThickness="0,0,0,1"
                                         Padding="3,4" Opacity="{Binding Opacity}">
-                                    <Grid Height="26">
+                                    <Grid Height="29">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="94" />
                                             <ColumnDefinition Width="56" />
@@ -192,23 +192,23 @@
                                             <Rectangle Fill="{Binding AccentBrush}" RadiusX="1" RadiusY="1" Margin="0,1" />
                                             <StackPanel Grid.Column="1" Margin="6,-1,2,0">
                                                 <TextBlock Text="{Binding DisplayName}" Foreground="#E0ECE7"
-                                                           FontFamily="Bahnschrift SemiCondensed" FontSize="9.5" FontWeight="SemiBold"
+                                                           FontFamily="Bahnschrift SemiCondensed" FontSize="10.5" FontWeight="SemiBold"
                                                            TextTrimming="CharacterEllipsis" />
                                                 <TextBlock Text="{Binding DetailText}" Foreground="{Binding DetailBrush}"
-                                                           FontFamily="Bahnschrift" FontSize="7" TextTrimming="CharacterEllipsis" />
+                                                           FontFamily="Bahnschrift" FontSize="7.5" TextTrimming="CharacterEllipsis" />
                                             </StackPanel>
                                         </Grid>
                                         <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                            <TextBlock Text="HP" Foreground="#A67A78" FontFamily="Bahnschrift SemiCondensed" FontSize="7" />
-                                            <TextBlock Text="{Binding HealthText}" Foreground="#EF7772" FontFamily="Bahnschrift" FontSize="9" />
+                                            <TextBlock Text="HP" Foreground="#A67A78" FontFamily="Bahnschrift SemiCondensed" FontSize="7.5" />
+                                            <TextBlock Text="{Binding HealthText}" Foreground="#EF7772" FontFamily="Bahnschrift" FontSize="10" />
                                         </StackPanel>
                                         <StackPanel Grid.Column="2" VerticalAlignment="Center">
-                                            <TextBlock Text="ĐÓI" Foreground="#98775E" FontFamily="Bahnschrift SemiCondensed" FontSize="7" />
-                                            <TextBlock Text="{Binding HungerText}" Foreground="#D99A68" FontFamily="Bahnschrift" FontSize="9" />
+                                            <TextBlock Text="ĐÓI" Foreground="#98775E" FontFamily="Bahnschrift SemiCondensed" FontSize="7.5" />
+                                            <TextBlock Text="{Binding HungerText}" Foreground="#D99A68" FontFamily="Bahnschrift" FontSize="10" />
                                         </StackPanel>
                                         <StackPanel Grid.Column="3" VerticalAlignment="Center">
-                                            <TextBlock Text="NƯỚC" Foreground="#6689A0" FontFamily="Bahnschrift SemiCondensed" FontSize="7" />
-                                            <TextBlock Text="{Binding ThirstText}" Foreground="#68B4E8" FontFamily="Bahnschrift" FontSize="9" />
+                                            <TextBlock Text="NƯỚC" Foreground="#6689A0" FontFamily="Bahnschrift SemiCondensed" FontSize="7.5" />
+                                            <TextBlock Text="{Binding ThirstText}" Foreground="#68B4E8" FontFamily="Bahnschrift" FontSize="10" />
                                         </StackPanel>
                                     </Grid>
                                 </Border>

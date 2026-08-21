@@ -140,6 +140,9 @@ public partial class HomeWindow
 
     private void InviteCodeTextBox_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e)
     {
+        InviteCodePlaceholder.Visibility = string.IsNullOrEmpty(InviteCodeTextBox.Text)
+            ? Visibility.Visible
+            : Visibility.Collapsed;
         if (_normalizingInviteCode)
         {
             return;
