@@ -8,6 +8,7 @@ public sealed record TelemetrySnapshot
     public bool PlayerOnline { get; init; }
     public DateTimeOffset? UpdatedAt { get; init; }
     public PlayerTelemetry? Player { get; init; }
+    public MapTelemetry? Map { get; init; }
     public TelemetrySessionState SessionState { get; init; } = TelemetrySessionState.Polling;
     public bool LiveDataStale { get; init; }
     public string? StatusMessage { get; init; }
@@ -29,6 +30,7 @@ public sealed record PlayerTelemetry
     public string? ExactVitalsSource { get; init; }
     public NutritionTelemetry? Nutrition { get; init; }
     public WorldLocation? Location { get; init; }
+    public MapPoint? MapLocation { get; init; }
     public double? ExactMapHeadingDegrees { get; init; }
     public PrimeTelemetry? Prime { get; init; }
 }
