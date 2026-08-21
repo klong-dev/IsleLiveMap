@@ -13,6 +13,8 @@
             <RowDefinition Height="170" />
             <RowDefinition Height="8" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="8" />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
         <Border x:Name="MapPanel" Grid.Row="0" Height="304" Background="#0C2020" BorderBrush="#783E625B" BorderThickness="1" CornerRadius="4" ClipToBounds="True">
@@ -23,6 +25,7 @@
                 <Canvas x:Name="MapViewport" Background="#102423" SizeChanged="MapViewport_SizeChanged" ClipToBounds="True">
                     <Image x:Name="MapImage" Stretch="Fill" Opacity="0.93" />
                     <Rectangle x:Name="MapShade" Fill="#0D00BBAA" IsHitTestVisible="False" />
+                    <Canvas x:Name="TeamMarkerLayer" IsHitTestVisible="False" />
                     <Grid x:Name="PlayerMarker" Width="38" Height="38" IsHitTestVisible="False">
                         <Ellipse Width="31" Height="31" Stroke="#B037D4C6" StrokeThickness="1" />
                         <Ellipse Width="18" Height="18" Fill="#2B071719" Stroke="#ECF5F2" StrokeThickness="1" />
@@ -134,7 +137,89 @@
             </Grid>
         </Border>
 
-        <Border x:Name="HotkeyGuide" Grid.Row="4" BorderBrush="#513E625B" BorderThickness="1" CornerRadius="4" Padding="10,8" Background="#A8071717">
+        <Border x:Name="TeamPanel" Grid.Row="4" Visibility="Collapsed"
+                BorderBrush="#5A3E625B" BorderThickness="1" CornerRadius="4"
+                Padding="10,8" Background="#A8071717">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="1" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Orientation="Horizontal">
+                        <Ellipse x:Name="TeamConnectionDot" Width="5" Height="5" Fill="#37D4C6"
+                                 VerticalAlignment="Center" Margin="0,0,6,0" />
+                        <TextBlock x:Name="TeamCodeLabel" Text="TEAM // ——————" Foreground="#DDEBE5"
+                                   FontFamily="Bahnschrift SemiCondensed" FontSize="10" FontWeight="SemiBold" />
+                    </StackPanel>
+                    <TextBlock x:Name="TeamConnectionLabel" Grid.Column="1" Text="RELAY"
+                               Foreground="#67877F" FontFamily="Bahnschrift SemiCondensed" FontSize="8"
+                               VerticalAlignment="Center" Margin="8,0,0,0" />
+                    <TextBlock x:Name="TeamCountLabel" Grid.Column="2" Text="1 NGƯỜI"
+                               Foreground="#8EA79F" FontFamily="Bahnschrift" FontSize="8" />
+                </Grid>
+
+                <Rectangle Grid.Row="1" Fill="#405D56" Margin="0,7,0,0" />
+
+                <Grid Grid.Row="2" Margin="0,6,0,0">
+                    <TextBlock x:Name="TeamEmptyLabel" Text="GỬI MÃ MỜI · ĐANG CHỜ ĐỒNG ĐỘI"
+                               Foreground="#6F8C84" FontFamily="Bahnschrift SemiCondensed" FontSize="8.5"
+                               HorizontalAlignment="Center" Margin="0,3" />
+                    <ItemsControl x:Name="TeamMembersList" Visibility="Collapsed">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Background="#620D2421" BorderBrush="#303F5E57" BorderThickness="0,0,0,1"
+                                        Padding="3,4" Opacity="{Binding Opacity}">
+                                    <Grid Height="26">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="94" />
+                                            <ColumnDefinition Width="56" />
+                                            <ColumnDefinition Width="56" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="3" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <Rectangle Fill="{Binding AccentBrush}" RadiusX="1" RadiusY="1" Margin="0,1" />
+                                            <StackPanel Grid.Column="1" Margin="6,-1,2,0">
+                                                <TextBlock Text="{Binding DisplayName}" Foreground="#E0ECE7"
+                                                           FontFamily="Bahnschrift SemiCondensed" FontSize="9.5" FontWeight="SemiBold"
+                                                           TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Text="{Binding DetailText}" Foreground="{Binding DetailBrush}"
+                                                           FontFamily="Bahnschrift" FontSize="7" TextTrimming="CharacterEllipsis" />
+                                            </StackPanel>
+                                        </Grid>
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                            <TextBlock Text="HP" Foreground="#A67A78" FontFamily="Bahnschrift SemiCondensed" FontSize="7" />
+                                            <TextBlock Text="{Binding HealthText}" Foreground="#EF7772" FontFamily="Bahnschrift" FontSize="9" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                                            <TextBlock Text="ĐÓI" Foreground="#98775E" FontFamily="Bahnschrift SemiCondensed" FontSize="7" />
+                                            <TextBlock Text="{Binding HungerText}" Foreground="#D99A68" FontFamily="Bahnschrift" FontSize="9" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="3" VerticalAlignment="Center">
+                                            <TextBlock Text="NƯỚC" Foreground="#6689A0" FontFamily="Bahnschrift SemiCondensed" FontSize="7" />
+                                            <TextBlock Text="{Binding ThirstText}" Foreground="#68B4E8" FontFamily="Bahnschrift" FontSize="9" />
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </Grid>
+            </Grid>
+        </Border>
+
+        <Border x:Name="HotkeyGuide" Grid.Row="6" BorderBrush="#513E625B" BorderThickness="1" CornerRadius="4" Padding="10,8" Background="#A8071717">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />

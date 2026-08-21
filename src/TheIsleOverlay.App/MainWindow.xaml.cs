@@ -96,6 +96,7 @@ public partial class MainWindow : Window
         Top = area.Top + 70;
         PlayerMarker.Visibility = Visibility.Collapsed;
         DirectionNeedle.Opacity = 0.45d;
+        InitializeTeamOverlay();
 
         var handle = new WindowInteropHelper(this).Handle;
         _windowSource = HwndSource.FromHwnd(handle);
@@ -228,69 +229,76 @@ public partial class MainWindow : Window
 
     private void RenderSnapshot(TelemetrySnapshot snapshot)
     {
-        if (snapshot.SessionState == TelemetrySessionState.AuthenticationRequired)
+        try
         {
-            ShowTelemetryUnavailable("PHIÊN ĐÃ HẾT HẠN", "Đăng nhập Steam lại để tiếp tục");
-            return;
-        }
-
-        if (snapshot.SessionState == TelemetrySessionState.UnsupportedServer)
-        {
-            ShowNoActiveDinosaur(
-                snapshot.StatusMessage ?? "ISLEPILOT · CHƯA VÀO SERVER HỖ TRỢ",
-                "Server hiện tại chưa cài IslePilot");
-            return;
-        }
-
-        if (!snapshot.Success || !snapshot.ServerOnline)
-        {
-            ShowTelemetryUnavailable("SERVER OFFLINE", "Nguồn telemetry đang ngoại tuyến");
-            return;
-        }
-
-        if (!snapshot.PlayerOnline || snapshot.Player is null)
-        {
-            var state = ConnectionText(snapshot.SessionState);
-            var detail = snapshot.SessionState switch
+            if (snapshot.SessionState == TelemetrySessionState.AuthenticationRequired)
             {
-                TelemetrySessionState.Connecting => "Đang khởi tạo phiên telemetry",
-                TelemetrySessionState.Reconnecting => "Mất kết nối, đang thử lại",
-                TelemetrySessionState.Stale => "Dữ liệu realtime đã quá hạn",
-                _ => $"Join server {_configuredSource} để nhận telemetry"
-            };
-            ShowNoActiveDinosaur(state, detail);
-            return;
+                ShowTelemetryUnavailable("PHIÊN ĐÃ HẾT HẠN", "Đăng nhập Steam lại để tiếp tục");
+                return;
+            }
+
+            if (snapshot.SessionState == TelemetrySessionState.UnsupportedServer)
+            {
+                ShowNoActiveDinosaur(
+                    snapshot.StatusMessage ?? "ISLEPILOT · CHƯA VÀO SERVER HỖ TRỢ",
+                    "Server hiện tại chưa cài IslePilot");
+                return;
+            }
+
+            if (!snapshot.Success || !snapshot.ServerOnline)
+            {
+                ShowTelemetryUnavailable("SERVER OFFLINE", "Nguồn telemetry đang ngoại tuyến");
+                return;
+            }
+
+            if (!snapshot.PlayerOnline || snapshot.Player is null)
+            {
+                var state = ConnectionText(snapshot.SessionState);
+                var detail = snapshot.SessionState switch
+                {
+                    TelemetrySessionState.Connecting => "Đang khởi tạo phiên telemetry",
+                    TelemetrySessionState.Reconnecting => "Mất kết nối, đang thử lại",
+                    TelemetrySessionState.Stale => "Dữ liệu realtime đã quá hạn",
+                    _ => $"Join server {_configuredSource} để nhận telemetry"
+                };
+                ShowNoActiveDinosaur(state, detail);
+                return;
+            }
+
+            var player = snapshot.Player;
+            var exact = player.ExactVitals;
+
+            var degraded = snapshot.SessionState is TelemetrySessionState.Reconnecting or TelemetrySessionState.Stale;
+            SetTelemetryOpacity(degraded ? 0.58d : 1d);
+            SetConnectionState(ConnectionText(snapshot.SessionState), degraded ? WaitingBrush : OnlineBrush);
+            SpeciesLabel.Text = FriendlySpecies(player.Class);
+            PlayerNameLabel.Text = string.IsNullOrWhiteSpace(player.Name) ? "ACTIVE PLAYER" : player.Name;
+
+            var growth = exact?.Growth ?? player.GrowthPercent;
+            GrowthLabel.Text = $"{NormalizePercent(growth):0.#}%";
+
+            RenderVital(HealthBar, HealthValue, exact?.Health, exact?.MaxHealth, player.HealthPercent);
+            RenderVital(StaminaBar, StaminaValue, exact?.Stamina, exact?.MaxStamina, player.StaminaPercent);
+
+            RenderVital(HungerBar, HungerValue, exact?.Hunger, exact?.MaxHunger, player.HungerPercent);
+            RenderVital(WaterBar, WaterValue, exact?.Thirst, exact?.MaxThirst, player.ThirstPercent);
+
+            UpdatedLabel.Text = $"SYNC {(snapshot.UpdatedAt ?? DateTimeOffset.Now).ToLocalTime():HH:mm:ss}";
+
+            UpdateHeading(player);
+            _location = player.Location;
+            _mapLocation = player.MapLocation;
+            if (_location is not null)
+            {
+                var altitude = _location.Z is null ? "—" : $"{_location.Z.Value / 1000d:0.0}";
+                CoordinateLabel.Text = $"X {_location.X / 1000d:0.0}  Y {_location.Y / 1000d:0.0}  Z {altitude}";
+                PlayerMarker.Visibility = Visibility.Visible;
+                PositionMap();
+            }
         }
-
-        var player = snapshot.Player;
-        var exact = player.ExactVitals;
-
-        var degraded = snapshot.SessionState is TelemetrySessionState.Reconnecting or TelemetrySessionState.Stale;
-        SetTelemetryOpacity(degraded ? 0.58d : 1d);
-        SetConnectionState(ConnectionText(snapshot.SessionState), degraded ? WaitingBrush : OnlineBrush);
-        SpeciesLabel.Text = FriendlySpecies(player.Class);
-        PlayerNameLabel.Text = string.IsNullOrWhiteSpace(player.Name) ? "ACTIVE PLAYER" : player.Name;
-
-        var growth = exact?.Growth ?? player.GrowthPercent;
-        GrowthLabel.Text = $"{NormalizePercent(growth):0.#}%";
-
-        RenderVital(HealthBar, HealthValue, exact?.Health, exact?.MaxHealth, player.HealthPercent);
-        RenderVital(StaminaBar, StaminaValue, exact?.Stamina, exact?.MaxStamina, player.StaminaPercent);
-
-        RenderVital(HungerBar, HungerValue, exact?.Hunger, exact?.MaxHunger, player.HungerPercent);
-        RenderVital(WaterBar, WaterValue, exact?.Thirst, exact?.MaxThirst, player.ThirstPercent);
-
-        UpdatedLabel.Text = $"SYNC {(snapshot.UpdatedAt ?? DateTimeOffset.Now).ToLocalTime():HH:mm:ss}";
-
-        UpdateHeading(player);
-        _location = player.Location;
-        _mapLocation = player.MapLocation;
-        if (_location is not null)
+        finally
         {
-            var altitude = _location.Z is null ? "—" : $"{_location.Z.Value / 1000d:0.0}";
-            CoordinateLabel.Text = $"X {_location.X / 1000d:0.0}  Y {_location.Y / 1000d:0.0}  Z {altitude}";
-            PlayerMarker.Visibility = Visibility.Visible;
-            PositionMap();
+            PublishTeamTelemetry(snapshot);
         }
     }
 
@@ -469,6 +477,7 @@ public partial class MainWindow : Window
 
         Canvas.SetLeft(PlayerMarker, left + point.Left * imageWidth - PlayerMarker.Width / 2d);
         Canvas.SetTop(PlayerMarker, top + point.Top * imageHeight - PlayerMarker.Height / 2d);
+        PositionTeamMarkers(left, top, imageWidth, imageHeight);
     }
 
     private static double ClampImageOffset(double desired, double viewportSize, double imageSize) =>
@@ -590,6 +599,8 @@ public partial class MainWindow : Window
 
     private async void Window_Closed(object? sender, EventArgs e)
     {
+        DetachTeamOverlay();
+        App.CurrentTeam.ClearTelemetry();
         _shutdown.Cancel();
         if (_telemetryWatchTask is not null)
         {
