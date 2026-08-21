@@ -1,5 +1,6 @@
 using System.Net.Http;
 using System.Windows;
+using TheIsleOverlay.Core;
 using TheIsleOverlay.IslePilot;
 
 namespace TheIsleOverlay.App;
@@ -120,10 +121,12 @@ public partial class HomeWindow
 
     private async Task OpenIslePilotOverlayAsync(IslePilotOverlayAuthResult credentials)
     {
-        var session = IslePilotRealtimeSession.Create(new IslePilotOverlayOptions
-        {
-            OverlayToken = credentials.OverlayToken
-        });
+        var session = new AuthenticationInvalidatingTelemetrySession(
+            IslePilotRealtimeSession.Create(new IslePilotOverlayOptions
+            {
+                OverlayToken = credentials.OverlayToken
+            }),
+            _islePilotCredentialStore.Clear);
 
         try
         {
