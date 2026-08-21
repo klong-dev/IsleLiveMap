@@ -18,11 +18,7 @@ public static class IslePilotOverlayAuthService
             || !TryParseQuery(uri.Query, out var query)
             || !query.TryGetValue("sid", out var steamId)
             || !query.TryGetValue("token", out var overlayToken)
-            || steamId.Length != 17
-            || !steamId.All(character => character is >= '0' and <= '9')
-            || string.IsNullOrWhiteSpace(overlayToken)
-            || overlayToken.Contains('\r')
-            || overlayToken.Contains('\n'))
+            || !IsValidCredentials(steamId, overlayToken))
         {
             return false;
         }
@@ -30,6 +26,13 @@ public static class IslePilotOverlayAuthService
         result = new IslePilotOverlayAuthResult(steamId, overlayToken);
         return true;
     }
+
+    internal static bool IsValidCredentials(string? steamId, string? overlayToken) =>
+        steamId is { Length: 17 }
+        && steamId.All(character => character is >= '0' and <= '9')
+        && !string.IsNullOrWhiteSpace(overlayToken)
+        && !overlayToken.Contains('\r')
+        && !overlayToken.Contains('\n');
 
     private static bool TryParseQuery(
         string queryString,
