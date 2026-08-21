@@ -14,4 +14,8 @@ public static class AppPaths
     public static string IslePilotCredential { get; } = Path.Combine(
         Root,
         "islepilot-overlay.credential");
+
+    public static string OverlayLayoutSettings { get; } = Path.Combine(
+        Root,
+        "overlay-layout.json");
 }

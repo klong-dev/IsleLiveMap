@@ -1,12 +1,17 @@
 <Window x:Class="TheIsleOverlay.App.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Isle Live Map" Width="318" MinWidth="318" SizeToContent="Height"
+        Title="Isle Live Map" SizeToContent="WidthAndHeight"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
         ResizeMode="NoResize" Topmost="True" ShowInTaskbar="True"
         FontFamily="Segoe UI Variable Text" TextOptions.TextFormattingMode="Display"
         Loaded="Window_Loaded" Closed="Window_Closed">
-    <Grid Margin="7">
+    <Grid x:Name="OverlayScaleRoot" Width="318">
+        <Grid.LayoutTransform>
+            <ScaleTransform x:Name="OverlayScaleTransform" ScaleX="1" ScaleY="1" />
+        </Grid.LayoutTransform>
+
+        <Grid Margin="7">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="8" />
@@ -14,6 +19,7 @@
             <RowDefinition Height="8" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="8" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
@@ -241,9 +247,77 @@
                 <Grid Grid.Row="2" Margin="0,5,0,0">
                     <Grid.ColumnDefinitions><ColumnDefinition Width="82" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
                     <TextBlock Text="CTRL+SHIFT+O" Foreground="#D7E6E0" FontFamily="Bahnschrift SemiCondensed" FontSize="9" />
-                    <TextBlock Grid.Column="1" Text="MOVE / EDIT OVERLAY" Foreground="#65867D" FontFamily="Bahnschrift" FontSize="8" />
+                    <TextBlock Grid.Column="1" Text="MOVE / RESIZE OVERLAY" Foreground="#65867D" FontFamily="Bahnschrift" FontSize="8" />
                 </Grid>
             </Grid>
         </Border>
+
+        <Border x:Name="LayoutControls" Grid.Row="7"
+                Margin="0,8,0,0" Padding="9,7"
+                Background="#E10A1F1D" BorderBrush="#6A52776F" BorderThickness="1"
+                CornerRadius="4">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="4" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="4" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="7" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock Text="LAYOUT SETTINGS" Foreground="#789A92"
+                               FontFamily="Bahnschrift SemiCondensed" FontSize="8" />
+                    <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                        <TextBlock Text="HUD SCALE // " Foreground="#BCD0C9"
+                                   FontFamily="Bahnschrift SemiCondensed" FontSize="9" FontWeight="SemiBold" />
+                        <TextBlock x:Name="OverlayScaleLabel" Text="100%" Foreground="#E7B74E"
+                                   FontFamily="Bahnschrift" FontSize="9" FontWeight="SemiBold" />
+                    </StackPanel>
+                </StackPanel>
+
+                <Button x:Name="ScaleDownButton" Grid.Column="1"
+                        Style="{StaticResource ChromeButton}" Content="−"
+                        Width="25" Height="27" Padding="0" FontSize="12"
+                        AutomationProperties.Name="Thu nhỏ toàn bộ overlay"
+                        ToolTip="Thu nhỏ toàn bộ overlay 10%"
+                        Click="ScaleDownButton_Click" />
+                <Button x:Name="ScaleResetButton" Grid.Column="3"
+                        Style="{StaticResource ChromeButton}" Content="RESET"
+                        Height="27" Padding="8,0"
+                        AutomationProperties.Name="Đặt kích thước overlay về 100 phần trăm"
+                        ToolTip="Đưa overlay về kích thước chuẩn 100%"
+                        Click="ScaleResetButton_Click" />
+                <Button x:Name="ScaleUpButton" Grid.Column="5"
+                        Style="{StaticResource ChromeButton}" Content="+"
+                        Width="25" Height="27" Padding="0" FontSize="12"
+                        AutomationProperties.Name="Phóng to toàn bộ overlay"
+                        ToolTip="Phóng to toàn bộ overlay 10%"
+                        Click="ScaleUpButton_Click" />
+
+                <Border x:Name="ResizeGrip" Grid.Column="7"
+                        Width="43" Height="29" CornerRadius="2"
+                        Background="#D5153732" BorderBrush="#64958B" BorderThickness="1"
+                        Cursor="SizeNWSE"
+                        AutomationProperties.Name="Kéo để thay đổi kích thước toàn bộ overlay"
+                        ToolTip="Giữ và kéo để resize toàn bộ overlay"
+                        MouseLeftButtonDown="ResizeGrip_MouseLeftButtonDown"
+                        MouseMove="ResizeGrip_MouseMove"
+                        MouseLeftButtonUp="ResizeGrip_MouseLeftButtonUp"
+                        LostMouseCapture="ResizeGrip_LostMouseCapture">
+                    <Grid>
+                        <TextBlock Text="DRAG" Foreground="#A8C8BF"
+                                   FontFamily="Bahnschrift SemiCondensed" FontSize="7.5"
+                                   Margin="6,0,0,5" HorizontalAlignment="Left" VerticalAlignment="Bottom" />
+                        <TextBlock Text="↘" Foreground="#37D4C6" FontSize="15"
+                                   Margin="0,0,4,1" HorizontalAlignment="Right" VerticalAlignment="Bottom" />
+                    </Grid>
+                </Border>
+            </Grid>
+        </Border>
+        </Grid>
     </Grid>
 </Window>

@@ -39,8 +39,10 @@ public partial class MainWindow : Window
     private readonly TelemetrySourceDefinition? _requestedSource;
     private readonly string? _providedCookie;
     private readonly ITelemetrySession? _providedSession;
+    private readonly OverlayLayoutSettingsStore _layoutSettingsStore = new();
     private ITelemetrySession? _telemetrySession;
     private Task? _telemetryWatchTask;
+    private OverlayLayoutSettings _layoutSettings = new();
     private string _configuredSource = "ERA";
     private WorldLocation? _location;
     private MapPoint? _mapLocation;
@@ -49,7 +51,11 @@ public partial class MainWindow : Window
     private HwndSource? _windowSource;
     private double _mapZoom = 2.25d;
     private double _headingDegrees;
+    private double _overlayScale = OverlayLayoutRules.DefaultScale;
+    private double _resizeStartingScale;
+    private Point _resizeStartingScreenPoint;
     private bool _clickThrough;
+    private bool _resizingOverlay;
     private bool _hasMovementHeading;
     private bool _editHotkeyRegistered;
     private bool _hideGuideHotkeyRegistered;
@@ -87,13 +93,12 @@ public partial class MainWindow : Window
         }
 
         InitializeComponent();
+        _layoutSettings = _layoutSettingsStore.Load();
+        ApplyOverlayScale(_layoutSettings.Scale, persist: false);
     }
 
     private void Window_Loaded(object sender, RoutedEventArgs e)
     {
-        var area = SystemParameters.WorkArea;
-        Left = Math.Max(area.Left, area.Right - ActualWidth - 24);
-        Top = area.Top + 70;
         PlayerMarker.Visibility = Visibility.Collapsed;
         DirectionNeedle.Opacity = 0.45d;
         InitializeTeamOverlay();
@@ -108,6 +113,8 @@ public partial class MainWindow : Window
         {
             SetClickThrough(true);
         }
+
+        RestoreOverlayPosition();
 
         if (!TryConfigureTelemetrySession())
         {
@@ -548,7 +555,178 @@ public partial class MainWindow : Window
         if (e.ButtonState == MouseButtonState.Pressed && e.OriginalSource is not System.Windows.Controls.Button)
         {
             DragMove();
+            SaveOverlayLayout();
         }
+    }
+
+    private void ScaleDownButton_Click(object sender, RoutedEventArgs e) =>
+        ApplyOverlayScale(_overlayScale - OverlayLayoutRules.ButtonStep, persist: true);
+
+    private void ScaleResetButton_Click(object sender, RoutedEventArgs e) =>
+        ApplyOverlayScale(OverlayLayoutRules.DefaultScale, persist: true);
+
+    private void ScaleUpButton_Click(object sender, RoutedEventArgs e) =>
+        ApplyOverlayScale(_overlayScale + OverlayLayoutRules.ButtonStep, persist: true);
+
+    private void ResizeGrip_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (e.ButtonState != MouseButtonState.Pressed)
+        {
+            return;
+        }
+
+        _resizeStartingScale = _overlayScale;
+        _resizeStartingScreenPoint = PointToScreen(e.GetPosition(this));
+        _resizingOverlay = ResizeGrip.CaptureMouse();
+        e.Handled = true;
+    }
+
+    private void ResizeGrip_MouseMove(object sender, MouseEventArgs e)
+    {
+        if (!_resizingOverlay)
+        {
+            return;
+        }
+
+        if (e.LeftButton != MouseButtonState.Pressed)
+        {
+            FinishOverlayResize();
+            return;
+        }
+
+        var current = PointToScreen(e.GetPosition(this));
+        var dpiScale = Math.Max(0.01d, VisualTreeHelper.GetDpi(this).DpiScaleX);
+        var deltaDip = (current.X - _resizeStartingScreenPoint.X) / dpiScale;
+        ApplyOverlayScale(
+            OverlayLayoutRules.ScaleFromHorizontalDrag(_resizeStartingScale, deltaDip),
+            persist: false);
+        e.Handled = true;
+    }
+
+    private void ResizeGrip_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        FinishOverlayResize();
+        e.Handled = true;
+    }
+
+    private void ResizeGrip_LostMouseCapture(object sender, MouseEventArgs e)
+    {
+        if (_resizingOverlay)
+        {
+            _resizingOverlay = false;
+            SaveOverlayLayout();
+        }
+    }
+
+    private void FinishOverlayResize()
+    {
+        if (!_resizingOverlay)
+        {
+            return;
+        }
+
+        _resizingOverlay = false;
+        ResizeGrip.ReleaseMouseCapture();
+        SaveOverlayLayout();
+    }
+
+    private void ApplyOverlayScale(double scale, bool persist)
+    {
+        _overlayScale = OverlayLayoutRules.NormalizeScale(scale);
+        OverlayScaleTransform.ScaleX = _overlayScale;
+        OverlayScaleTransform.ScaleY = _overlayScale;
+        OverlayScaleLabel.Text = OverlayLayoutRules.FormatScale(_overlayScale);
+        ScaleDownButton.IsEnabled = _overlayScale > OverlayLayoutRules.MinimumScale;
+        ScaleResetButton.IsEnabled = Math.Abs(_overlayScale - OverlayLayoutRules.DefaultScale) > 0.001d;
+        ScaleUpButton.IsEnabled = _overlayScale < OverlayLayoutRules.MaximumScale;
+        OverlayScaleRoot.InvalidateMeasure();
+        InvalidateMeasure();
+
+        if (IsLoaded)
+        {
+            UpdateLayout();
+            KeepOverlayVisible();
+            PositionMap();
+        }
+
+        if (persist)
+        {
+            SaveOverlayLayout();
+        }
+    }
+
+    private void RestoreOverlayPosition()
+    {
+        UpdateLayout();
+        var primaryWorkArea = SystemParameters.WorkArea;
+        Left = _layoutSettings.Left
+            ?? Math.Max(primaryWorkArea.Left, primaryWorkArea.Right - ActualWidth - 24d);
+        Top = _layoutSettings.Top ?? primaryWorkArea.Top + 70d;
+        KeepOverlayVisible();
+    }
+
+    private void KeepOverlayVisible()
+    {
+        const double minimumVisible = 80d;
+        var virtualLeft = SystemParameters.VirtualScreenLeft;
+        var virtualTop = SystemParameters.VirtualScreenTop;
+        var virtualWidth = SystemParameters.VirtualScreenWidth;
+        var virtualHeight = SystemParameters.VirtualScreenHeight;
+        if (virtualWidth <= 0d || virtualHeight <= 0d)
+        {
+            return;
+        }
+
+        var width = Math.Max(1d, ActualWidth);
+        var height = Math.Max(1d, ActualHeight);
+        Left = KeepCoordinateVisible(
+            Left,
+            width,
+            virtualLeft,
+            virtualWidth,
+            minimumVisible);
+        Top = KeepCoordinateVisible(
+            Top,
+            height,
+            virtualTop,
+            virtualHeight,
+            minimumVisible);
+    }
+
+    private static double KeepCoordinateVisible(
+        double coordinate,
+        double windowSize,
+        double virtualStart,
+        double virtualSize,
+        double minimumVisible)
+    {
+        if (!double.IsFinite(coordinate))
+        {
+            return virtualStart;
+        }
+
+        if (windowSize <= virtualSize)
+        {
+            return Math.Clamp(coordinate, virtualStart, virtualStart + virtualSize - windowSize);
+        }
+
+        var visible = Math.Min(minimumVisible, virtualSize);
+        return Math.Clamp(
+            coordinate,
+            virtualStart - windowSize + visible,
+            virtualStart + virtualSize - visible);
+    }
+
+    private void SaveOverlayLayout()
+    {
+        KeepOverlayVisible();
+        _layoutSettings = OverlayLayoutRules.Normalize(_layoutSettings with
+        {
+            Scale = _overlayScale,
+            Left = Left,
+            Top = Top
+        });
+        _layoutSettingsStore.Save(_layoutSettings);
     }
 
     private void LockButton_Click(object sender, RoutedEventArgs e) => SetClickThrough(true);
@@ -563,6 +741,11 @@ public partial class MainWindow : Window
 
     private void SetClickThrough(bool enabled)
     {
+        if (enabled)
+        {
+            FinishOverlayResize();
+        }
+
         var handle = new WindowInteropHelper(this).Handle;
         var style = GetWindowLong(handle, GwlExStyle);
         style = enabled ? style | WsExTransparent | WsExNoActivate : style & ~(WsExTransparent | WsExNoActivate);
@@ -570,11 +753,21 @@ public partial class MainWindow : Window
         _clickThrough = enabled;
         EditToolbar.Visibility = enabled ? Visibility.Collapsed : Visibility.Visible;
         MapZoomControls.Visibility = enabled ? Visibility.Collapsed : Visibility.Visible;
+        LayoutControls.Visibility = enabled ? Visibility.Collapsed : Visibility.Visible;
         LockButton.Content = enabled ? "LOCKED" : "LOCK";
         if (!enabled)
         {
             Activate();
         }
+
+        Dispatcher.BeginInvoke(
+            () =>
+            {
+                UpdateLayout();
+                KeepOverlayVisible();
+                PositionMap();
+            },
+            DispatcherPriority.Loaded);
     }
 
     private IntPtr WindowMessageHook(IntPtr hwnd, int message, IntPtr wParam, IntPtr lParam, ref bool handled)
@@ -599,6 +792,7 @@ public partial class MainWindow : Window
 
     private async void Window_Closed(object? sender, EventArgs e)
     {
+        SaveOverlayLayout();
         DetachTeamOverlay();
         App.CurrentTeam.ClearTelemetry();
         _shutdown.Cancel();
