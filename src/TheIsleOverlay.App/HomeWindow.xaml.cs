@@ -36,6 +36,15 @@ public partial class HomeWindow : Window
             return;
         }
 
+        if (App.CurrentApp.TryMarkDonatePromptShown())
+        {
+            var donateWindow = new DonateWindow
+            {
+                Owner = this
+            };
+            donateWindow.ShowDialog();
+        }
+
         await CheckForUpdatesAsync();
     }
 

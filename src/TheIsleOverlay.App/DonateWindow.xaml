@@ -1,0 +1,250 @@
+<Window x:Class="TheIsleOverlay.App.DonateWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:automation="clr-namespace:System.Windows.Automation;assembly=PresentationCore"
+        Title="Ủng hộ Isle Live Map"
+        Width="850" Height="620"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent"
+        ResizeMode="NoResize" WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
+        FontFamily="Segoe UI" FontSize="13"
+        TextOptions.TextFormattingMode="Display" TextOptions.TextHintingMode="Fixed"
+        UseLayoutRounding="True" SnapsToDevicePixels="True"
+        PreviewKeyDown="Window_PreviewKeyDown">
+    <Window.Resources>
+        <SolidColorBrush x:Key="Bone" Color="#E9F4EE" />
+        <SolidColorBrush x:Key="Muted" Color="#9EB3AD" />
+        <SolidColorBrush x:Key="Teal" Color="#37D4C6" />
+        <SolidColorBrush x:Key="Amber" Color="#E7B74E" />
+
+        <Style x:Key="FieldButton" TargetType="Button">
+            <Setter Property="Foreground" Value="#D8EBE5" />
+            <Setter Property="Background" Value="#B70B2421" />
+            <Setter Property="BorderBrush" Value="#456B63" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="FontFamily" Value="Bahnschrift SemiCondensed" />
+            <Setter Property="FontSize" Value="11.5" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="ButtonChrome"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="2"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ButtonChrome" Property="Background" Value="#193D37" />
+                                <Setter Property="Foreground" Value="#F3FFF9" />
+                                <Setter Property="BorderBrush" Value="#5D968B" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="ButtonChrome" Property="Background" Value="#28544C" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <Border Margin="14"
+            Background="#FA071716"
+            BorderBrush="#7258736C"
+            BorderThickness="1"
+            CornerRadius="7">
+        <Border.Effect>
+            <DropShadowEffect Color="#000000" BlurRadius="30" ShadowDepth="5" Opacity="0.8" />
+        </Border.Effect>
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="48" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <Border Grid.Row="0"
+                    BorderBrush="#31534D"
+                    BorderThickness="0,0,0,1"
+                    MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+                <Grid Margin="16,0,10,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <Grid Width="18" Height="18" VerticalAlignment="Center">
+                        <Ellipse Width="15" Height="15" Stroke="#37D4C6" StrokeThickness="1" Opacity="0.76" />
+                        <Ellipse Width="5" Height="5" Fill="#E7B74E" />
+                    </Grid>
+
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="9,0,0,0">
+                        <TextBlock Text="SUPPLY DROP // OPTIONAL"
+                                   Foreground="{StaticResource Bone}"
+                                   FontFamily="Bahnschrift SemiCondensed"
+                                   FontSize="11.5" FontWeight="SemiBold" />
+                        <TextBlock Text="   ISLE LIVE MAP · DONATE"
+                                   Foreground="#7F9B94"
+                                   FontFamily="Bahnschrift"
+                                   FontSize="9.5" FontWeight="Medium"
+                                   VerticalAlignment="Center" />
+                    </StackPanel>
+
+                    <Button x:Name="TopCloseButton" Grid.Column="2"
+                            Style="{StaticResource FieldButton}"
+                            Content="×" Width="29" Height="25" Padding="0"
+                            FontSize="15" AutomationProperties.Name="Đóng lời mời ủng hộ"
+                            Click="CloseButton_Click" />
+                </Grid>
+            </Border>
+
+            <Grid Grid.Row="1" Margin="24,22,24,24">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="372" />
+                    <ColumnDefinition Width="28" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <Border Background="#061110"
+                        BorderBrush="#41655E"
+                        BorderThickness="1"
+                        CornerRadius="4"
+                        Padding="6">
+                    <Grid>
+                        <Image x:Name="DonateImage"
+                               Source="/IsleLiveMap;component/Assets/cute_cat.jpg"
+                               Stretch="Uniform"
+                               RenderOptions.BitmapScalingMode="HighQuality"
+                               AutomationProperties.Name="Ảnh mèo và mã QR Vietcombank để ủng hộ" />
+                        <Border VerticalAlignment="Bottom" HorizontalAlignment="Left"
+                                Margin="9" Padding="8,5"
+                                Background="#D9071716" BorderBrush="#5D8B82" BorderThickness="1"
+                                CornerRadius="2">
+                            <StackPanel Orientation="Horizontal">
+                                <Ellipse Width="6" Height="6" Fill="#37D4C6" Margin="0,0,7,0" VerticalAlignment="Center" />
+                                <TextBlock Text="QR ĐÃ KIỂM TRA"
+                                           Foreground="#D8F7F0"
+                                           FontFamily="Bahnschrift SemiCondensed"
+                                           FontSize="9.5" FontWeight="SemiBold" />
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+                </Border>
+
+                <Grid Grid.Column="2">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <StackPanel>
+                        <TextBlock Text="TIẾP TẾ CHO DỰ ÁN"
+                                   Foreground="{StaticResource Teal}"
+                                   FontFamily="Bahnschrift SemiCondensed"
+                                   FontSize="11" FontWeight="SemiBold" />
+                        <TextBlock Text="NUÔI RELAY,&#x0a;NUÔI CON MÈO NÀY."
+                                   Foreground="{StaticResource Bone}"
+                                   FontFamily="Bahnschrift SemiCondensed"
+                                   FontSize="31" FontWeight="Bold"
+                                   LineHeight="31" Margin="-1,4,0,0" />
+                        <TextBlock Text="Tool vẫn miễn phí. Nếu Isle Live Map giúp bạn không phải mở web giữa trận, một ly cà phê sẽ giúp Long duy trì relay và tiếp tục cập nhật."
+                                   Foreground="{StaticResource Muted}"
+                                   FontSize="13" FontWeight="Medium"
+                                   TextWrapping="Wrap" LineHeight="19"
+                                   Margin="0,12,0,0" />
+                    </StackPanel>
+
+                    <Border Grid.Row="1"
+                            Background="#C20A1D1B"
+                            BorderBrush="#5E6146"
+                            BorderThickness="1"
+                            CornerRadius="3"
+                            Margin="0,19,0,0"
+                            Padding="0">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="5" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Rectangle Fill="#E7B74E" RadiusX="1" RadiusY="1" />
+                            <StackPanel Grid.Column="1" Margin="15,12,14,13">
+                                <TextBlock Text="VIETCOMBANK"
+                                           Foreground="#B6C8C2"
+                                           FontFamily="Bahnschrift SemiCondensed"
+                                           FontSize="10.5" FontWeight="SemiBold" />
+                                <TextBlock Text="1029 118 580"
+                                           Foreground="#FFE18A"
+                                           FontFamily="Bahnschrift"
+                                           FontSize="27" FontWeight="Bold"
+                                           Margin="0,1,0,0" />
+                                <TextBlock Text="HOANG KIM LONG"
+                                           Foreground="{StaticResource Bone}"
+                                           FontFamily="Bahnschrift SemiCondensed"
+                                           FontSize="13" FontWeight="SemiBold"
+                                           Margin="0,2,0,0" />
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <TextBlock Grid.Row="2"
+                               Text="Quét QR trong ảnh hoặc chuyển khoản thủ công. Hãy kiểm tra đúng tên Hoang Kim Long trước khi xác nhận."
+                               Foreground="#839D96"
+                               FontSize="11.5" FontWeight="Medium"
+                               TextWrapping="Wrap" LineHeight="17"
+                               Margin="0,11,0,0" />
+
+                    <Border Grid.Row="3" VerticalAlignment="Bottom"
+                            BorderBrush="#284A44" BorderThickness="0,1,0,0"
+                            Margin="0,14,0,14" Padding="0,12,0,0">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="KHÔNG BẮT BUỘC"
+                                       Foreground="#E7B74E"
+                                       FontFamily="Bahnschrift SemiCondensed"
+                                       FontSize="9.5" FontWeight="SemiBold" />
+                            <TextBlock x:Name="CopyStateLabel" Grid.Column="1"
+                                       Text="Ủng hộ hoàn toàn tự nguyện"
+                                       Foreground="#758F88"
+                                       FontSize="10.5" FontWeight="Medium"
+                                       HorizontalAlignment="Right" />
+                        </Grid>
+                    </Border>
+
+                    <Grid Grid.Row="4">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="10" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Button x:Name="CopyAccountButton"
+                                Style="{StaticResource FieldButton}"
+                                Content="COPY STK"
+                                Height="42" Padding="14,0"
+                                AutomationProperties.Name="Sao chép số tài khoản Vietcombank"
+                                Click="CopyAccountButton_Click" />
+                        <Button x:Name="EnterToolButton" Grid.Column="2"
+                                Style="{StaticResource FieldButton}"
+                                Content="ĐÓNG · VÀO TOOL  →"
+                                Height="42" Padding="17,0"
+                                Foreground="#F1FFFB"
+                                Background="#D41B4942"
+                                BorderBrush="#5C9D91"
+                                AutomationProperties.Name="Đóng lời mời và vào tool"
+                                IsDefault="True"
+                                Click="CloseButton_Click" />
+                    </Grid>
+                </Grid>
+            </Grid>
+        </Grid>
+    </Border>
+</Window>

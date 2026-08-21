@@ -4,6 +4,8 @@ namespace TheIsleOverlay.App;
 
 public partial class App : Application
 {
+    private int _donatePromptShown;
+
     public App()
     {
         Team = new TeamCoordinator();
@@ -11,7 +13,12 @@ public partial class App : Application
 
     public TeamCoordinator Team { get; }
 
+    public static App CurrentApp => (App)Current;
+
     public static TeamCoordinator CurrentTeam => ((App)Current).Team;
+
+    public bool TryMarkDonatePromptShown() =>
+        Interlocked.Exchange(ref _donatePromptShown, 1) == 0;
 
     protected override void OnExit(ExitEventArgs e)
     {
