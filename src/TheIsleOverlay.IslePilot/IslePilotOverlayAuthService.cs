@@ -8,6 +8,40 @@ public static class IslePilotOverlayAuthService
         IslePilotOverlayOptions.ServiceBaseUri,
         "api/overlay/auth/steam");
 
+    public static async Task<IslePilotOverlayAuthValidationState> ValidateAsync(
+        HttpClient httpClient,
+        IslePilotOverlayAuthResult credentials,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(httpClient);
+        ArgumentNullException.ThrowIfNull(credentials);
+        if (!IsValidCredentials(credentials.SteamId, credentials.OverlayToken))
+        {
+            throw new ArgumentException("The IslePilot credentials are invalid.", nameof(credentials));
+        }
+
+        try
+        {
+            var options = new IslePilotOverlayOptions
+            {
+                OverlayToken = credentials.OverlayToken
+            };
+            var apiClient = new IslePilotOverlayApiClient(httpClient, options);
+            _ = await apiClient.GetMeAsync(cancellationToken);
+            return IslePilotOverlayAuthValidationState.Valid;
+        }
+        catch (IslePilotOverlayAuthenticationException)
+        {
+            return IslePilotOverlayAuthValidationState.Invalid;
+        }
+        catch (Exception exception) when (
+            exception is HttpRequestException or IOException or InvalidDataException or System.Text.Json.JsonException
+            || exception is OperationCanceledException && !cancellationToken.IsCancellationRequested)
+        {
+            return IslePilotOverlayAuthValidationState.Unavailable;
+        }
+    }
+
     public static bool TryParseCallback(
         string? callback,
         out IslePilotOverlayAuthResult? result)
@@ -73,3 +107,10 @@ public static class IslePilotOverlayAuthService
 public sealed record IslePilotOverlayAuthResult(
     string SteamId,
     string OverlayToken);
+
+public enum IslePilotOverlayAuthValidationState
+{
+    Valid,
+    Invalid,
+    Unavailable
+}

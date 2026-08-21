@@ -1,4 +1,6 @@
 using TheIsleOverlay.IslePilot;
+using System.Net;
+using System.Text;
 
 namespace TheIsleOverlay.Tests;
 
@@ -35,5 +37,67 @@ public sealed class IslePilotOverlayAuthServiceTests
     {
         Assert.False(IslePilotOverlayAuthService.TryParseCallback(callback, out var result));
         Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task ValidateAsync_ReturnsValidForAnAuthenticatedMeResponse()
+    {
+        using var httpClient = new HttpClient(new StubHandler(new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent("{\"hasData\":true}", Encoding.UTF8, "application/json")
+        }));
+
+        var state = await IslePilotOverlayAuthService.ValidateAsync(
+            httpClient,
+            Credentials());
+
+        Assert.Equal(IslePilotOverlayAuthValidationState.Valid, state);
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.Unauthorized)]
+    [InlineData(HttpStatusCode.Forbidden)]
+    public async Task ValidateAsync_ReturnsInvalidForRejectedCredentials(HttpStatusCode statusCode)
+    {
+        using var httpClient = new HttpClient(new StubHandler(new HttpResponseMessage(statusCode)));
+
+        var state = await IslePilotOverlayAuthService.ValidateAsync(
+            httpClient,
+            Credentials());
+
+        Assert.Equal(IslePilotOverlayAuthValidationState.Invalid, state);
+    }
+
+    [Fact]
+    public async Task ValidateAsync_ReturnsUnavailableForARecoverableNetworkFailure()
+    {
+        using var httpClient = new HttpClient(new StubHandler(new HttpRequestException("offline")));
+
+        var state = await IslePilotOverlayAuthService.ValidateAsync(
+            httpClient,
+            Credentials());
+
+        Assert.Equal(IslePilotOverlayAuthValidationState.Unavailable, state);
+    }
+
+    private static IslePilotOverlayAuthResult Credentials() => new(
+        "76561198000000000",
+        "overlay-token");
+
+    private sealed class StubHandler : HttpMessageHandler
+    {
+        private readonly HttpResponseMessage? _response;
+        private readonly Exception? _exception;
+
+        public StubHandler(HttpResponseMessage response) => _response = response;
+
+        public StubHandler(Exception exception) => _exception = exception;
+
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken) =>
+            _exception is null
+                ? Task.FromResult(_response!)
+                : Task.FromException<HttpResponseMessage>(_exception);
     }
 }
