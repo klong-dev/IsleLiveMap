@@ -7,5 +7,6 @@ obj/
 .env
 artifacts/
 screenshots/
+.playwright-cli/
 *.WebView2/
 src/TheIsleOverlay.App/Assets/*.png
