@@ -1,10 +1,6 @@
-# Isle Live Map 1.1.0
+# Isle Live Map 1.1.1
 
-- Thêm **Nhóm sinh tồn** bằng mã mời 6 ký tự, không cần tài khoản nhóm và không lưu dữ liệu phiên.
-- Hiển thị marker, tên và hướng quay của đồng đội đang ở cùng server trên minimap.
-- Thêm hàng status HP, Đói và Nước cho từng đồng đội; nhận biết mất tín hiệu/khác server.
-- Dùng relay realtime tại `isle-relay.klong.dev`, tự heartbeat và reconnect; member token chỉ giữ trong RAM.
-- Thay login cookie từng server bằng một Steam Login IslePilot và tự nhận server đang chơi.
-- Nhận tọa độ, yaw và vitals realtime qua WebSocket `/ows`; tự phát hiện stale và reconnect.
-- Dùng texture Gateway đóng gói local, không tải ảnh map khi mở overlay.
-- Mã hóa overlay token bằng Windows DPAPI CurrentUser và tự xóa khi phiên IslePilot hết hạn.
+- Thêm lời mời donate **không bắt buộc** khi mở app, có thể đóng ngay bằng nút `×`, `ĐÓNG · VÀO TOOL` hoặc phím `Esc`.
+- Hiển thị ảnh mèo/VietQR cùng thông tin Vietcombank `1029118580` — `HOANG KIM LONG`; có nút copy số tài khoản.
+- Lời mời chỉ xuất hiện một lần trong mỗi lần chạy app, không hiện lại khi quay từ overlay về Home.
+- Giữ nguyên toàn bộ minimap, telemetry, phím tắt và tính năng Nhóm sinh tồn của bản 1.1.0.

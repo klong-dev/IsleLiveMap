@@ -26,6 +26,7 @@ Texture Gateway dùng bản EraGaming/MyIsleMap đóng gói trong app. Đây ch�
 - Token overlay được mã hóa bằng Windows DPAPI cho tài khoản Windows hiện tại; không lưu plaintext.
 - Tự reconnect với backoff, giữ snapshot cuối và báo `RECONNECTING`/`DATA STALE` khi mạng yếu.
 - HUD dọc, nền ngoài trong suốt, always-on-top, click-through và hỗ trợ phím tắt toàn cục.
+- Lời mời ủng hộ tự nguyện hiện một lần khi mở app và luôn có thể đóng ngay.
 - Auto-update qua GitHub Releases bằng Velopack.
 
 ## Nhóm sinh tồn
@@ -87,7 +88,7 @@ dotnet build .\TheIsleOverlay.sln --configuration Release
 Build installer/update package:
 
 ```powershell
-.\scripts\Package-Release.ps1 -Version 1.1.0
+.\scripts\Package-Release.ps1 -Version 1.1.1
 ```
 
 Output nằm trong `artifacts/distribution`.
