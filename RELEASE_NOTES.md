@@ -1,7 +1,5 @@
-# Isle Live Map 1.0.2
+# Isle Live Map 1.0.3
 
-- Thêm nguồn HoHo với minimap, hướng quay và status từ IslePilot.
-- Không còn xóa nhầm cookie hợp lệ khi API IslePilot phản hồi chậm hoặc timeout.
-- Marker và hướng quay vẫn hoạt động khi trang `/me` tạm thời không phản hồi.
-- Hiển thị `TELEMETRY UNAVAILABLE` thay cho `NO ACTIVE DINOSAUR` khi mất kết nối.
-- Cập nhật Home và hướng dẫn sử dụng cho bốn server được hỗ trợ.
+- Dùng texture Gateway EraGaming/MyIsleMap đóng gói local cho toàn bộ nguồn telemetry.
+- Loại bỏ việc tải texture map online khi mở overlay, tránh lỗi bản đồ trên kết nối mạng yếu.
+- Giữ nguyên API tọa độ, marker, yaw và status của EraGaming, DinoVietNam, DinoVietNam Premium và HoHo.

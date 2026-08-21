@@ -15,7 +15,8 @@
 
 ## Tính năng
 
-- Minimap Gateway độc lập với website, marker luôn giữ giữa viewport.
+- Minimap Gateway dùng texture EraGaming/MyIsleMap đóng gói local, không tải ảnh map qua mạng khi khởi động.
+- Marker luôn giữ giữa viewport và dùng chung map Gateway cho mọi nguồn telemetry.
 - Yaw server cho các nguồn IslePilot; EraGaming suy hướng di chuyển từ các mẫu tọa độ.
 - Growth, Health, Stamina, Hunger và Water khi nguồn cung cấp trường tương ứng.
 - Home chọn nguồn và cửa sổ đăng nhập WebView2 riêng của ứng dụng.
@@ -89,12 +90,15 @@ TheIsleOverlay.Tests      Unit tests provider, parser, projection và heading
 
 `ITelemetryProvider` là ranh giới mở rộng. Muốn thêm server mới chỉ cần tạo source definition/provider; UI không phụ thuộc schema riêng của website.
 
+Texture nền Gateway được nhúng vào ứng dụng. Các provider chỉ lấy telemetry như tọa độ, yaw và status để overlay vẽ lên texture local; chúng không cung cấp hoặc tải ảnh map.
+
 ## Giới hạn
 
 - `POLL 2S` là nhịp client kiểm tra API, không đảm bảo plugin/server tạo dữ liệu mới mỗi hai giây.
 - Live map chính thức của IslePilot hiện poll marker mỗi 15 giây; yaw có thể giữ nguyên qua nhiều tick.
 - `/me` của IslePilot không cung cấp Stamina nên HUD hiển thị `—`.
 - Parser HTML cần cập nhật nếu IslePilot thay đổi nhãn hoặc cấu trúc trang.
+- Texture Gateway local được cập nhật theo từng bản phát hành của ứng dụng khi map game thay đổi.
 - Bản phát hành chưa được ký bằng chứng thư thương mại, vì vậy Windows SmartScreen có thể cảnh báo ở lần chạy đầu.
 
 ## License
