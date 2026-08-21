@@ -2,6 +2,7 @@ using System.Net.Http;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
@@ -568,54 +569,32 @@ public partial class MainWindow : Window
     private void ScaleUpButton_Click(object sender, RoutedEventArgs e) =>
         ApplyOverlayScale(_overlayScale + OverlayLayoutRules.ButtonStep, persist: true);
 
-    private void ResizeGrip_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    private void ResizeGrip_DragStarted(object sender, DragStartedEventArgs e)
     {
-        if (e.ButtonState != MouseButtonState.Pressed)
-        {
-            return;
-        }
-
         _resizeStartingScale = _overlayScale;
-        _resizeStartingScreenPoint = PointToScreen(e.GetPosition(this));
-        _resizingOverlay = ResizeGrip.CaptureMouse();
-        e.Handled = true;
+        _resizeStartingScreenPoint = PointToScreen(Mouse.GetPosition(this));
+        _resizingOverlay = true;
     }
 
-    private void ResizeGrip_MouseMove(object sender, MouseEventArgs e)
+    private void ResizeGrip_DragDelta(object sender, DragDeltaEventArgs e)
     {
         if (!_resizingOverlay)
         {
             return;
         }
 
-        if (e.LeftButton != MouseButtonState.Pressed)
-        {
-            FinishOverlayResize();
-            return;
-        }
-
-        var current = PointToScreen(e.GetPosition(this));
+        var current = PointToScreen(Mouse.GetPosition(this));
         var dpiScale = Math.Max(0.01d, VisualTreeHelper.GetDpi(this).DpiScaleX);
         var deltaDip = (current.X - _resizeStartingScreenPoint.X) / dpiScale;
         ApplyOverlayScale(
             OverlayLayoutRules.ScaleFromHorizontalDrag(_resizeStartingScale, deltaDip),
             persist: false);
-        e.Handled = true;
     }
 
-    private void ResizeGrip_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    private void ResizeGrip_DragCompleted(object sender, DragCompletedEventArgs e)
     {
-        FinishOverlayResize();
-        e.Handled = true;
-    }
-
-    private void ResizeGrip_LostMouseCapture(object sender, MouseEventArgs e)
-    {
-        if (_resizingOverlay)
-        {
-            _resizingOverlay = false;
-            SaveOverlayLayout();
-        }
+        _resizingOverlay = false;
+        SaveOverlayLayout();
     }
 
     private void FinishOverlayResize()
@@ -626,7 +605,10 @@ public partial class MainWindow : Window
         }
 
         _resizingOverlay = false;
-        ResizeGrip.ReleaseMouseCapture();
+        if (ResizeGrip.IsDragging)
+        {
+            ResizeGrip.CancelDrag();
+        }
         SaveOverlayLayout();
     }
 
@@ -763,11 +745,23 @@ public partial class MainWindow : Window
         Dispatcher.BeginInvoke(
             () =>
             {
-                UpdateLayout();
+                RefreshWindowSizeToContent();
                 KeepOverlayVisible();
                 PositionMap();
             },
             DispatcherPriority.Loaded);
+    }
+
+    private void RefreshWindowSizeToContent()
+    {
+        // WPF can retain the smaller click-through window bounds after controls
+        // transition from Collapsed to Visible under a LayoutTransform. Toggling
+        // the sizing mode forces the native HWND to match the newly measured HUD.
+        SizeToContent = System.Windows.SizeToContent.Manual;
+        SizeToContent = System.Windows.SizeToContent.WidthAndHeight;
+        OverlayScaleRoot.InvalidateMeasure();
+        InvalidateMeasure();
+        UpdateLayout();
     }
 
     private IntPtr WindowMessageHook(IntPtr hwnd, int message, IntPtr wParam, IntPtr lParam, ref bool handled)

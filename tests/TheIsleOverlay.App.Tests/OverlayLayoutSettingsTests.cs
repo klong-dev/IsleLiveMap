@@ -93,7 +93,11 @@ public sealed class OverlayLayoutSettingsTests
         Assert.NotNull(Control("ScaleDownButton"));
         Assert.NotNull(Control("ScaleResetButton"));
         Assert.NotNull(Control("ScaleUpButton"));
-        Assert.NotNull(Control("ResizeGrip"));
+        var resizeGrip = Control("ResizeGrip");
+        Assert.Equal("Thumb", resizeGrip.Name.LocalName);
+        Assert.Equal("ResizeGrip_DragStarted", (string?)resizeGrip.Attribute("DragStarted"));
+        Assert.Equal("ResizeGrip_DragDelta", (string?)resizeGrip.Attribute("DragDelta"));
+        Assert.Equal("ResizeGrip_DragCompleted", (string?)resizeGrip.Attribute("DragCompleted"));
         Assert.Equal("100%", (string?)Control("OverlayScaleLabel").Attribute("Text"));
     }
 }
