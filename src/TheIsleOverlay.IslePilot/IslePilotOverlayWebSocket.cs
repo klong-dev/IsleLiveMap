@@ -1,4 +1,5 @@
 using System.Buffers;
+using System.Net;
 using System.Net.WebSockets;
 using System.Runtime.CompilerServices;
 using System.Text;
@@ -28,7 +29,15 @@ public sealed class IslePilotOverlayWebSocket : IIslePilotOverlayWebSocket
         }
 
         _socket.Options.SetRequestHeader("Authorization", $"Bearer {overlayToken}");
-        await _socket.ConnectAsync(IslePilotOverlayOptions.WebSocketUri, cancellationToken);
+        try
+        {
+            await _socket.ConnectAsync(IslePilotOverlayOptions.WebSocketUri, cancellationToken);
+        }
+        catch (Exception exception) when (IsAuthenticationFailure(exception))
+        {
+            throw new IslePilotOverlayAuthenticationException(
+                "Phiên IslePilot đã hết hạn hoặc chưa đăng nhập.");
+        }
     }
 
     public async Task SendHelloAsync(
@@ -171,6 +180,22 @@ public sealed class IslePilotOverlayWebSocket : IIslePilotOverlayWebSocket
         {
             ArrayPool<byte>.Shared.Return(buffer);
         }
+    }
+
+    internal static bool IsAuthenticationFailure(Exception exception)
+    {
+        for (Exception? current = exception; current is not null; current = current.InnerException)
+        {
+            if (current is HttpRequestException
+                {
+                    StatusCode: HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden
+                })
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private sealed record IslePilotOverlayHelloFrame

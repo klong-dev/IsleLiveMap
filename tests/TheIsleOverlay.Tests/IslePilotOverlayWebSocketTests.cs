@@ -1,4 +1,5 @@
 using System.Net.WebSockets;
+using System.Net;
 using System.Text;
 using System.Text.Json;
 using TheIsleOverlay.IslePilot;
@@ -48,6 +49,18 @@ public sealed class IslePilotOverlayWebSocketTests
             CancellationToken.None);
 
         Assert.Null(message);
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.Unauthorized)]
+    [InlineData(HttpStatusCode.Forbidden)]
+    public void IsAuthenticationFailure_RecognizesHandshakeStatus(HttpStatusCode statusCode)
+    {
+        var exception = new WebSocketException(
+            "handshake failed",
+            new HttpRequestException("request failed", null, statusCode));
+
+        Assert.True(IslePilotOverlayWebSocket.IsAuthenticationFailure(exception));
     }
 
     private sealed class FragmentedWebSocket(params byte[][] fragments) : WebSocket

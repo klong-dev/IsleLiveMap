@@ -6,6 +6,7 @@ public sealed class IslePilotOverlayStateReducer
 {
     public static readonly TimeSpan LiveDataLifetime = TimeSpan.FromSeconds(4);
 
+    private readonly TimeSpan _liveDataLifetime;
     private IslePilotOverlayMeDto? _me;
     private IslePilotOverlayMapDto? _map;
     private IslePilotOverlayLiveDataDto? _live;
@@ -14,6 +15,17 @@ public sealed class IslePilotOverlayStateReducer
     private DateTimeOffset? _lastMapAt;
     private DateTimeOffset? _lastLiveAt;
     private TelemetrySessionState _sessionState = TelemetrySessionState.Connecting;
+
+    public IslePilotOverlayStateReducer(TimeSpan? liveDataLifetime = null)
+    {
+        _liveDataLifetime = liveDataLifetime ?? LiveDataLifetime;
+        if (_liveDataLifetime <= TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(nameof(liveDataLifetime));
+        }
+    }
+
+    public string? PersonaName => _me?.PersonaName ?? _me?.Name;
 
     public void ApplyMe(IslePilotOverlayMeDto me, DateTimeOffset receivedAt)
     {
@@ -49,7 +61,7 @@ public sealed class IslePilotOverlayStateReducer
 
     public TelemetrySnapshot BuildSnapshot(DateTimeOffset now)
     {
-        var liveDataStale = _lastLiveAt is not null && now - _lastLiveAt > LiveDataLifetime;
+        var liveDataStale = _lastLiveAt is not null && now - _lastLiveAt > _liveDataLifetime;
         var sessionState = ResolveSessionState(liveDataStale);
         var selfMarker = FindSelfMarker();
         var playerOnline = ResolvePlayerOnline(selfMarker);

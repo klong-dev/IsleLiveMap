@@ -5,7 +5,7 @@ using TheIsleOverlay.Core;
 
 namespace TheIsleOverlay.IslePilot;
 
-public sealed class IslePilotOverlayApiClient
+public sealed class IslePilotOverlayApiClient : IIslePilotOverlayApiClient
 {
     private static readonly Uri MeUri = new(IslePilotOverlayOptions.ServiceBaseUri, "api/overlay/me");
     private static readonly Uri MapUri = new(IslePilotOverlayOptions.ServiceBaseUri, "api/overlay/map");
