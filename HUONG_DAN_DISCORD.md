@@ -2,9 +2,14 @@
 
 **1. Cài đặt:** Tải bản mới nhất tại [GitHub Releases](https://github.com/klong-dev/IsleLiveMap/releases/latest), mở file `.exe` và cài đặt.
 
-**2. Kết nối:** Mở app → bấm **ĐĂNG NHẬP STEAM** → hoàn tất đăng nhập IslePilot/Steam trong cửa sổ vừa mở.
+**2. Kết nối:** Chọn đúng nguồn trên Home:
 
-**3. Vào game:** Join một server đã cài plugin IslePilot. Tool tự nhận server và cập nhật tọa độ, hướng quay cùng status dino; không cần chọn DinoVietNam/Premium/HoHo thủ công.
+- DinoVietNam / Premium / HoHo / server IslePilot → **ĐĂNG NHẬP STEAM**.
+- EraGaming → **ERAGAMING**. PANDORA → **PANDORA**.
+
+Hoàn tất đăng nhập ngay trong cửa sổ tool rồi bấm **KIỂM TRA PHIÊN** nếu cửa sổ chưa tự đóng.
+
+**3. Vào game:** Join server rồi giữ tool chạy. Map, hướng quay và status dino sẽ tự cập nhật khi website nguồn đã nhận dữ liệu.
 
 **4. Chơi nhóm (tùy chọn):** Ở Home, nhập tên → **TẠO NHÓM** → gửi mã 6 ký tự. Bạn bè nhập tên + mã → **NHẬP MÃ**. Khi cùng server, overlay sẽ hiện vị trí, hướng quay, HP, Đói và Nước của nhau.
 

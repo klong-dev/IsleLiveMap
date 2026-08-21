@@ -1,6 +1,6 @@
 # Isle Live Map
 
-Ứng dụng overlay miễn phí, mã nguồn mở cho **The Isle Evrima**. Isle Live Map chạy ngoài process game, luôn nổi trên màn hình và hiển thị minimap Gateway, telemetry cá nhân cùng vị trí/status của nhóm bạn do IslePilot cung cấp.
+Ứng dụng overlay miễn phí, mã nguồn mở cho **The Isle Evrima**. Isle Live Map chạy ngoài process game, luôn nổi trên màn hình và hiển thị minimap Gateway, telemetry cá nhân cùng vị trí/status của nhóm bạn từ nguồn server tương thích.
 
 [Facebook K-Long.dev](https://www.facebook.com/klong.dev) · [YouTube Long Hoàng Kim](https://www.youtube.com/@longhoangkim2246) · [GitHub](https://github.com/klong-dev/IsleLiveMap)
 
@@ -8,11 +8,11 @@
 
 ## Nguồn telemetry
 
-- IslePilot Network — `https://islepilot.eu`
-- Tự nhận server hiện tại sau một lần đăng nhập Steam; không cần chọn DinoVietNam, Premium hay HoHo.
-- Chỉ server đã cài plugin IslePilot mới cung cấp tọa độ và status.
+- **IslePilot Network** — đăng nhập Steam một lần và tự nhận server hiện tại; hỗ trợ DinoVietNam, Premium, HoHo cùng các server đã cài plugin IslePilot.
+- **EraGaming** — kết nối trực tiếp bằng phiên đăng nhập tại `https://eragamingvn.net/live-map`.
+- **PANDORA** — kết nối trực tiếp bằng phiên đăng nhập tại `https://islapandora.eu/live-map`.
 
-Texture Gateway dùng bản EraGaming/MyIsleMap đóng gói trong app. Đây chỉ là ảnh nền local; telemetry và marker vẫn đến từ API IslePilot.
+Texture Gateway dùng bản EraGaming/MyIsleMap đóng gói trong app. Đây chỉ là ảnh nền local; telemetry và marker đến từ nguồn đã chọn.
 
 ## Tính năng
 
@@ -22,7 +22,7 @@ Texture Gateway dùng bản EraGaming/MyIsleMap đóng gói trong app. Đây ch�
 - Growth, Health, Stamina, Hunger và Water khi nguồn cung cấp trường tương ứng.
 - Tạo nhóm tạm thời bằng mã mời 6 ký tự; đồng đội cùng server xuất hiện trên minimap với tên và hướng quay.
 - Mỗi đồng đội có một hàng HP, Đói và Nước; người mất tín hiệu hoặc đang ở server khác được đánh dấu riêng.
-- Home chỉ có một Steam Login và tự nhận server IslePilot đang chơi.
+- Home có Steam Login cho IslePilot và hai nút riêng cho EraGaming/PANDORA, tránh dùng nhầm phiên giữa các website.
 - Token overlay được mã hóa bằng Windows DPAPI cho tài khoản Windows hiện tại; không lưu plaintext.
 - Tự reconnect với backoff, giữ snapshot cuối và báo `RECONNECTING`/`DATA STALE` khi mạng yếu.
 - HUD dọc, nền ngoài trong suốt, always-on-top, click-through và hỗ trợ phím tắt toàn cục.
@@ -52,15 +52,15 @@ Các phím tắt hoạt động kể cả khi game hoặc ứng dụng khác đa
 
 Để đổi kích thước, bấm `Ctrl + Shift + O`, sau đó dùng `− / RESET / +` hoặc giữ `DRAG ↘` ở cuối overlay. Map, status và danh sách đồng đội sẽ cùng scale; thiết lập được lưu tự động cho lần mở sau.
 
-## Steam Login và quyền riêng tư
+## Đăng nhập và quyền riêng tư
 
-App mở luồng đăng nhập IslePilot/Steam trong Microsoft Edge WebView2 với profile riêng tại:
+App mở website đăng nhập trong Microsoft Edge WebView2 với profile riêng tại:
 
 ```text
 %LocalAppData%\KLongDev\IsleLiveMap\WebView2
 ```
 
-Callback `isle-overlay://` được bắt ngay bên trong WebView2. Isle Live Map không đăng ký hoặc chiếm protocol này trong Windows.
+Callback IslePilot `isle-overlay://` được bắt ngay bên trong WebView2. Isle Live Map không đăng ký hoặc chiếm protocol này trong Windows.
 
 Overlay Bearer token được lưu tại `%LocalAppData%\KLongDev\IsleLiveMap` sau khi mã hóa bằng DPAPI CurrentUser. Token:
 
@@ -68,6 +68,8 @@ Overlay Bearer token được lưu tại `%LocalAppData%\KLongDev\IsleLiveMap` s
 - Chỉ được gửi tới host cố định `https://islepilot.eu` và `wss://islepilot.eu/ows`.
 - Chỉ dùng để đọc `/api/overlay/me`, `/api/overlay/map` và frame `live` từ `/ows`.
 - Bị xóa khi người dùng đăng xuất hoặc API trả 401/403.
+
+Với nguồn trực tiếp, app chỉ đọc cookie từ đúng host đang mở: `era_session` chỉ được gửi lại `eragamingvn.net`; phiên PANDORA chỉ được gửi lại `islapandora.eu`. WebView2 quản lý cookie trong profile riêng; header dùng gọi API chỉ được ghép trong bộ nhớ và không được ghi vào log hoặc source.
 
 ## Yêu cầu chạy
 
@@ -91,7 +93,7 @@ dotnet build .\TheIsleOverlay.sln --configuration Release
 Build installer/update package:
 
 ```powershell
-.\scripts\Package-Release.ps1 -Version 1.1.2
+.\scripts\Package-Release.ps1 -Version 1.1.3
 ```
 
 Output nằm trong `artifacts/distribution`.
@@ -103,6 +105,7 @@ TheIsleOverlay.App        Home, Steam WebView2 login, WPF overlay, updater, glob
 TheIsleOverlay.Core       Telemetry session contract, reducer support, projection và heading
 TheIsleOverlay.EraGaming  Adapter JSON API EraGaming
 TheIsleOverlay.IslePilot  Bearer REST, WebSocket realtime, auth, reducer và DPAPI credential store
+TheIsleOverlay.Pandora    Adapter session API PANDORA
 TheIsleOverlay.TeamRelay  REST + SignalR cho nhóm tạm thời, heartbeat, reconnect và relay telemetry
 TheIsleOverlay.Tests      Unit/integration tests auth, transport, reducer, projection và heading
 ```
@@ -113,11 +116,11 @@ Texture nền Gateway được nhúng vào ứng dụng. Các provider chỉ l�
 
 ## Giới hạn
 
-- Realtime chỉ hoạt động trên server đã cài và bật plugin IslePilot.
+- IslePilot dùng WebSocket realtime; EraGaming và PANDORA cập nhật theo nhịp API do website tương ứng cho phép.
 - Marker nhóm chỉ được vẽ khi hai người đang ở cùng server; status khác server vẫn hiện trong danh sách.
 - Nhóm là phiên tạm thời, tối đa 10 người và phải tạo lại sau khi đóng app.
 - Mất Internet không ảnh hưởng texture map local nhưng telemetry sẽ chuyển `RECONNECTING` hoặc `DATA STALE`.
-- IslePilot thay đổi endpoint, callback hoặc payload có thể yêu cầu cập nhật client.
+- Website nguồn thay đổi endpoint, callback hoặc payload có thể yêu cầu cập nhật client.
 - Texture Gateway local được cập nhật theo từng bản phát hành của ứng dụng khi map game thay đổi.
 - Bản phát hành chưa được ký bằng chứng thư thương mại, vì vậy Windows SmartScreen có thể cảnh báo ở lần chạy đầu.
 

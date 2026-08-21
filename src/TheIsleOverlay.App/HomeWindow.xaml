@@ -338,7 +338,7 @@
                         </Grid.ColumnDefinitions>
                         <TextBlock Text="SERVER DÙNG WEBSITE RIÊNG" Foreground="#A8BDB7"
                                    FontSize="11.5" FontWeight="SemiBold" />
-                        <TextBlock Grid.Column="1" Text="2 DIRECT LINKS" Foreground="#6F8C84"
+                        <TextBlock Grid.Column="1" Text="2 NGUỒN RIÊNG" Foreground="#6F8C84"
                                    FontFamily="Bahnschrift SemiCondensed" FontSize="10"
                                    FontWeight="SemiBold" VerticalAlignment="Center" />
                     </Grid>
@@ -352,7 +352,7 @@
 
                         <Button x:Name="EraSourceButton" Style="{StaticResource SourceButton}" Tag="era"
                                 Height="64" Margin="0" Padding="12,0"
-                                AutomationProperties.Name="Kết nối trực tiếp Eragaming"
+                                AutomationProperties.Name="Kết nối trực tiếp EraGaming"
                                 Click="SourceButton_Click">
                             <Grid>
                                 <Grid.ColumnDefinitions>
