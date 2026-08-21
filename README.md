@@ -26,6 +26,7 @@ Texture Gateway dùng bản EraGaming/MyIsleMap đóng gói trong app. Đây ch�
 - Token overlay được mã hóa bằng Windows DPAPI cho tài khoản Windows hiện tại; không lưu plaintext.
 - Tự reconnect với backoff, giữ snapshot cuối và báo `RECONNECTING`/`DATA STALE` khi mạng yếu.
 - HUD dọc, nền ngoài trong suốt, always-on-top, click-through và hỗ trợ phím tắt toàn cục.
+- Resize đồng nhất toàn bộ HUD 65–175%, kéo trực tiếp trong Edit Mode và tự lưu kích thước/vị trí.
 - Lời mời ủng hộ tự nguyện hiện một lần khi mở app và luôn có thể đóng ngay.
 - Auto-update qua GitHub Releases bằng Velopack.
 
@@ -45,9 +46,11 @@ Nhóm không phải tài khoản cố định: mã, thành viên và telemetry c
 | `Alt + cuộn xuống` | Zoom out map |
 | `Alt + nút chuột giữa` | Ẩn / hiện map |
 | `Alt + ]` | Ẩn block hướng dẫn phím tắt |
-| `Ctrl + Shift + O` | Mở / khóa Edit Mode để kéo overlay |
+| `Ctrl + Shift + O` | Mở / khóa Edit Mode để kéo và resize overlay |
 
 Các phím tắt hoạt động kể cả khi game hoặc ứng dụng khác đang focus. Low-level mouse hook chỉ nhận tổ hợp có `Alt`, không inject DLL và không đọc memory game.
+
+Để đổi kích thước, bấm `Ctrl + Shift + O`, sau đó dùng `− / RESET / +` hoặc giữ `DRAG ↘` ở cuối overlay. Map, status và danh sách đồng đội sẽ cùng scale; thiết lập được lưu tự động cho lần mở sau.
 
 ## Steam Login và quyền riêng tư
 
@@ -88,7 +91,7 @@ dotnet build .\TheIsleOverlay.sln --configuration Release
 Build installer/update package:
 
 ```powershell
-.\scripts\Package-Release.ps1 -Version 1.1.1
+.\scripts\Package-Release.ps1 -Version 1.1.2
 ```
 
 Output nằm trong `artifacts/distribution`.

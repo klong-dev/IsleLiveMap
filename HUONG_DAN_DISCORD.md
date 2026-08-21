@@ -16,7 +16,7 @@
 
 - `Alt + cuộn chuột` — Zoom map
 - `Alt + chuột giữa` — Ẩn/hiện map
-- `Ctrl + Shift + O` — Mở/khóa chế độ kéo overlay
+- `Ctrl + Shift + O` — Mở Edit Mode để kéo/resize toàn bộ overlay; dùng `− / RESET / +` hoặc giữ `DRAG ↘`
 - `Alt + ]` — Ẩn hướng dẫn phím tắt
 
 > Tool miễn phí, open source và không can thiệp vào game. Nếu thấy hữu ích, hãy [⭐ GitHub](https://github.com/klong-dev/IsleLiveMap) và chia sẻ giúp Long nhé!
