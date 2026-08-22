@@ -8,11 +8,11 @@ namespace TheIsleOverlay.App.Tests;
 
 public sealed class BundledGatewayMapTests
 {
-    private const string ResourceKey = "assets/gatewaymap.webp";
-    private const string ExpectedSha256 = "BA2E5E614995BEC84559B950F1AE978C2F9A66743F0DA47A348278DB01557EF3";
+    private const string ResourceKey = "assets/gatewaymap.jpg";
+    private const string ExpectedSha256 = "D773E50DDD5FD691D4F751454F972EB49E70243E3326789BE9D6E32913481BB7";
 
     [Fact]
-    public void GatewayMap_IsEmbeddedUnchanged()
+    public void GatewayMap_IsEmbeddedAsNativeWpfJpeg()
     {
         var assembly = typeof(MainWindow).Assembly;
         var manifestName = Assert.Single(
@@ -32,7 +32,7 @@ public sealed class BundledGatewayMapTests
             }
 
             using var mapStream = Assert.IsAssignableFrom<Stream>(resources.Value);
-            Assert.Equal(6_739_366, mapStream.Length);
+            Assert.Equal(13_787_683, mapStream.Length);
             Assert.Equal(ExpectedSha256, Convert.ToHexString(SHA256.HashData(mapStream)));
             return;
         }
@@ -51,6 +51,6 @@ public sealed class BundledGatewayMapTests
         var resourceUri = Assert.IsType<Uri>(resourceUriField?.GetValue(null));
 
         Assert.False(resourceUri.IsAbsoluteUri);
-        Assert.Equal("Assets/GatewayMap.webp", resourceUri.OriginalString);
+        Assert.Equal("Assets/GatewayMap.jpg", resourceUri.OriginalString);
     }
 }

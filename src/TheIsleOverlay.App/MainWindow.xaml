@@ -32,6 +32,22 @@
                 <Canvas x:Name="MapViewport" Background="#102423" SizeChanged="MapViewport_SizeChanged" ClipToBounds="True">
                     <Image x:Name="MapImage" Stretch="Fill" Opacity="0.93" />
                     <Rectangle x:Name="MapShade" Fill="#0D00BBAA" IsHitTestVisible="False" />
+                    <Line x:Name="RouteLine" Visibility="Collapsed" IsHitTestVisible="False"
+                          Stroke="#F2C95D" StrokeThickness="1.8" StrokeDashArray="5,3"
+                          StrokeStartLineCap="Round" StrokeEndLineCap="Round">
+                        <Line.Effect>
+                            <DropShadowEffect Color="#E7B74E" BlurRadius="5" ShadowDepth="0" Opacity="0.85" />
+                        </Line.Effect>
+                    </Line>
+                    <Grid x:Name="RouteTargetMarker" Width="28" Height="28"
+                          Visibility="Collapsed" IsHitTestVisible="False">
+                        <Ellipse Width="26" Height="26" Stroke="#DDE7B74E" StrokeThickness="1.4" />
+                        <Ellipse Width="9" Height="9" Fill="#D2071717" Stroke="#FFE18A" StrokeThickness="1.4" />
+                        <Line X1="14" Y1="0" X2="14" Y2="7" Stroke="#FFE18A" StrokeThickness="1" />
+                        <Line X1="14" Y1="21" X2="14" Y2="28" Stroke="#FFE18A" StrokeThickness="1" />
+                        <Line X1="0" Y1="14" X2="7" Y2="14" Stroke="#FFE18A" StrokeThickness="1" />
+                        <Line X1="21" Y1="14" X2="28" Y2="14" Stroke="#FFE18A" StrokeThickness="1" />
+                    </Grid>
                     <Canvas x:Name="TeamMarkerLayer" IsHitTestVisible="False" />
                     <Grid x:Name="PlayerMarker" Width="38" Height="38" IsHitTestVisible="False">
                         <Ellipse Width="31" Height="31" Stroke="#B037D4C6" StrokeThickness="1" />
@@ -55,6 +71,15 @@
 
                 <Border HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="9" Background="#92071517" Padding="7,4">
                     <TextBlock x:Name="HeadingModeLabel" Text="COURSE · WAITING" Foreground="#7DA89F" FontFamily="Bahnschrift SemiCondensed" FontSize="9" />
+                </Border>
+
+                <Border x:Name="RouteDistanceBadge" Visibility="Collapsed"
+                        HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,9"
+                        Background="#CE181A13" BorderBrush="#8A6E5828" BorderThickness="1"
+                        CornerRadius="2" Padding="8,4">
+                    <TextBlock x:Name="RouteDistanceLabel" Text="ĐÍCH · —"
+                               Foreground="#FFE18A" FontFamily="Bahnschrift SemiCondensed"
+                               FontSize="9" FontWeight="SemiBold" />
                 </Border>
 
                 <StackPanel x:Name="EditToolbar" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,8,8,0">
@@ -226,30 +251,45 @@
             </Grid>
         </Border>
 
-        <Border x:Name="HotkeyGuide" Grid.Row="6" BorderBrush="#513E625B" BorderThickness="1" CornerRadius="4" Padding="10,8" Background="#A8071717">
+        <Border x:Name="MissionPanel" Grid.Row="6" Visibility="Collapsed"
+                BorderBrush="#665A5131" BorderThickness="1" CornerRadius="4"
+                Padding="10,8" Background="#B50B1715">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="1" />
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
                 <Grid>
-                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-                    <TextBlock Text="GLOBAL SHORTCUTS" Foreground="#789A92" FontFamily="Bahnschrift SemiCondensed" FontSize="8" />
-                    <TextBlock Grid.Column="1" Text="ALT + ]  HIDE" Foreground="#607E76" FontFamily="Bahnschrift" FontSize="8" />
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Ellipse Width="6" Height="6" Fill="#E7B74E" Margin="0,0,7,0" VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="1" Text="NHIỆM VỤ PRIME" Foreground="#E9F4EE"
+                               FontFamily="Bahnschrift SemiCondensed" FontSize="10" FontWeight="SemiBold" />
+                    <TextBlock x:Name="MissionProgressLabel" Grid.Column="2" Text="0 / 0"
+                               Foreground="#FFE18A" FontFamily="Bahnschrift" FontSize="9" FontWeight="SemiBold" />
                 </Grid>
-                <Grid Grid.Row="1" Margin="0,7,0,0">
-                    <Grid.ColumnDefinitions><ColumnDefinition Width="82" /><ColumnDefinition Width="*" /><ColumnDefinition Width="94" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-                    <TextBlock Text="ALT + WHEEL" Foreground="#D7E6E0" FontFamily="Bahnschrift SemiCondensed" FontSize="9" />
-                    <TextBlock Grid.Column="1" Text="ZOOM" Foreground="#65867D" FontFamily="Bahnschrift" FontSize="8" />
-                    <TextBlock Grid.Column="2" Text="ALT + MIDDLE" Foreground="#D7E6E0" FontFamily="Bahnschrift SemiCondensed" FontSize="9" />
-                    <TextBlock Grid.Column="3" Text="MAP" Foreground="#65867D" FontFamily="Bahnschrift" FontSize="8" />
-                </Grid>
-                <Grid Grid.Row="2" Margin="0,5,0,0">
-                    <Grid.ColumnDefinitions><ColumnDefinition Width="82" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
-                    <TextBlock Text="CTRL+SHIFT+O" Foreground="#D7E6E0" FontFamily="Bahnschrift SemiCondensed" FontSize="9" />
-                    <TextBlock Grid.Column="1" Text="MOVE / RESIZE OVERLAY" Foreground="#65867D" FontFamily="Bahnschrift" FontSize="8" />
-                </Grid>
+                <Rectangle Grid.Row="1" Fill="#5A51442B" Margin="0,7,0,0" />
+                <ItemsControl x:Name="MissionList" Grid.Row="2" Margin="0,6,0,0">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Grid Height="18">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="17" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="{Binding StateGlyph}" Foreground="{Binding StateBrush}"
+                                           FontFamily="Bahnschrift" FontSize="10" VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="1" Text="{Binding Name}" Foreground="{Binding TextBrush}"
+                                           FontFamily="Segoe UI" FontSize="9" FontWeight="Medium"
+                                           TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
             </Grid>
         </Border>
 
@@ -257,6 +297,7 @@
                 Margin="0,8,0,0" Padding="9,7"
                 Background="#E10A1F1D" BorderBrush="#6A52776F" BorderThickness="1"
                 CornerRadius="4">
+            <StackPanel>
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
@@ -331,7 +372,73 @@
                     </primitives:Thumb.Template>
                 </primitives:Thumb>
             </Grid>
+            <Rectangle Height="1" Fill="#405D56" Margin="0,8,0,7" />
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="6" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="5" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel>
+                    <TextBlock Text="CHỈ ĐƯỜNG // DÁN TỌA ĐỘ X, Y, Z"
+                               Foreground="#BFD1CB" FontFamily="Bahnschrift SemiCondensed"
+                               FontSize="8.5" FontWeight="SemiBold" />
+                    <Border Margin="0,4,0,0" Height="29" Background="#B6071517"
+                            BorderBrush="#527269" BorderThickness="1" CornerRadius="2">
+                        <Grid>
+                            <TextBox x:Name="RouteCoordinateInput" Background="Transparent" BorderThickness="0"
+                                     Foreground="#F2E8C8" CaretBrush="#E7B74E" SelectionBrush="#7AE7B74E"
+                                     FontFamily="Bahnschrift" FontSize="9.5" FontWeight="Medium"
+                                     Padding="7,4" VerticalContentAlignment="Center"
+                                     AutomationProperties.Name="Nhập tọa độ đích X Y Z"
+                                     TextChanged="RouteCoordinateInput_TextChanged"
+                                     PreviewKeyDown="RouteCoordinateInput_PreviewKeyDown" />
+                            <TextBlock x:Name="RouteCoordinateHint" Text="-3,007.455, -4,606.069, 44,728.061"
+                                       Foreground="#56736B" FontFamily="Bahnschrift" FontSize="8.5"
+                                       Margin="8,0" VerticalAlignment="Center" IsHitTestVisible="False" />
+                        </Grid>
+                    </Border>
+                </StackPanel>
+                <Button x:Name="StartRouteButton" Grid.Column="2" Style="{StaticResource ChromeButton}"
+                        Content="CHỈ ĐƯỜNG" Height="29" Padding="8,0" VerticalAlignment="Bottom"
+                        Foreground="#FFE18A" BorderBrush="#7B6841"
+                        AutomationProperties.Name="Bật chỉ đường đến tọa độ đã nhập"
+                        Click="StartRouteButton_Click" />
+                <Button x:Name="StopRouteButton" Grid.Column="4" Style="{StaticResource ChromeButton}"
+                        Content="TẮT" Height="29" Padding="7,0" VerticalAlignment="Bottom"
+                        IsEnabled="False" AutomationProperties.Name="Tắt chỉ đường"
+                        Click="StopRouteButton_Click" />
+            </Grid>
+            <TextBlock x:Name="RouteInputStatus" Text="Hỗ trợ chuỗi tọa độ copy trực tiếp từ game."
+                       Foreground="#6F8C84" FontFamily="Segoe UI" FontSize="8.5"
+                       TextWrapping="Wrap" Margin="0,5,0,0" />
+            </StackPanel>
         </Border>
         </Grid>
+
+        <Border x:Name="MissionToast" Panel.ZIndex="100" Visibility="Collapsed" Opacity="0"
+                HorizontalAlignment="Center" VerticalAlignment="Top" Margin="12,18,12,0"
+                Background="#F00B201D" BorderBrush="#B0E7B74E" BorderThickness="1"
+                CornerRadius="4" Padding="11,8" IsHitTestVisible="False">
+            <Border.RenderTransform>
+                <TranslateTransform x:Name="MissionToastTransform" Y="-8" />
+            </Border.RenderTransform>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="4" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Rectangle Fill="#E7B74E" RadiusX="1" RadiusY="1" />
+                <StackPanel Grid.Column="1" Margin="10,0,0,0">
+                    <TextBlock Text="NHIỆM VỤ HOÀN THÀNH" Foreground="#FFE18A"
+                               FontFamily="Bahnschrift SemiCondensed" FontSize="9" FontWeight="SemiBold" />
+                    <TextBlock x:Name="MissionToastLabel" Text="—" Foreground="#F0F7F3"
+                               FontFamily="Segoe UI" FontSize="10.5" FontWeight="SemiBold"
+                               TextWrapping="Wrap" Margin="0,2,0,0" />
+                </StackPanel>
+            </Grid>
+        </Border>
     </Grid>
 </Window>

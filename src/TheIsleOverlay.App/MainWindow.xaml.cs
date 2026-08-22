@@ -15,18 +15,20 @@ namespace TheIsleOverlay.App;
 
 public partial class MainWindow : Window
 {
-    private static readonly Uri GatewayMapResourceUri = new("Assets/GatewayMap.webp", UriKind.Relative);
+    private static readonly Uri GatewayMapResourceUri = new("Assets/GatewayMap.jpg", UriKind.Relative);
     private static readonly TimeSpan LiveHeadingAnimationDuration = TimeSpan.FromMilliseconds(70);
     private static readonly TimeSpan MovementHeadingAnimationDuration = TimeSpan.FromMilliseconds(220);
 
     private const int EditHotkeyId = 0x714;
-    private const int HideGuideHotkeyId = 0x715;
+    private const int ToggleMissionsNHotkeyId = 0x715;
+    private const int ToggleMissionsPHotkeyId = 0x716;
     private const int WmHotkey = 0x0312;
     private const uint ModAlt = 0x0001;
     private const uint ModControl = 0x0002;
     private const uint ModShift = 0x0004;
     private const uint KeyO = 0x4F;
-    private const uint KeyCloseBracket = 0xDD;
+    private const uint KeyN = 0x4E;
+    private const uint KeyP = 0x50;
     private const int GwlExStyle = -20;
     private const int WsExTransparent = 0x00000020;
     private const int WsExNoActivate = 0x08000000;
@@ -59,7 +61,8 @@ public partial class MainWindow : Window
     private bool _resizingOverlay;
     private bool _hasMovementHeading;
     private bool _editHotkeyRegistered;
-    private bool _hideGuideHotkeyRegistered;
+    private bool _toggleMissionsNHotkeyRegistered;
+    private bool _toggleMissionsPHotkeyRegistered;
 
     public MainWindow() : this(null, null, null, null)
     {
@@ -108,7 +111,8 @@ public partial class MainWindow : Window
         _windowSource = HwndSource.FromHwnd(handle);
         _windowSource?.AddHook(WindowMessageHook);
         _editHotkeyRegistered = RegisterHotKey(handle, EditHotkeyId, ModControl | ModShift, KeyO);
-        _hideGuideHotkeyRegistered = RegisterHotKey(handle, HideGuideHotkeyId, ModAlt, KeyCloseBracket);
+        _toggleMissionsNHotkeyRegistered = RegisterHotKey(handle, ToggleMissionsNHotkeyId, ModAlt, KeyN);
+        _toggleMissionsPHotkeyRegistered = RegisterHotKey(handle, ToggleMissionsPHotkeyId, ModAlt, KeyP);
         InstallMouseShortcuts();
         if (_editHotkeyRegistered)
         {
@@ -297,6 +301,7 @@ public partial class MainWindow : Window
 
             RenderVital(HungerBar, HungerValue, exact?.Hunger, exact?.MaxHunger, player.HungerPercent);
             RenderVital(WaterBar, WaterValue, exact?.Thirst, exact?.MaxThirst, player.ThirstPercent);
+            RenderPrimeMissions(player.Prime);
 
             UpdatedLabel.Text = $"SYNC {(snapshot.UpdatedAt ?? DateTimeOffset.Now).ToLocalTime():HH:mm:ss}";
 
@@ -307,9 +312,16 @@ public partial class MainWindow : Window
             {
                 var altitude = _location.Z is null ? "—" : $"{_location.Z.Value / 1000d:0.0}";
                 CoordinateLabel.Text = $"X {_location.X / 1000d:0.0}  Y {_location.Y / 1000d:0.0}  Z {altitude}";
-                PlayerMarker.Visibility = Visibility.Visible;
-                PositionMap();
             }
+            else
+            {
+                CoordinateLabel.Text = "X —  Y —  Z —";
+            }
+
+            PlayerMarker.Visibility = ResolvePlayerMapPoint() is null
+                ? Visibility.Collapsed
+                : Visibility.Visible;
+            PositionMap();
         }
         finally
         {
@@ -424,6 +436,8 @@ public partial class MainWindow : Window
         PlayerMarker.Visibility = Visibility.Collapsed;
         HeadingModeLabel.Text = "COURSE · WAITING";
         ClearVitals();
+        ClearPrimeMissions();
+        PositionMap();
     }
 
     private void ShowNoActiveDinosaur(string connectionState, string detail)
@@ -439,6 +453,8 @@ public partial class MainWindow : Window
         PlayerMarker.Visibility = Visibility.Collapsed;
         HeadingModeLabel.Text = "COURSE · WAITING";
         ClearVitals();
+        ClearPrimeMissions();
+        PositionMap();
     }
 
     private string ConnectionText(TelemetrySessionState state) => state switch
@@ -481,8 +497,8 @@ public partial class MainWindow : Window
         MapImage.Width = imageWidth;
         MapImage.Height = imageHeight;
 
-        var point = _mapLocation ??
-            (_location is null ? new MapPoint(0.5d, 0.5d) : GatewayMapProjection.Project(_location));
+        var playerPoint = ResolvePlayerMapPoint();
+        var point = playerPoint ?? new MapPoint(0.5d, 0.5d);
         var desiredLeft = viewportWidth / 2d - point.Left * imageWidth;
         var desiredTop = viewportHeight / 2d - point.Top * imageHeight;
         var left = ClampImageOffset(desiredLeft, viewportWidth, imageWidth);
@@ -493,6 +509,23 @@ public partial class MainWindow : Window
         Canvas.SetLeft(PlayerMarker, left + point.Left * imageWidth - PlayerMarker.Width / 2d);
         Canvas.SetTop(PlayerMarker, top + point.Top * imageHeight - PlayerMarker.Height / 2d);
         PositionTeamMarkers(left, top, imageWidth, imageHeight);
+        PositionRoute(playerPoint, left, top, imageWidth, imageHeight);
+    }
+
+    private MapPoint? ResolvePlayerMapPoint()
+    {
+        if (_mapLocation is { } mapPoint
+            && double.IsFinite(mapPoint.Left)
+            && double.IsFinite(mapPoint.Top))
+        {
+            return mapPoint;
+        }
+
+        return _location is { } location
+               && double.IsFinite(location.X)
+               && double.IsFinite(location.Y)
+            ? GatewayMapProjection.Project(location)
+            : null;
     }
 
     private static double ClampImageOffset(double desired, double viewportSize, double imageSize) =>
@@ -778,9 +811,11 @@ public partial class MainWindow : Window
             SetClickThrough(!_clickThrough);
             handled = true;
         }
-        else if (message == WmHotkey && wParam.ToInt32() == HideGuideHotkeyId)
+        else if (message == WmHotkey &&
+                 (wParam.ToInt32() == ToggleMissionsNHotkeyId ||
+                  wParam.ToInt32() == ToggleMissionsPHotkeyId))
         {
-            HotkeyGuide.Visibility = Visibility.Collapsed;
+            ToggleMissions();
             handled = true;
         }
 
@@ -809,7 +844,8 @@ public partial class MainWindow : Window
 
         var handle = new WindowInteropHelper(this).Handle;
         if (_editHotkeyRegistered) UnregisterHotKey(handle, EditHotkeyId);
-        if (_hideGuideHotkeyRegistered) UnregisterHotKey(handle, HideGuideHotkeyId);
+        if (_toggleMissionsNHotkeyRegistered) UnregisterHotKey(handle, ToggleMissionsNHotkeyId);
+        if (_toggleMissionsPHotkeyRegistered) UnregisterHotKey(handle, ToggleMissionsPHotkeyId);
         if (_mouseShortcuts is not null)
         {
             _mouseShortcuts.ZoomInRequested -= ZoomInMap;

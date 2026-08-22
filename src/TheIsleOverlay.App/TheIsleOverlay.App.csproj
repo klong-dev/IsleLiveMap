@@ -14,7 +14,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Resource Include="Assets\GatewayMap.webp" />
+    <Resource Include="Assets\GatewayMap.jpg" />
     <Resource Include="Assets\cute_cat.jpg" />
   </ItemGroup>
 
