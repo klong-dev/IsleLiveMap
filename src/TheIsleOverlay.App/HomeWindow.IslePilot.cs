@@ -156,7 +156,7 @@ public partial class HomeWindow
         SteamLoginDetailLabel.Text = authenticated
             ? "Phiên IslePilot đã được mã hóa bằng Windows DPAPI"
             : "Một phiên cho mọi server đã cài IslePilot";
-        SteamLoginActionLabel.Text = authenticated ? "MỞ OVERLAY  →" : "ĐĂNG NHẬP  →";
+        SteamLoginActionLabel.Text = authenticated ? "MỞ MAP  →" : "ĐĂNG NHẬP  →";
         LogoutSteamButton.Visibility = authenticated ? Visibility.Visible : Visibility.Collapsed;
     }
 

@@ -14,6 +14,7 @@ public partial class HomeWindow : Window
 {
     private readonly CancellationTokenSource _shutdown = new();
     private readonly GitHubUpdateService _updateService = new();
+    private readonly ReleaseHighlightsStore _releaseHighlightsStore = new();
     private bool _connecting;
 
     public HomeWindow()
@@ -44,6 +45,26 @@ public partial class HomeWindow : Window
                 Owner = this
             };
             donateWindow.ShowDialog();
+        }
+
+        if (App.CurrentApp.TryMarkGuidePromptShown())
+        {
+            var guideWindow = new GuideWindow
+            {
+                Owner = this
+            };
+            guideWindow.ShowDialog();
+        }
+
+        var currentVersion = CurrentVersion();
+        if (_releaseHighlightsStore.ShouldShow(currentVersion))
+        {
+            var highlightsWindow = new ReleaseHighlightsWindow(currentVersion)
+            {
+                Owner = this
+            };
+            highlightsWindow.ShowDialog();
+            _releaseHighlightsStore.MarkShown(currentVersion);
         }
 
         await CheckForUpdatesAsync();

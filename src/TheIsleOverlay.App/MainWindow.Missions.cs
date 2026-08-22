@@ -63,6 +63,26 @@ public partial class MainWindow
         PositionMap();
     }
 
+    private void ToggleHud()
+    {
+        _hudVisible = !_hudVisible;
+        if (!_hudVisible && !_clickThrough)
+        {
+            SetClickThrough(true);
+        }
+
+        BeginAnimation(
+            OpacityProperty,
+            new DoubleAnimation
+            {
+                To = _hudVisible ? 1d : 0d,
+                Duration = TimeSpan.FromMilliseconds(140),
+                EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut },
+                FillBehavior = FillBehavior.HoldEnd
+            },
+            HandoffBehavior.SnapshotAndReplace);
+    }
+
     private void EnqueueMissionToast(string missionName)
     {
         _missionToastQueue.Enqueue(missionName);

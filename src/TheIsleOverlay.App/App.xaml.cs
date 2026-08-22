@@ -5,6 +5,7 @@ namespace TheIsleOverlay.App;
 public partial class App : Application
 {
     private int _donatePromptShown;
+    private int _guidePromptShown;
 
     public App()
     {
@@ -19,6 +20,9 @@ public partial class App : Application
 
     public bool TryMarkDonatePromptShown() =>
         Interlocked.Exchange(ref _donatePromptShown, 1) == 0;
+
+    public bool TryMarkGuidePromptShown() =>
+        Interlocked.Exchange(ref _guidePromptShown, 1) == 0;
 
     protected override void OnExit(ExitEventArgs e)
     {

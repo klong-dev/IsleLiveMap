@@ -8,8 +8,8 @@ namespace TheIsleOverlay.App.Tests;
 
 public sealed class DonatePromptTests
 {
-    private const string ResourceKey = "assets/cute_cat.jpg";
-    private const string ExpectedSha256 = "271FEC9499DFF84D217D74CAE9B9BBE269895B1E75C9A4914834DC8D4AA85E15";
+    private const string ResourceKey = "assets/cute_mouse.jpg";
+    private const string ExpectedSha256 = "4306AAF2D8F99F3B2A234B49576ABA4B1FEA7F6E4D9B16A3E5C2BC4CA98DD290";
 
     [Fact]
     public void DonatePrompt_ContainsVerifiedPaymentDetailsAndClearExit()
@@ -28,7 +28,7 @@ public sealed class DonatePromptTests
                 StringComparison.Ordinal));
 
         Assert.Equal(
-            "/IsleLiveMap;component/Assets/cute_cat.jpg",
+            "/IsleLiveMap;component/Assets/cute_mouse.jpg",
             (string?)Control("DonateImage").Attribute("Source"));
         Assert.Equal("ĐÓNG · VÀO TOOL  →", (string?)Control("EnterToolButton").Attribute("Content"));
         Assert.NotNull(Control("TopCloseButton"));
@@ -45,7 +45,9 @@ public sealed class DonatePromptTests
         Assert.Contains("1029 118 580", allCopy, StringComparison.Ordinal);
         Assert.Contains("HOANG KIM LONG", allCopy, StringComparison.Ordinal);
         Assert.Contains("KHÔNG BẮT BUỘC", allCopy, StringComparison.Ordinal);
-        Assert.Contains("hoàn toàn tự nguyện", allCopy, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("NUÔI LIVE MAP", allCopy, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("NUÔI CON CHUỘT NÀY", allCopy, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Ủng hộ dev đau lưng", allCopy, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -69,7 +71,7 @@ public sealed class DonatePromptTests
             }
 
             using var imageStream = Assert.IsAssignableFrom<Stream>(resources.Value);
-            Assert.Equal(74_181, imageStream.Length);
+            Assert.Equal(56_745, imageStream.Length);
             Assert.Equal(ExpectedSha256, Convert.ToHexString(SHA256.HashData(imageStream)));
             return;
         }

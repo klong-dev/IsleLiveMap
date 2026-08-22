@@ -116,10 +116,10 @@
                         Padding="6">
                     <Grid>
                         <Image x:Name="DonateImage"
-                               Source="/IsleLiveMap;component/Assets/cute_cat.jpg"
+                               Source="/IsleLiveMap;component/Assets/cute_mouse.jpg"
                                Stretch="Uniform"
                                RenderOptions.BitmapScalingMode="HighQuality"
-                               AutomationProperties.Name="Ảnh mèo và mã QR Vietcombank để ủng hộ" />
+                               AutomationProperties.Name="Ảnh chuột và mã QR Vietcombank để ủng hộ" />
                         <Border VerticalAlignment="Bottom" HorizontalAlignment="Left"
                                 Margin="9" Padding="8,5"
                                 Background="#D9071716" BorderBrush="#5D8B82" BorderThickness="1"
@@ -149,12 +149,12 @@
                                    Foreground="{StaticResource Teal}"
                                    FontFamily="Bahnschrift SemiCondensed"
                                    FontSize="11" FontWeight="SemiBold" />
-                        <TextBlock Text="NUÔI RELAY,&#x0a;NUÔI CON MÈO NÀY."
+                        <TextBlock Text="NUÔI LIVE MAP,&#x0a;NUÔI CON CHUỘT NÀY."
                                    Foreground="{StaticResource Bone}"
                                    FontFamily="Bahnschrift SemiCondensed"
                                    FontSize="31" FontWeight="Bold"
                                    LineHeight="31" Margin="-1,4,0,0" />
-                        <TextBlock Text="Tool vẫn miễn phí. Nếu Isle Live Map giúp bạn không phải mở web giữa trận, một ly cà phê sẽ giúp Long duy trì relay và tiếp tục cập nhật."
+                        <TextBlock Text="Tool vẫn miễn phí. Nếu Isle Live Map giúp bạn không phải mở web giữa trận, một ly cà phê sẽ giúp Long duy trì Live Map và tiếp tục cập nhật."
                                    Foreground="{StaticResource Muted}"
                                    FontSize="13" FontWeight="Medium"
                                    TextWrapping="Wrap" LineHeight="19"
@@ -213,7 +213,7 @@
                                        FontFamily="Bahnschrift SemiCondensed"
                                        FontSize="9.5" FontWeight="SemiBold" />
                             <TextBlock x:Name="CopyStateLabel" Grid.Column="1"
-                                       Text="Ủng hộ hoàn toàn tự nguyện"
+                                       Text="Ủng hộ dev đau lưng"
                                        Foreground="#758F88"
                                        FontSize="10.5" FontWeight="Medium"
                                        HorizontalAlignment="Right" />

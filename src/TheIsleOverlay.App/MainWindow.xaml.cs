@@ -21,7 +21,7 @@ public partial class MainWindow : Window
 
     private const int EditHotkeyId = 0x714;
     private const int ToggleMissionsNHotkeyId = 0x715;
-    private const int ToggleMissionsPHotkeyId = 0x716;
+    private const int ToggleHudHotkeyId = 0x716;
     private const int WmHotkey = 0x0312;
     private const uint ModAlt = 0x0001;
     private const uint ModControl = 0x0002;
@@ -62,7 +62,8 @@ public partial class MainWindow : Window
     private bool _hasMovementHeading;
     private bool _editHotkeyRegistered;
     private bool _toggleMissionsNHotkeyRegistered;
-    private bool _toggleMissionsPHotkeyRegistered;
+    private bool _toggleHudHotkeyRegistered;
+    private bool _hudVisible = true;
 
     public MainWindow() : this(null, null, null, null)
     {
@@ -112,7 +113,7 @@ public partial class MainWindow : Window
         _windowSource?.AddHook(WindowMessageHook);
         _editHotkeyRegistered = RegisterHotKey(handle, EditHotkeyId, ModControl | ModShift, KeyO);
         _toggleMissionsNHotkeyRegistered = RegisterHotKey(handle, ToggleMissionsNHotkeyId, ModAlt, KeyN);
-        _toggleMissionsPHotkeyRegistered = RegisterHotKey(handle, ToggleMissionsPHotkeyId, ModAlt, KeyP);
+        _toggleHudHotkeyRegistered = RegisterHotKey(handle, ToggleHudHotkeyId, ModAlt, KeyP);
         InstallMouseShortcuts();
         if (_editHotkeyRegistered)
         {
@@ -811,11 +812,14 @@ public partial class MainWindow : Window
             SetClickThrough(!_clickThrough);
             handled = true;
         }
-        else if (message == WmHotkey &&
-                 (wParam.ToInt32() == ToggleMissionsNHotkeyId ||
-                  wParam.ToInt32() == ToggleMissionsPHotkeyId))
+        else if (message == WmHotkey && wParam.ToInt32() == ToggleMissionsNHotkeyId)
         {
             ToggleMissions();
+            handled = true;
+        }
+        else if (message == WmHotkey && wParam.ToInt32() == ToggleHudHotkeyId)
+        {
+            ToggleHud();
             handled = true;
         }
 
@@ -845,7 +849,7 @@ public partial class MainWindow : Window
         var handle = new WindowInteropHelper(this).Handle;
         if (_editHotkeyRegistered) UnregisterHotKey(handle, EditHotkeyId);
         if (_toggleMissionsNHotkeyRegistered) UnregisterHotKey(handle, ToggleMissionsNHotkeyId);
-        if (_toggleMissionsPHotkeyRegistered) UnregisterHotKey(handle, ToggleMissionsPHotkeyId);
+        if (_toggleHudHotkeyRegistered) UnregisterHotKey(handle, ToggleHudHotkeyId);
         if (_mouseShortcuts is not null)
         {
             _mouseShortcuts.ZoomInRequested -= ZoomInMap;

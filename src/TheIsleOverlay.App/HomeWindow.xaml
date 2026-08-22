@@ -309,7 +309,7 @@
                                 </StackPanel>
                                 <TextBlock x:Name="SteamLoginActionLabel" Grid.Column="2"
                                            Text="ĐĂNG NHẬP  →" Foreground="#A0D2C8"
-                                           FontFamily="Bahnschrift SemiCondensed" FontSize="10.5"
+                                           FontFamily="Bahnschrift SemiCondensed" FontSize="13"
                                            FontWeight="SemiBold" VerticalAlignment="Center" Margin="12,0,0,0" />
                             </Grid>
                         </Button>

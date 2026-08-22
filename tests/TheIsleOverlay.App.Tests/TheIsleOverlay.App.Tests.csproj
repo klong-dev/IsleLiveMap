@@ -33,6 +33,12 @@
     <Content Include="..\..\src\TheIsleOverlay.App\DonateWindow.xaml"
              Link="TestAssets\DonateWindow.xaml"
              CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\src\TheIsleOverlay.App\GuideWindow.xaml"
+             Link="TestAssets\GuideWindow.xaml"
+             CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\src\TheIsleOverlay.App\ReleaseHighlightsWindow.xaml"
+             Link="TestAssets\ReleaseHighlightsWindow.xaml"
+             CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>
