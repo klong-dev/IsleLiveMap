@@ -1,6 +1,10 @@
-# Isle Live Map 1.1.3
+# Isle Live Map 1.2.0
 
-- Khôi phục nút kết nối trực tiếp **EraGaming** trên Home sau hồi quy ở bản trước.
-- Thêm nguồn **PANDORA** (`islapandora.eu`) với đăng nhập website riêng, vị trí và status dino.
-- Giữ nguyên session OAuth PANDORA trong lúc người dùng hoàn tất Discord/Steam login.
-- Làm rõ trạng thái hết phiên và phạm vi cookie: mỗi phiên chỉ được gửi lại đúng website nguồn.
+- Thêm **chỉ đường bằng tọa độ** trong Edit Mode (`Ctrl + Shift + O`): line, beacon và khoảng cách tới đích.
+- Thêm danh sách **nhiệm vụ Prime tiếng Việt** cùng notify khi hoàn thành; `Alt + N` để ẩn/hiện.
+- Thêm `Alt + P` để ẩn/hiện toàn bộ HUD ngay trong game.
+- Thay block phím tắt trong overlay bằng modal hướng dẫn rõ ràng khi mở app.
+- Thêm modal **Có gì mới** chỉ xuất hiện một lần sau mỗi phiên bản cập nhật.
+- Đổi nút Home thành **MỞ MAP**, làm mới lời mời ủng hộ với ảnh chuột và nội dung dễ hiểu hơn.
+- Sửa lỗi một số máy không đọc được map bằng texture JPEG nhúng, không còn phụ thuộc codec WebP.
+- Tăng khả năng nhận marker IslePilot khi server thiếu `self`, Steam ID/calibration hoặc trả collection `null`.

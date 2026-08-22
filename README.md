@@ -12,14 +12,16 @@
 - **EraGaming** — kết nối trực tiếp bằng phiên đăng nhập tại `https://eragamingvn.net/live-map`.
 - **PANDORA** — kết nối trực tiếp bằng phiên đăng nhập tại `https://islapandora.eu/live-map`.
 
-Texture Gateway dùng bản EraGaming/MyIsleMap đóng gói trong app. Đây chỉ là ảnh nền local; telemetry và marker đến từ nguồn đã chọn.
+Texture Gateway dùng bản EraGaming/MyIsleMap đóng gói trong app dưới dạng JPEG tương thích native với WPF. Đây chỉ là ảnh nền local; telemetry và marker đến từ nguồn đã chọn.
 
 ## Tính năng
 
-- Minimap Gateway dùng texture EraGaming/MyIsleMap đóng gói local, không tải ảnh map qua mạng khi khởi động.
+- Minimap Gateway dùng texture EraGaming/MyIsleMap đóng gói local dạng JPEG, không tải ảnh map qua mạng và không phụ thuộc codec WebP của Windows.
 - Marker luôn giữ giữa viewport và dùng chung map Gateway cho mọi server Evrima tương thích.
+- Dán tọa độ `X, Y, Z` trong Edit Mode để vẽ đường, beacon và khoảng cách tới đích.
 - Tọa độ, yaw và status realtime từ WebSocket `/ows`; `/api/overlay/me` và `/api/overlay/map` làm baseline/fallback.
 - Growth, Health, Stamina, Hunger và Water khi nguồn cung cấp trường tương ứng.
+- Danh sách nhiệm vụ Prime được Việt hóa; khi nhiệm vụ chuyển sang hoàn thành, overlay hiện notify ngắn rồi tự ẩn.
 - Tạo nhóm tạm thời bằng mã mời 6 ký tự; đồng đội cùng server xuất hiện trên minimap với tên và hướng quay.
 - Mỗi đồng đội có một hàng HP, Đói và Nước; người mất tín hiệu hoặc đang ở server khác được đánh dấu riêng.
 - Home có Steam Login cho IslePilot và hai nút riêng cho EraGaming/PANDORA, tránh dùng nhầm phiên giữa các website.
@@ -27,7 +29,7 @@ Texture Gateway dùng bản EraGaming/MyIsleMap đóng gói trong app. Đây ch�
 - Tự reconnect với backoff, giữ snapshot cuối và báo `RECONNECTING`/`DATA STALE` khi mạng yếu.
 - HUD dọc, nền ngoài trong suốt, always-on-top, click-through và hỗ trợ phím tắt toàn cục.
 - Resize đồng nhất toàn bộ HUD 65–175%, kéo trực tiếp trong Edit Mode và tự lưu kích thước/vị trí.
-- Lời mời ủng hộ tự nguyện hiện một lần khi mở app và luôn có thể đóng ngay.
+- Lời mời ủng hộ, hướng dẫn phím tắt và bảng “Có gì mới” theo phiên bản đều có thể đóng ngay.
 - Auto-update qua GitHub Releases bằng Velopack.
 
 ## Nhóm sinh tồn
@@ -45,12 +47,13 @@ Nhóm không phải tài khoản cố định: mã, thành viên và telemetry c
 | `Alt + cuộn lên` | Zoom in map |
 | `Alt + cuộn xuống` | Zoom out map |
 | `Alt + nút chuột giữa` | Ẩn / hiện map |
-| `Alt + ]` | Ẩn block hướng dẫn phím tắt |
-| `Ctrl + Shift + O` | Mở / khóa Edit Mode để kéo và resize overlay |
+| `Alt + N` | Ẩn / hiện danh sách nhiệm vụ Prime |
+| `Alt + P` | Ẩn / hiện toàn bộ HUD |
+| `Ctrl + Shift + O` | Mở / khóa Edit Mode để kéo, resize hoặc nhập tọa độ chỉ đường |
 
 Các phím tắt hoạt động kể cả khi game hoặc ứng dụng khác đang focus. Low-level mouse hook chỉ nhận tổ hợp có `Alt`, không inject DLL và không đọc memory game.
 
-Để đổi kích thước, bấm `Ctrl + Shift + O`, sau đó dùng `− / RESET / +` hoặc giữ `DRAG ↘` ở cuối overlay. Map, status và danh sách đồng đội sẽ cùng scale; thiết lập được lưu tự động cho lần mở sau.
+Để đổi kích thước, bấm `Ctrl + Shift + O`, sau đó dùng `− / RESET / +` hoặc giữ `DRAG ↘` ở cuối overlay. Cũng tại đây, dán chuỗi như `-3,007.455, -4,606.069, 44,728.061` rồi bấm **CHỈ ĐƯỜNG**. Map, status, nhiệm vụ và danh sách đồng đội cùng scale; thiết lập được lưu tự động.
 
 ## Đăng nhập và quyền riêng tư
 
@@ -93,7 +96,7 @@ dotnet build .\TheIsleOverlay.sln --configuration Release
 Build installer/update package:
 
 ```powershell
-.\scripts\Package-Release.ps1 -Version 1.1.3
+.\scripts\Package-Release.ps1 -Version 1.2.0
 ```
 
 Output nằm trong `artifacts/distribution`.
@@ -120,6 +123,7 @@ Texture nền Gateway được nhúng vào ứng dụng. Các provider chỉ l�
 - Marker nhóm chỉ được vẽ khi hai người đang ở cùng server; status khác server vẫn hiện trong danh sách.
 - Nhóm là phiên tạm thời, tối đa 10 người và phải tạo lại sau khi đóng app.
 - Mất Internet không ảnh hưởng texture map local nhưng telemetry sẽ chuyển `RECONNECTING` hoặc `DATA STALE`.
+- Nhiệm vụ Prime hiện chỉ có trên nguồn IslePilot khi server/API cung cấp danh sách tương ứng.
 - Website nguồn thay đổi endpoint, callback hoặc payload có thể yêu cầu cập nhật client.
 - Texture Gateway local được cập nhật theo từng bản phát hành của ứng dụng khi map game thay đổi.
 - Bản phát hành chưa được ký bằng chứng thư thương mại, vì vậy Windows SmartScreen có thể cảnh báo ở lần chạy đầu.

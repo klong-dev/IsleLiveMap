@@ -9,7 +9,7 @@
 
 Hoàn tất đăng nhập ngay trong cửa sổ tool rồi bấm **KIỂM TRA PHIÊN** nếu cửa sổ chưa tự đóng.
 
-**3. Vào game:** Join server rồi giữ tool chạy. Map, hướng quay và status dino sẽ tự cập nhật khi website nguồn đã nhận dữ liệu.
+**3. Vào game:** Join server → bấm **MỞ MAP** → giữ tool chạy. Map, hướng quay, status và nhiệm vụ sẽ tự cập nhật khi nguồn nhận dữ liệu.
 
 **4. Chơi nhóm (tùy chọn):** Ở Home, nhập tên → **TẠO NHÓM** → gửi mã 6 ký tự. Bạn bè nhập tên + mã → **NHẬP MÃ**. Khi cùng server, overlay sẽ hiện vị trí, hướng quay, HP, Đói và Nước của nhau.
 
@@ -21,8 +21,9 @@ Hoàn tất đăng nhập ngay trong cửa sổ tool rồi bấm **KIỂM TRA PH
 
 - `Alt + cuộn chuột` — Zoom map
 - `Alt + chuột giữa` — Ẩn/hiện map
-- `Ctrl + Shift + O` — Mở Edit Mode để kéo/resize toàn bộ overlay; dùng `− / RESET / +` hoặc giữ `DRAG ↘`
-- `Alt + ]` — Ẩn hướng dẫn phím tắt
+- `Alt + N` — Ẩn/hiện nhiệm vụ Prime
+- `Alt + P` — Ẩn/hiện toàn bộ HUD
+- `Ctrl + Shift + O` — Kéo/resize overlay hoặc dán tọa độ `X, Y, Z` để chỉ đường
 
 > Tool miễn phí, open source và không can thiệp vào game. Nếu thấy hữu ích, hãy [⭐ GitHub](https://github.com/klong-dev/IsleLiveMap) và chia sẻ giúp Long nhé!
 
