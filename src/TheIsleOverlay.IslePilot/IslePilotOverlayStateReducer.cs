@@ -125,12 +125,8 @@ public sealed class IslePilotOverlayStateReducer
             ? ToLocation(_live!.Position!)
             : ToLocation(selfMarker) ?? ToLocation(_live?.Position);
         var yaw = useLivePosition ? _live?.Position?.Yaw : selfMarker?.Yaw ?? _live?.Position?.Yaw;
-        MapPoint? mapLocation = location is null || _calibration is null
-            ? null
-            : _calibration.Project(location.X, location.Y);
-        double? mapHeading = location is null || yaw is null || _calibration is null
-            ? null
-            : _calibration.ProjectHeading(location.X, location.Y, yaw.Value);
+        var mapLocation = ProjectLocation(location);
+        var mapHeading = ProjectHeading(location, yaw);
 
         var growth = _live?.Growth ?? _me?.Growth;
         var health = _live?.Health ?? _me?.Health;
@@ -184,8 +180,8 @@ public sealed class IslePilotOverlayStateReducer
 
         return new MapTelemetry
         {
-            Markers = _map.Markers.Select(ToMarker).ToArray(),
-            PointsOfInterest = _map.Pois.Select(ToPointOfInterest).ToArray()
+            Markers = (_map.Markers ?? []).Select(ToMarker).ToArray(),
+            PointsOfInterest = (_map.Pois ?? []).Select(ToPointOfInterest).ToArray()
         };
     }
 
@@ -198,13 +194,9 @@ public sealed class IslePilotOverlayStateReducer
             Label = marker.Label,
             Self = marker.Self,
             Location = location,
-            MapLocation = location is null || _calibration is null
-                ? null
-                : _calibration.Project(location.X, location.Y),
-            ExactMapHeadingDegrees = location is null || marker.Yaw is null || _calibration is null
-                ? null
-                : _calibration.ProjectHeading(location.X, location.Y, marker.Yaw.Value),
-            Path = marker.Path
+            MapLocation = ProjectLocation(location),
+            ExactMapHeadingDegrees = ProjectHeading(location, marker.Yaw),
+            Path = (marker.Path ?? [])
                 .Where(HasLocation)
                 .Select(point => _calibration?.Project(point.X!.Value, point.Y!.Value))
                 .Where(point => point is not null)
@@ -218,7 +210,7 @@ public sealed class IslePilotOverlayStateReducer
         Id = poi.Id,
         Name = poi.Name,
         CategoryId = poi.CategoryId,
-        Points = poi.Points
+        Points = (poi.Points ?? [])
             .Where(HasLocation)
             .Select(point => _calibration?.Project(point.X!.Value, point.Y!.Value))
             .Where(point => point is not null)
@@ -233,10 +225,19 @@ public sealed class IslePilotOverlayStateReducer
             return null;
         }
 
+        var candidates = (_map.Markers ?? [])
+            .Where(HasLocation)
+            .ToArray();
         var steamId = _live?.SteamId ?? _me?.SteamId;
-        return _map.Markers.FirstOrDefault(marker => marker.Self) ??
-            _map.Markers.FirstOrDefault(marker =>
-                steamId is not null && string.Equals(marker.SteamId, steamId, StringComparison.Ordinal));
+        var personaName = _me?.PersonaName ?? _me?.Name;
+        return candidates.FirstOrDefault(marker => marker.Self) ??
+            candidates.FirstOrDefault(marker =>
+                steamId is not null && string.Equals(marker.SteamId, steamId, StringComparison.Ordinal)) ??
+            candidates.FirstOrDefault(marker =>
+                string.Equals(marker.Label, "You", StringComparison.OrdinalIgnoreCase)) ??
+            candidates.FirstOrDefault(marker =>
+                personaName is not null && string.Equals(marker.Label, personaName, StringComparison.OrdinalIgnoreCase)) ??
+            (candidates.Length == 1 ? candidates[0] : null);
     }
 
     private DateTimeOffset? LatestTimestamp()
@@ -265,12 +266,17 @@ public sealed class IslePilotOverlayStateReducer
             : null;
 
     private static WorldLocation? ToLocation(IslePilotOverlayMapMarkerDto? marker) =>
-        marker is not null && marker.X is not null && marker.Y is not null
-            ? new WorldLocation { X = marker.X.Value, Y = marker.Y.Value, Z = marker.Z }
+        marker is not null && HasLocation(marker)
+            ? new WorldLocation { X = marker.X!.Value, Y = marker.Y!.Value, Z = marker.Z }
             : null;
 
     private static bool HasLocation(IslePilotOverlayPositionDto? position) =>
-        position?.X is not null && position.Y is not null;
+        position?.X is not null && position.Y is not null &&
+        double.IsFinite(position.X.Value) && double.IsFinite(position.Y.Value);
+
+    private static bool HasLocation(IslePilotOverlayMapMarkerDto marker) =>
+        marker.X is not null && marker.Y is not null &&
+        double.IsFinite(marker.X.Value) && double.IsFinite(marker.Y.Value);
 
     private static bool HasLocation(IslePilotOverlayWorldPointDto point) =>
         point.X is not null && point.Y is not null;
@@ -294,12 +300,45 @@ public sealed class IslePilotOverlayStateReducer
             Eligible = prime.Eligible,
             Done = prime.Done,
             Required = prime.Required,
-            Quests = prime.Quests.Select(quest => new PrimeQuestTelemetry
+            Quests = (prime.Quests ?? []).Select(quest => new PrimeQuestTelemetry
             {
                 Name = quest.Name,
                 Done = quest.Done
             }).ToArray()
         };
+
+    private MapPoint? ProjectLocation(WorldLocation? location)
+    {
+        if (location is null)
+        {
+            return null;
+        }
+
+        if (_calibration is not null)
+        {
+            var calibrated = _calibration.Project(location.X, location.Y);
+            if (double.IsFinite(calibrated.Left) && double.IsFinite(calibrated.Top) &&
+                calibrated.Left is >= -0.25d and <= 1.25d &&
+                calibrated.Top is >= -0.25d and <= 1.25d)
+            {
+                return calibrated;
+            }
+        }
+
+        return GatewayMapProjection.Project(location);
+    }
+
+    private double? ProjectHeading(WorldLocation? location, double? yaw)
+    {
+        if (location is null || yaw is null || !double.IsFinite(yaw.Value))
+        {
+            return null;
+        }
+
+        return _calibration is null
+            ? MapHeading.FromUnrealYaw(yaw.Value)
+            : _calibration.ProjectHeading(location.X, location.Y, yaw.Value);
+    }
 
     private static IslePilotOverlayMeDto Merge(IslePilotOverlayMeDto? previous, IslePilotOverlayMeDto current)
     {

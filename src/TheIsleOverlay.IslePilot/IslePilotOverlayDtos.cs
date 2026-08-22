@@ -81,7 +81,7 @@ public sealed record IslePilotPrimeDto
     public bool? Eligible { get; init; }
     public int? Done { get; init; }
     public int? Required { get; init; }
-    public IReadOnlyList<IslePilotPrimeQuestDto> Quests { get; init; } = [];
+    public IReadOnlyList<IslePilotPrimeQuestDto>? Quests { get; init; } = [];
 }
 
 public sealed record IslePilotPrimeQuestDto
@@ -96,9 +96,9 @@ public sealed record IslePilotOverlayMapDto
     public bool? Allowed { get; init; }
     public string? Reason { get; init; }
     public IslePilotMapCalibrationDto? Calibration { get; init; }
-    public IReadOnlyList<IslePilotOverlayMapMarkerDto> Markers { get; init; } = [];
-    public IReadOnlyList<IslePilotOverlayMapCategoryDto> Categories { get; init; } = [];
-    public IReadOnlyList<IslePilotOverlayMapPoiDto> Pois { get; init; } = [];
+    public IReadOnlyList<IslePilotOverlayMapMarkerDto>? Markers { get; init; } = [];
+    public IReadOnlyList<IslePilotOverlayMapCategoryDto>? Categories { get; init; } = [];
+    public IReadOnlyList<IslePilotOverlayMapPoiDto>? Pois { get; init; } = [];
 }
 
 public sealed record IslePilotMapCalibrationDto
@@ -124,7 +124,7 @@ public sealed record IslePilotOverlayMapMarkerDto
     public double? Z { get; init; }
     public double? Yaw { get; init; }
     public bool Self { get; init; }
-    public IReadOnlyList<IslePilotOverlayWorldPointDto> Path { get; init; } = [];
+    public IReadOnlyList<IslePilotOverlayWorldPointDto>? Path { get; init; } = [];
 }
 
 public sealed record IslePilotOverlayWorldPointDto
@@ -144,5 +144,5 @@ public sealed record IslePilotOverlayMapPoiDto
     public string? Id { get; init; }
     public string? Name { get; init; }
     public string? CategoryId { get; init; }
-    public IReadOnlyList<IslePilotOverlayWorldPointDto> Points { get; init; } = [];
+    public IReadOnlyList<IslePilotOverlayWorldPointDto>? Points { get; init; } = [];
 }

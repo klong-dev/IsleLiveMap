@@ -130,6 +130,88 @@ public sealed class IslePilotOverlayStateReducerTests
         Assert.NotEqual(firstHeading, secondHeading);
     }
 
+    [Fact]
+    public void NullMapCollections_DoNotStopRealtimeStats()
+    {
+        var reducer = new IslePilotOverlayStateReducer();
+        reducer.ApplyMe(Baseline(), Now);
+        reducer.ApplyMap(new IslePilotOverlayMapDto
+        {
+            Allowed = false,
+            Markers = null,
+            Categories = null,
+            Pois = null
+        }, Now);
+        reducer.ApplyLive(new IslePilotOverlayLiveDataDto
+        {
+            HasDino = true,
+            Health = 8,
+            Position = new IslePilotOverlayPositionDto { X = 51_000, Y = -49_000, Yaw = 0 }
+        }, Now);
+
+        var snapshot = reducer.BuildSnapshot(Now);
+
+        Assert.True(snapshot.PlayerOnline);
+        Assert.Equal(8, snapshot.Player?.ExactVitals?.Health);
+        Assert.Equal(new MapPoint(0.5, 0.5), snapshot.Player?.MapLocation);
+        Assert.Empty(snapshot.Map?.Markers ?? []);
+        Assert.Empty(snapshot.Map?.PointsOfInterest ?? []);
+    }
+
+    [Fact]
+    public void SingleLegacyMarkerWithoutSelfOrSteamId_IsUsedForThePlayer()
+    {
+        var reducer = new IslePilotOverlayStateReducer();
+        reducer.ApplyMe(Baseline(), Now);
+        reducer.ApplyMap(MapWithSelfMarker(51_000, -49_000) with
+        {
+            Markers =
+            [
+                new IslePilotOverlayMapMarkerDto
+                {
+                    Label = "You",
+                    X = 51_000,
+                    Y = -49_000,
+                    Yaw = 90,
+                    Self = false
+                }
+            ]
+        }, Now);
+
+        var snapshot = reducer.BuildSnapshot(Now);
+
+        Assert.True(snapshot.PlayerOnline);
+        Assert.Equal(51_000, snapshot.Player?.Location?.X);
+        Assert.Equal(-49_000, snapshot.Player?.Location?.Y);
+        Assert.NotNull(snapshot.Player?.MapLocation);
+        Assert.NotNull(snapshot.Player?.ExactMapHeadingDegrees);
+    }
+
+    [Fact]
+    public void MissingCalibration_FallsBackToTheBundledGatewayProjection()
+    {
+        var reducer = new IslePilotOverlayStateReducer();
+        reducer.ApplyMe(Baseline(), Now);
+        reducer.ApplyMap(new IslePilotOverlayMapDto
+        {
+            Markers =
+            [
+                new IslePilotOverlayMapMarkerDto
+                {
+                    Label = "You",
+                    X = 51_000,
+                    Y = -49_000,
+                    Yaw = 0
+                }
+            ]
+        }, Now);
+
+        var player = reducer.BuildSnapshot(Now).Player;
+
+        Assert.Equal(new MapPoint(0.5, 0.5), player?.MapLocation);
+        Assert.Equal(90d, player?.ExactMapHeadingDegrees);
+    }
+
     private static IslePilotOverlayMeDto Baseline() => new()
     {
         HasData = true,
