@@ -25,4 +25,37 @@ public sealed class GatewayMapProjectionTests
         Assert.Equal(expectedLeft, point.Left);
         Assert.Equal(expectedTop, point.Top);
     }
+
+    [Fact]
+    public void ResolveForBundledTexture_PrefersWorldCoordinateOverProviderCalibration()
+    {
+        var world = new WorldLocation { X = -329_555.776, Y = 112_985.442 };
+        var providerPoint = new MapPoint(0.164, 0.641);
+
+        var point = GatewayMapProjection.ResolveForBundledTexture(world, providerPoint);
+
+        var expected = GatewayMapProjection.Project(world);
+        Assert.Equal(expected, point);
+        Assert.NotEqual(providerPoint, point);
+    }
+
+    [Fact]
+    public void ResolveForBundledTexture_UsesProviderPointOnlyWithoutWorldCoordinate()
+    {
+        var point = GatewayMapProjection.ResolveForBundledTexture(
+            null,
+            new MapPoint(1.1, -0.1));
+
+        Assert.Equal(new MapPoint(1, 0), point);
+    }
+
+    [Fact]
+    public void ResolveForBundledTexture_RejectsNonFiniteCoordinates()
+    {
+        var point = GatewayMapProjection.ResolveForBundledTexture(
+            new WorldLocation { X = double.NaN, Y = 10 },
+            new MapPoint(double.PositiveInfinity, 0.5));
+
+        Assert.Null(point);
+    }
 }

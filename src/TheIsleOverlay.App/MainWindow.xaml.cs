@@ -514,20 +514,7 @@ public partial class MainWindow : Window
     }
 
     private MapPoint? ResolvePlayerMapPoint()
-    {
-        if (_mapLocation is { } mapPoint
-            && double.IsFinite(mapPoint.Left)
-            && double.IsFinite(mapPoint.Top))
-        {
-            return mapPoint;
-        }
-
-        return _location is { } location
-               && double.IsFinite(location.X)
-               && double.IsFinite(location.Y)
-            ? GatewayMapProjection.Project(location)
-            : null;
-    }
+        => GatewayMapProjection.ResolveForBundledTexture(_location, _mapLocation);
 
     private static double ClampImageOffset(double desired, double viewportSize, double imageSize) =>
         imageSize <= viewportSize ? (viewportSize - imageSize) / 2d : Math.Clamp(desired, viewportSize - imageSize, 0d);

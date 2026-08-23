@@ -188,21 +188,25 @@ public partial class MainWindow
             return false;
         }
 
-        if (telemetry.MapLeft is { } left
-            && telemetry.MapTop is { } top
-            && double.IsFinite(left)
-            && double.IsFinite(top))
-        {
-            point = new MapPoint(left, top);
-            return true;
-        }
-
-        if (telemetry.WorldX is { } worldX
+        var worldLocation = telemetry.WorldX is { } worldX
             && telemetry.WorldY is { } worldY
             && double.IsFinite(worldX)
-            && double.IsFinite(worldY))
+            && double.IsFinite(worldY)
+                ? new WorldLocation { X = worldX, Y = worldY }
+                : null;
+        MapPoint? providerMapLocation = telemetry.MapLeft is { } left
+            && telemetry.MapTop is { } top
+            && double.IsFinite(left)
+            && double.IsFinite(top)
+                ? new MapPoint(left, top)
+                : null;
+
+        var resolved = GatewayMapProjection.ResolveForBundledTexture(
+            worldLocation,
+            providerMapLocation);
+        if (resolved is { } mapPoint)
         {
-            point = GatewayMapProjection.Project(new WorldLocation { X = worldX, Y = worldY });
+            point = mapPoint;
             return true;
         }
 
