@@ -23,7 +23,7 @@ Hoàn tất đăng nhập ngay trong cửa sổ tool rồi bấm **KIỂM TRA PH
 - `Alt + chuột giữa` — Ẩn/hiện map
 - `Alt + N` — Ẩn/hiện nhiệm vụ Prime
 - `Alt + P` — Ẩn/hiện toàn bộ HUD
-- `Ctrl + Shift + O` — Kéo/resize overlay hoặc dán tọa độ `X, Y, Z` để chỉ đường
+- `Ctrl + Shift + O` — Kéo/resize overlay hoặc dán tọa độ `Lat, Long, Alt` để chỉ đường
 
 > Tool miễn phí, open source và không can thiệp vào game. Nếu thấy hữu ích, hãy [⭐ GitHub](https://github.com/klong-dev/IsleLiveMap) và chia sẻ giúp Long nhé!
 

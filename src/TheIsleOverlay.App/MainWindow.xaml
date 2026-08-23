@@ -382,7 +382,7 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <StackPanel>
-                    <TextBlock Text="CHỈ ĐƯỜNG // DÁN TỌA ĐỘ X, Y, Z"
+                    <TextBlock Text="CHỈ ĐƯỜNG // DÁN LAT, LONG, ALT"
                                Foreground="#BFD1CB" FontFamily="Bahnschrift SemiCondensed"
                                FontSize="8.5" FontWeight="SemiBold" />
                     <Border Margin="0,4,0,0" Height="29" Background="#B6071517"
@@ -392,7 +392,7 @@
                                      Foreground="#F2E8C8" CaretBrush="#E7B74E" SelectionBrush="#7AE7B74E"
                                      FontFamily="Bahnschrift" FontSize="9.5" FontWeight="Medium"
                                      Padding="7,4" VerticalContentAlignment="Center"
-                                     AutomationProperties.Name="Nhập tọa độ đích X Y Z"
+                                     AutomationProperties.Name="Nhập tọa độ đích Lat Long Alt"
                                      TextChanged="RouteCoordinateInput_TextChanged"
                                      PreviewKeyDown="RouteCoordinateInput_PreviewKeyDown" />
                             <TextBlock x:Name="RouteCoordinateHint" Text="-3,007.455, -4,606.069, 44,728.061"

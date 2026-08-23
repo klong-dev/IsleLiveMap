@@ -34,10 +34,14 @@ public static partial class NavigationTargetParser
             }
         }
 
+        var explicitlyUsesWorldAxes = ExplicitWorldAxes().IsMatch(text);
         target = new WorldLocation
         {
-            X = values[0],
-            Y = values[1],
+            // The Isle copies coordinates as Lat, Long, Alt. In Gateway data,
+            // longitude is the east/west world X axis and latitude is world Y.
+            // Preserve explicitly labelled X/Y input for developer diagnostics.
+            X = explicitlyUsesWorldAxes ? values[0] : values[1],
+            Y = explicitlyUsesWorldAxes ? values[1] : values[0],
             Z = values[2]
         };
         return true;
@@ -45,4 +49,7 @@ public static partial class NavigationTargetParser
 
     [GeneratedRegex(@"[-+]?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?", RegexOptions.CultureInvariant)]
     private static partial Regex CoordinateNumber();
+
+    [GeneratedRegex(@"\bX\b[\s\S]*\bY\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex ExplicitWorldAxes();
 }

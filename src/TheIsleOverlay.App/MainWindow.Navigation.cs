@@ -42,7 +42,7 @@ public partial class MainWindow
     {
         if (!NavigationTargetParser.TryParse(RouteCoordinateInput.Text, out var target))
         {
-            RouteInputStatus.Text = "Không đọc được tọa độ. Dán đủ X, Y, Z như mẫu.";
+            RouteInputStatus.Text = "Không đọc được tọa độ. Dán đủ Lat, Long, Alt như mẫu.";
             RouteInputStatus.Foreground = ErrorBrush;
             RouteCoordinateInput.Focus();
             RouteCoordinateInput.SelectAll();
@@ -53,7 +53,7 @@ public partial class MainWindow
         _routeTargetMapLocation = GatewayMapProjection.Project(target);
         StopRouteButton.IsEnabled = true;
         StartRouteButton.Content = "CẬP NHẬT";
-        RouteInputStatus.Text = $"Đang chỉ đường · X {target.X:0.###} / Y {target.Y:0.###}";
+        RouteInputStatus.Text = $"Đang chỉ đường · LAT {target.Y:0.###} / LONG {target.X:0.###}";
         RouteInputStatus.Foreground = BrushFrom("#E7B74E");
         PositionMap();
     }

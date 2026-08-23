@@ -18,7 +18,7 @@ Texture Gateway dùng bản EraGaming/MyIsleMap đóng gói trong app dưới d�
 
 - Minimap Gateway dùng texture EraGaming/MyIsleMap đóng gói local dạng JPEG, không tải ảnh map qua mạng và không phụ thuộc codec WebP của Windows.
 - Marker luôn giữ giữa viewport và dùng chung map Gateway cho mọi server Evrima tương thích.
-- Dán tọa độ `X, Y, Z` trong Edit Mode để vẽ đường, beacon và khoảng cách tới đích.
+- Dán tọa độ `Lat, Long, Alt` copy từ game trong Edit Mode để vẽ đường, beacon và khoảng cách tới đích.
 - Tọa độ, yaw và status realtime từ WebSocket `/ows`; `/api/overlay/me` và `/api/overlay/map` làm baseline/fallback.
 - Growth, Health, Stamina, Hunger và Water khi nguồn cung cấp trường tương ứng.
 - Danh sách nhiệm vụ Prime được Việt hóa; khi nhiệm vụ chuyển sang hoàn thành, overlay hiện notify ngắn rồi tự ẩn.
