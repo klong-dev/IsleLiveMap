@@ -96,7 +96,7 @@ dotnet build .\TheIsleOverlay.sln --configuration Release
 Build installer/update package:
 
 ```powershell
-.\scripts\Package-Release.ps1 -Version 1.2.0
+.\scripts\Package-Release.ps1 -Version 1.2.1
 ```
 
 Output nằm trong `artifacts/distribution`.

@@ -34,7 +34,7 @@ public sealed class ReleaseHighlightsTests
     }
 
     [Fact]
-    public void Modal_SummarizesVersion120AndItsGlobalHotkeys()
+    public void Modal_SummarizesVersion121MapCoordinateHotfix()
     {
         var document = XDocument.Load(Path.Combine(
             AppContext.BaseDirectory,
@@ -57,12 +57,11 @@ public sealed class ReleaseHighlightsTests
                 (string?)element.Attribute("Content")
             }));
 
-        Assert.Equal("1.2.0", ReleaseHighlightsWindow.ReleaseVersion);
-        Assert.Contains("CTRL + SHIFT + O", allCopy, StringComparison.Ordinal);
-        Assert.Contains("ALT + N", allCopy, StringComparison.Ordinal);
-        Assert.Contains("ALT + P", allCopy, StringComparison.Ordinal);
-        Assert.Contains("MAP TƯƠNG THÍCH HƠN", allCopy, StringComparison.Ordinal);
-        Assert.Contains("MARKER SERVER ỔN ĐỊNH", allCopy, StringComparison.Ordinal);
+        Assert.Equal("1.2.1", ReleaseHighlightsWindow.ReleaseVersion);
+        Assert.Contains("MARKER PLAYER KHỚP MAP", allCopy, StringComparison.Ordinal);
+        Assert.Contains("MARKER ĐỒNG ĐỘI", allCopy, StringComparison.Ordinal);
+        Assert.Contains("LAT / LONG ĐÚNG THỨ TỰ", allCopy, StringComparison.Ordinal);
+        Assert.Contains("FALLBACK AN TOÀN", allCopy, StringComparison.Ordinal);
         Assert.Equal("ĐÃ XEM · BẮT ĐẦU  →", (string?)Control("EnterToolButton").Attribute("Content"));
     }
 }

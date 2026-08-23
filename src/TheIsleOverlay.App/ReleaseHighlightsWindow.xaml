@@ -2,7 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Có gì mới trong Isle Live Map"
-        Width="760" Height="620"
+        Width="760" Height="558"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
         ResizeMode="NoResize" WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
         FontFamily="Segoe UI" FontSize="13"
@@ -70,7 +70,7 @@
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="9,0,0,0">
                         <TextBlock Text="PATCH NOTES // DEPLOYED" Foreground="{StaticResource ReleaseBone}"
                                    FontFamily="Bahnschrift SemiCondensed" FontSize="11.5" FontWeight="SemiBold" />
-                        <TextBlock x:Name="TitleVersionLabel" Text="   ISLE LIVE MAP · v1.2.0"
+                        <TextBlock x:Name="TitleVersionLabel" Text="   ISLE LIVE MAP · v1.2.1"
                                    Foreground="#7F9B94" FontFamily="Bahnschrift" FontSize="9.5"
                                    FontWeight="Medium" VerticalAlignment="Center" />
                     </StackPanel>
@@ -94,17 +94,17 @@
                 <Grid Margin="0,0,0,18">
                     <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                     <StackPanel>
-                        <TextBlock Text="BẢN CẬP NHẬT TÍNH NĂNG" Foreground="{StaticResource ReleaseTeal}"
+                        <TextBlock Text="BẢN HOTFIX BẢN ĐỒ" Foreground="{StaticResource ReleaseTeal}"
                                    FontFamily="Bahnschrift SemiCondensed" FontSize="11" FontWeight="SemiBold" />
-                        <TextBlock Text="MAP BIẾT DẪN ĐƯỜNG."
+                        <TextBlock Text="MARKER ĐÃ VỀ ĐÚNG CHỖ."
                                    Foreground="{StaticResource ReleaseBone}" FontFamily="Bahnschrift SemiCondensed"
                                    FontSize="31" FontWeight="Bold" Margin="-1,2,0,0" />
-                        <TextBlock Text="Nhiệm vụ rõ hơn, thao tác nhanh hơn và bản đồ ổn định trên nhiều máy hơn."
+                        <TextBlock Text="Player, đồng đội và điểm chỉ đường nay cùng khớp với map đang hiển thị."
                                    Foreground="{StaticResource ReleaseMuted}" FontSize="12.5" FontWeight="Medium" Margin="0,5,0,0" />
                     </StackPanel>
                     <StackPanel Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center">
                         <TextBlock Text="VERSION" Foreground="#6F8C84" FontFamily="Bahnschrift SemiCondensed" FontSize="9" HorizontalAlignment="Right" />
-                        <TextBlock x:Name="HeroVersionLabel" Text="1.2.0" Foreground="#FFE18A"
+                        <TextBlock x:Name="HeroVersionLabel" Text="1.2.1" Foreground="#FFE18A"
                                    FontFamily="Bahnschrift" FontSize="28" FontWeight="Bold" Margin="0,-3,0,0" />
                     </StackPanel>
                 </Grid>
@@ -117,46 +117,32 @@
                         <Grid Height="62">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="43" /><ColumnDefinition Width="190" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                             <TextBlock Text="01" Foreground="#E7B74E" FontFamily="Bahnschrift" FontSize="11" FontWeight="Bold" VerticalAlignment="Center" />
-                            <TextBlock Grid.Column="1" Text="CHỈ ĐƯỜNG TỌA ĐỘ" Foreground="#FFE18A" FontFamily="Bahnschrift SemiCondensed" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" />
-                            <TextBlock Grid.Column="2" Text="Dán Lat, Long, Alt để vẽ đường và beacon tới đích" Foreground="{StaticResource ReleaseMuted}" FontSize="11.5" VerticalAlignment="Center" />
-                            <Border Grid.Column="3" Background="#C20A1D1B" BorderBrush="#756A3A" BorderThickness="1" CornerRadius="2" Padding="8,4" VerticalAlignment="Center">
-                                <TextBlock Text="CTRL + SHIFT + O" Foreground="#FFE18A" FontFamily="Bahnschrift" FontSize="9.5" FontWeight="Bold" />
-                            </Border>
+                            <TextBlock Grid.Column="1" Text="MARKER PLAYER KHỚP MAP" Foreground="#FFE18A" FontFamily="Bahnschrift SemiCondensed" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="2" Text="Chiếu lại world coordinate theo texture local" Foreground="{StaticResource ReleaseMuted}" FontSize="11.5" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="3" Text="FIX" Foreground="#FFE18A" FontFamily="Bahnschrift" FontSize="9.5" FontWeight="Bold" VerticalAlignment="Center" />
                         </Grid>
                         <Rectangle Height="1" Fill="#304A45" />
                         <Grid Height="62">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="43" /><ColumnDefinition Width="190" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                             <TextBlock Text="02" Foreground="#E7B74E" FontFamily="Bahnschrift" FontSize="11" FontWeight="Bold" VerticalAlignment="Center" />
-                            <TextBlock Grid.Column="1" Text="NHIỆM VỤ PRIME" Foreground="#E4EEE9" FontFamily="Bahnschrift SemiCondensed" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" />
-                            <TextBlock Grid.Column="2" Text="Tiếng Việt + thông báo khi hoàn thành" Foreground="{StaticResource ReleaseMuted}" FontSize="11.5" VerticalAlignment="Center" />
-                            <Border Grid.Column="3" Background="#C20A1D1B" BorderBrush="#526C65" BorderThickness="1" CornerRadius="2" Padding="8,4" VerticalAlignment="Center">
-                                <TextBlock Text="ALT + N" Foreground="#E9F4EE" FontFamily="Bahnschrift" FontSize="9.5" FontWeight="Bold" />
-                            </Border>
+                            <TextBlock Grid.Column="1" Text="MARKER ĐỒNG ĐỘI" Foreground="#E4EEE9" FontFamily="Bahnschrift SemiCondensed" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="2" Text="Không còn lệch vì calibration khác nguồn" Foreground="{StaticResource ReleaseMuted}" FontSize="11.5" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="3" Text="TEAM" Foreground="#7FA49B" FontFamily="Bahnschrift" FontSize="9.5" FontWeight="Bold" VerticalAlignment="Center" />
                         </Grid>
                         <Rectangle Height="1" Fill="#304A45" />
                         <Grid Height="62">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="43" /><ColumnDefinition Width="190" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                             <TextBlock Text="03" Foreground="#37D4C6" FontFamily="Bahnschrift" FontSize="11" FontWeight="Bold" VerticalAlignment="Center" />
-                            <TextBlock Grid.Column="1" Text="ẨN / HIỆN TOÀN BỘ HUD" Foreground="#90E6DA" FontFamily="Bahnschrift SemiCondensed" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" />
-                            <TextBlock Grid.Column="2" Text="Dọn màn hình ngay mà không cần đóng tool" Foreground="{StaticResource ReleaseMuted}" FontSize="11.5" VerticalAlignment="Center" />
-                            <Border Grid.Column="3" Background="#C20A1D1B" BorderBrush="#4B8177" BorderThickness="1" CornerRadius="2" Padding="8,4" VerticalAlignment="Center">
-                                <TextBlock Text="ALT + P" Foreground="#90E6DA" FontFamily="Bahnschrift" FontSize="9.5" FontWeight="Bold" />
-                            </Border>
+                            <TextBlock Grid.Column="1" Text="LAT / LONG ĐÚNG THỨ TỰ" Foreground="#90E6DA" FontFamily="Bahnschrift SemiCondensed" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="2" Text="Chuỗi copy từ game được đọc là Lat, Long, Alt" Foreground="{StaticResource ReleaseMuted}" FontSize="11.5" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="3" Text="ROUTE" Foreground="#90E6DA" FontFamily="Bahnschrift" FontSize="9.5" FontWeight="Bold" VerticalAlignment="Center" />
                         </Grid>
                         <Rectangle Height="1" Fill="#304A45" />
                         <Grid Height="62">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="43" /><ColumnDefinition Width="190" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                             <TextBlock Text="04" Foreground="#7A9B93" FontFamily="Bahnschrift" FontSize="11" FontWeight="Bold" VerticalAlignment="Center" />
-                            <TextBlock Grid.Column="1" Text="MAP TƯƠNG THÍCH HƠN" Foreground="#E4EEE9" FontFamily="Bahnschrift SemiCondensed" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" />
-                            <TextBlock Grid.Column="2" Text="Không còn phụ thuộc codec WebP của Windows" Foreground="{StaticResource ReleaseMuted}" FontSize="11.5" VerticalAlignment="Center" />
-                            <TextBlock Grid.Column="3" Text="FIX" Foreground="#7FA49B" FontFamily="Bahnschrift" FontSize="9.5" FontWeight="Bold" VerticalAlignment="Center" />
-                        </Grid>
-                        <Rectangle Height="1" Fill="#304A45" />
-                        <Grid Height="62">
-                            <Grid.ColumnDefinitions><ColumnDefinition Width="43" /><ColumnDefinition Width="190" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-                            <TextBlock Text="05" Foreground="#7A9B93" FontFamily="Bahnschrift" FontSize="11" FontWeight="Bold" VerticalAlignment="Center" />
-                            <TextBlock Grid.Column="1" Text="MARKER SERVER ỔN ĐỊNH" Foreground="#E4EEE9" FontFamily="Bahnschrift SemiCondensed" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" />
-                            <TextBlock Grid.Column="2" Text="Khôi phục vị trí khi API thiếu self hoặc calibration" Foreground="{StaticResource ReleaseMuted}" FontSize="11.5" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="1" Text="FALLBACK AN TOÀN" Foreground="#E4EEE9" FontFamily="Bahnschrift SemiCondensed" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="2" Text="Chỉ dùng điểm server khi thiếu world coordinate" Foreground="{StaticResource ReleaseMuted}" FontSize="11.5" VerticalAlignment="Center" />
                             <TextBlock Grid.Column="3" Text="FIX" Foreground="#7FA49B" FontFamily="Bahnschrift" FontSize="9.5" FontWeight="Bold" VerticalAlignment="Center" />
                         </Grid>
                     </StackPanel>

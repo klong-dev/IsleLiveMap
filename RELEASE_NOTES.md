@@ -1,10 +1,6 @@
-# Isle Live Map 1.2.0
+# Isle Live Map 1.2.1
 
-- Thêm **chỉ đường bằng tọa độ** trong Edit Mode (`Ctrl + Shift + O`): line, beacon và khoảng cách tới đích.
-- Thêm danh sách **nhiệm vụ Prime tiếng Việt** cùng notify khi hoàn thành; `Alt + N` để ẩn/hiện.
-- Thêm `Alt + P` để ẩn/hiện toàn bộ HUD ngay trong game.
-- Thay block phím tắt trong overlay bằng modal hướng dẫn rõ ràng khi mở app.
-- Thêm modal **Có gì mới** chỉ xuất hiện một lần sau mỗi phiên bản cập nhật.
-- Đổi nút Home thành **MỞ MAP**, làm mới lời mời ủng hộ với ảnh chuột và nội dung dễ hiểu hơn.
-- Sửa lỗi một số máy không đọc được map bằng texture JPEG nhúng, không còn phụ thuộc codec WebP.
-- Tăng khả năng nhận marker IslePilot khi server thiếu `self`, Steam ID/calibration hoặc trả collection `null`.
+- Sửa marker player bị lệch địa danh do dùng calibration của basemap server trên texture Gateway nhúng khác.
+- Marker player và thành viên nhóm nay luôn ưu tiên world coordinate rồi chiếu theo đúng texture local.
+- Điểm chuẩn hóa từ provider chỉ được dùng làm fallback khi không có world coordinate hợp lệ.
+- Sửa tính năng chỉ đường để hiểu đúng chuỗi game copy theo thứ tự `Lat, Long, Alt`.
