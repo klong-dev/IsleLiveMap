@@ -31,13 +31,18 @@ public partial class HomeWindow
 
     private async void SteamLoginButton_Click(object sender, RoutedEventArgs e)
     {
-        if (_islePilotConnecting || _connecting)
+        if (!EnsureMapLaunchAvailable() || _islePilotConnecting || _connecting)
+        {
+            return;
+        }
+
+        if (!EnsureLocalCaptureAvailable())
         {
             return;
         }
 
         _islePilotConnecting = true;
-        SetSteamLoginControlsEnabled(false);
+        RefreshMapLaunchControls();
         try
         {
             var credentials = _islePilotCredentials
@@ -92,7 +97,7 @@ public partial class HomeWindow
         finally
         {
             _islePilotConnecting = false;
-            SetSteamLoginControlsEnabled(true);
+            RefreshMapLaunchControls();
         }
     }
 
@@ -156,13 +161,7 @@ public partial class HomeWindow
         SteamLoginDetailLabel.Text = authenticated
             ? "Phiên IslePilot đã được mã hóa bằng Windows DPAPI"
             : "Một phiên cho mọi server đã cài IslePilot";
-        SteamLoginActionLabel.Text = authenticated ? "MỞ MAP  →" : "ĐĂNG NHẬP  →";
         LogoutSteamButton.Visibility = authenticated ? Visibility.Visible : Visibility.Collapsed;
-    }
-
-    private void SetSteamLoginControlsEnabled(bool enabled)
-    {
-        SteamLoginButton.IsEnabled = enabled;
-        LogoutSteamButton.IsEnabled = enabled && _islePilotCredentials is not null;
+        RefreshMapLaunchControls();
     }
 }

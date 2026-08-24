@@ -285,10 +285,36 @@
                         </Grid>
                     </Border>
 
+                    <Border x:Name="MapLaunchGateBanner"
+                            Background="#B80A211E" BorderBrush="#4D746B" BorderThickness="1"
+                            CornerRadius="3" Padding="12,10" Margin="0,0,0,14">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="4" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Rectangle x:Name="MapLaunchStateBar" Fill="#E7B74E" RadiusX="1" RadiusY="1" />
+                            <Ellipse x:Name="MapLaunchStateDot" Grid.Column="1" Width="8" Height="8"
+                                     Fill="#E7B74E" Margin="12,0,9,0" VerticalAlignment="Center" />
+                            <StackPanel Grid.Column="2">
+                                <TextBlock x:Name="MapLaunchStateLabel"
+                                           Text="ĐANG KIỂM TRA CẬP NHẬT"
+                                           Foreground="#FFE18A" FontFamily="Bahnschrift SemiCondensed"
+                                           FontSize="11.5" FontWeight="SemiBold" />
+                                <TextBlock x:Name="MapLaunchStateDetail"
+                                           Text="MỞ MAP sẽ tự mở khóa ngay khi kiểm tra hoàn tất."
+                                           Foreground="#8FA79F" FontSize="10.5" FontWeight="Medium"
+                                           TextWrapping="Wrap" Margin="0,2,0,0" />
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
                     <TextBlock Text="ISLEPILOT NETWORK" Foreground="#A8BDB7" FontSize="11.5" FontWeight="SemiBold" Margin="0,0,0,9" />
 
                     <StackPanel Loaded="SteamLoginPanel_Loaded">
                         <Button x:Name="SteamLoginButton" Style="{StaticResource SourceButton}"
+                                IsEnabled="False"
                                 Height="66" Click="SteamLoginButton_Click" Margin="0,0,0,8">
                             <Grid>
                                 <Grid.ColumnDefinitions>
@@ -308,7 +334,7 @@
                                                Foreground="#91AAA3" FontSize="10.5" FontWeight="Medium" />
                                 </StackPanel>
                                 <TextBlock x:Name="SteamLoginActionLabel" Grid.Column="2"
-                                           Text="ĐĂNG NHẬP  →" Foreground="#A0D2C8"
+                                           Text="ĐỢI KIỂM TRA…" Foreground="#A0D2C8"
                                            FontFamily="Bahnschrift SemiCondensed" FontSize="13"
                                            FontWeight="SemiBold" VerticalAlignment="Center" Margin="12,0,0,0" />
                             </Grid>
@@ -351,6 +377,7 @@
                         </Grid.ColumnDefinitions>
 
                         <Button x:Name="EraSourceButton" Style="{StaticResource SourceButton}" Tag="era"
+                                IsEnabled="False"
                                 Height="64" Margin="0" Padding="12,0"
                                 AutomationProperties.Name="Kết nối trực tiếp EraGaming"
                                 Click="SourceButton_Click">
@@ -375,6 +402,7 @@
 
                         <Button x:Name="PandoraSourceButton" Grid.Column="2"
                                 Style="{StaticResource SourceButton}" Tag="pandora"
+                                IsEnabled="False"
                                 Height="64" Margin="0" Padding="12,0"
                                 AutomationProperties.Name="Kết nối trực tiếp PANDORA"
                                 Click="SourceButton_Click">

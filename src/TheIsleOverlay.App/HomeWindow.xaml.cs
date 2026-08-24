@@ -6,6 +6,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using TheIsleOverlay.EraGaming;
 using TheIsleOverlay.IslePilot;
+using TheIsleOverlay.LocalTelemetry;
 using TheIsleOverlay.Pandora;
 
 namespace TheIsleOverlay.App;
@@ -16,6 +17,7 @@ public partial class HomeWindow : Window
     private readonly GitHubUpdateService _updateService = new();
     private readonly ReleaseHighlightsStore _releaseHighlightsStore = new();
     private bool _connecting;
+    private MapLaunchGateState _mapLaunchGateState = MapLaunchGateState.Checking;
 
     public HomeWindow()
     {
@@ -31,12 +33,20 @@ public partial class HomeWindow : Window
                 "1",
                 StringComparison.Ordinal))
         {
-            var overlay = new MainWindow();
+            Environment.SetEnvironmentVariable("ISLELIVEMAP_DEV_AUTO_CONNECT", null);
+            var overlay = new MainWindow(
+                new LocalPositionTelemetrySession(),
+                "DIRECT");
             Application.Current.MainWindow = overlay;
             overlay.Show();
             Close();
             return;
         }
+
+        // Start the network check before the modal sequence. ShowDialog keeps a
+        // dispatcher frame alive, so update I/O continues while the user reads
+        // donate/help content instead of adding another wait afterwards.
+        var updateCheckTask = CheckForUpdatesAsync();
 
         if (App.CurrentApp.TryMarkDonatePromptShown())
         {
@@ -67,36 +77,84 @@ public partial class HomeWindow : Window
             _releaseHighlightsStore.MarkShown(currentVersion);
         }
 
-        await CheckForUpdatesAsync();
+        try
+        {
+            await updateCheckTask;
+        }
+        catch (OperationCanceledException) when (_shutdown.IsCancellationRequested)
+        {
+        }
     }
 
     private async Task CheckForUpdatesAsync()
     {
+        ApplyMapLaunchGate(
+            MapLaunchGateState.Checking,
+            "ĐANG KIỂM TRA CẬP NHẬT",
+            "MỞ MAP sẽ tự mở khóa ngay khi kiểm tra hoàn tất.",
+            "#E7B74E");
+        ApplyUpdateButton.Visibility = Visibility.Collapsed;
+
         var result = await _updateService.PrepareUpdateAsync(
-            progress => Dispatcher.Invoke(() => UpdateStatusLabel.Text = $"ĐANG TẢI BẢN MỚI · {progress}%"),
+            progress => Dispatcher.Invoke(() =>
+            {
+                UpdateStatusLabel.Text = $"ĐANG TẢI BẢN MỚI · {progress}%";
+                ApplyMapLaunchGate(
+                    MapLaunchGateState.Checking,
+                    $"ĐANG TẢI BẢN MỚI · {progress}%",
+                    "Hoàn tất bản cập nhật trước khi mở map.",
+                    "#E7B74E");
+            }),
             _shutdown.Token);
 
+        ApplyCompletedUpdateResult(result);
+    }
+
+    private void ApplyCompletedUpdateResult(UpdatePreparationResult result)
+    {
         switch (result.State)
         {
             case UpdatePreparationState.Ready:
                 UpdateStatusLabel.Text = $"BẢN {result.Version} ĐÃ SẴN SÀNG";
                 ApplyUpdateButton.Visibility = Visibility.Visible;
+                ApplyMapLaunchGate(
+                    MapLaunchGatePolicy.FromUpdate(result.State),
+                    $"CÓ BẢN {result.Version}",
+                    "Bấm CẬP NHẬT & KHỞI ĐỘNG LẠI trước khi mở map.",
+                    "#E7B74E");
                 break;
             case UpdatePreparationState.DevelopmentBuild:
                 UpdateStatusLabel.Text = $"BẢN CHẠY THỬ · v{CurrentVersion()}";
+                ApplyMapLaunchGate(
+                    MapLaunchGatePolicy.FromUpdate(result.State),
+                    "BẢN CHẠY THỬ · MỞ MAP ĐÃ SẴN SÀNG",
+                    "Tọa độ lấy trực tiếp từ game; status lấy từ nguồn bạn chọn.",
+                    "#37D4C6");
                 break;
             case UpdatePreparationState.Unavailable:
                 UpdateStatusLabel.Text = $"v{CurrentVersion()} · KHÔNG KIỂM TRA ĐƯỢC UPDATE";
+                ApplyMapLaunchGate(
+                    MapLaunchGatePolicy.FromUpdate(result.State),
+                    "KHÔNG KIỂM TRA ĐƯỢC CẬP NHẬT",
+                    "Bạn vẫn có thể mở map; app sẽ thử kiểm tra lại ở lần khởi động sau.",
+                    "#E7B74E");
                 break;
             default:
                 UpdateStatusLabel.Text = $"v{CurrentVersion()} · ĐÃ CẬP NHẬT";
+                ApplyMapLaunchGate(
+                    MapLaunchGatePolicy.FromUpdate(result.State),
+                    "MỞ MAP ĐÃ SẴN SÀNG",
+                    "Tọa độ lấy trực tiếp từ game; status lấy từ nguồn bạn chọn.",
+                    "#37D4C6");
                 break;
         }
     }
 
     private async void SourceButton_Click(object sender, RoutedEventArgs e)
     {
-        if (_connecting || sender is not Button { Tag: string sourceId })
+        if (!EnsureMapLaunchAvailable()
+            || _connecting
+            || sender is not Button { Tag: string sourceId })
         {
             return;
         }
@@ -107,8 +165,13 @@ public partial class HomeWindow : Window
             return;
         }
 
+        if (!EnsureLocalCaptureAvailable())
+        {
+            return;
+        }
+
         _connecting = true;
-        SetSourceButtonsEnabled(false);
+        RefreshMapLaunchControls();
         SourceStatusLabel.Text = $"ĐANG MỞ PHIÊN {source.DisplayName.ToUpperInvariant()}…";
 
         try
@@ -138,7 +201,7 @@ public partial class HomeWindow : Window
         finally
         {
             _connecting = false;
-            SetSourceButtonsEnabled(true);
+            RefreshMapLaunchControls();
         }
     }
 
@@ -176,10 +239,69 @@ public partial class HomeWindow : Window
         }
     }
 
-    private void SetSourceButtonsEnabled(bool enabled)
+    private bool EnsureMapLaunchAvailable()
     {
+        if (MapLaunchGatePolicy.AllowsMap(_mapLaunchGateState))
+        {
+            return true;
+        }
+
+        SourceStatusLabel.Text = _mapLaunchGateState == MapLaunchGateState.UpdateRequired
+            ? "Có bản mới đã tải xong. Hãy cập nhật và khởi động lại trước khi mở map."
+            : "App đang kiểm tra cập nhật. MỞ MAP sẽ tự mở khóa ngay khi hoàn tất.";
+        return false;
+    }
+
+    private bool EnsureLocalCaptureAvailable()
+    {
+        var availability = NpcapAvailabilityProbe.Check();
+        if (availability.IsAvailable)
+        {
+            return true;
+        }
+
+        SourceStatusLabel.Text = availability.ErrorMessage
+            ?? "Chưa thể đọc vị trí trực tiếp từ game.";
+        var prompt = new NpcapRequiredWindow { Owner = this };
+        if (prompt.ShowDialog() == true)
+        {
+            OpenExternal("https://npcap.com/#download");
+        }
+
+        return false;
+    }
+
+    private void ApplyMapLaunchGate(
+        MapLaunchGateState state,
+        string title,
+        string detail,
+        string accentColor)
+    {
+        _mapLaunchGateState = state;
+        MapLaunchStateLabel.Text = title;
+        MapLaunchStateDetail.Text = detail;
+        MapLaunchStateLabel.Foreground = HomeBrush(accentColor);
+        MapLaunchStateDot.Fill = HomeBrush(accentColor);
+        MapLaunchStateBar.Fill = HomeBrush(accentColor);
+        RefreshMapLaunchControls();
+    }
+
+    private void RefreshMapLaunchControls()
+    {
+        var enabled = MapLaunchGatePolicy.AllowsMap(_mapLaunchGateState)
+                      && !_connecting
+                      && !_islePilotConnecting;
+        SteamLoginButton.IsEnabled = enabled;
         EraSourceButton.IsEnabled = enabled;
         PandoraSourceButton.IsEnabled = enabled;
+        LogoutSteamButton.IsEnabled = !_islePilotConnecting && _islePilotCredentials is not null;
+
+        SteamLoginActionLabel.Text = _mapLaunchGateState switch
+        {
+            MapLaunchGateState.Checking => "ĐỢI KIỂM TRA…",
+            MapLaunchGateState.UpdateRequired => "CẬP NHẬT TRƯỚC",
+            _ => _islePilotCredentials is null ? "ĐĂNG NHẬP  →" : "MỞ MAP  →"
+        };
     }
 
     private static string FriendlyError(Exception exception) => exception switch

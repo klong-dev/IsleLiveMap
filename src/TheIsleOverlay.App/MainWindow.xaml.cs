@@ -131,9 +131,12 @@ public partial class MainWindow : Window
             return;
         }
 
-        _telemetrySession = new LocalPositionTelemetrySession(
-            _telemetrySession,
-            sourceName: _configuredSource);
+        if (_telemetrySession is not LocalPositionTelemetrySession)
+        {
+            _telemetrySession = new LocalPositionTelemetrySession(
+                _telemetrySession,
+                sourceName: _configuredSource);
+        }
 
         LoadMap();
         _telemetryWatchTask = WatchTelemetryAsync();

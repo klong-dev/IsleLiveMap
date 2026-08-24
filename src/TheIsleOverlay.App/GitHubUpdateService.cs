@@ -7,6 +7,7 @@ namespace TheIsleOverlay.App;
 public sealed class GitHubUpdateService
 {
     public const string RepositoryUrl = "https://github.com/klong-dev/IsleLiveMap";
+    private static readonly TimeSpan UpdateCheckTimeout = TimeSpan.FromSeconds(15);
 
     private UpdateManager? _manager;
     private UpdateInfo? _pendingUpdate;
@@ -18,7 +19,9 @@ public sealed class GitHubUpdateService
         try
         {
             _manager = new UpdateManager(new GithubSource(RepositoryUrl, null, false));
-            _pendingUpdate = await _manager.CheckForUpdatesAsync();
+            _pendingUpdate = await _manager
+                .CheckForUpdatesAsync()
+                .WaitAsync(UpdateCheckTimeout, cancellationToken);
             if (_pendingUpdate is null)
             {
                 return UpdatePreparationResult.Current;
