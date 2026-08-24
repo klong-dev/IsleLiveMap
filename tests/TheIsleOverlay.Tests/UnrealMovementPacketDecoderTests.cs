@@ -99,4 +99,94 @@ public sealed class UnrealMovementPacketDecoderTests
         Assert.Equal(285_822.42d, tracked.Y, precision: 2);
         Assert.Equal(22.38d, tracked.UnrealYawDegrees, precision: 2);
     }
+
+    [Fact]
+    public void Tracker_RejectsRetransmittedMovementWithOlderClientTimestamp()
+    {
+        var observedAt = DateTimeOffset.Parse("2026-08-24T00:00:01Z");
+        var current = Candidate(100, 100, 100, timestamp: 40f);
+        var retransmitted = Candidate(450, 100, 100, timestamp: 39.5f);
+
+        var selected = LocalMovementTracker.TryContinueTrack(
+            [retransmitted],
+            current,
+            observedAt.AddMilliseconds(-50),
+            observedAt,
+            out _);
+
+        Assert.False(selected);
+    }
+
+    [Fact]
+    public void Tracker_PrefersNewestForwardMovementOverOlderSavedMove()
+    {
+        var observedAt = DateTimeOffset.Parse("2026-08-24T00:00:01Z");
+        var current = Candidate(100, 100, 100, timestamp: 40f);
+        var retransmitted = Candidate(450, 100, 100, timestamp: 39.5f);
+        var newest = Candidate(130, 110, 100, timestamp: 40.05f);
+
+        var selected = LocalMovementTracker.TryContinueTrack(
+            [retransmitted, newest],
+            current,
+            observedAt.AddMilliseconds(-50),
+            observedAt,
+            out var sample);
+
+        Assert.True(selected);
+        Assert.Equal(newest, sample);
+    }
+
+    [Fact]
+    public void Tracker_RecoversFromUnreliableTimestampWithoutLongPositionFreeze()
+    {
+        var observedAt = DateTimeOffset.Parse("2026-08-24T00:00:01Z");
+        var current = Candidate(100, 100, 100, timestamp: 229_678f);
+        var validPositionWithLowerTimestamp = Candidate(140, 120, 100, timestamp: 134f);
+
+        var selected = LocalMovementTracker.TryContinueTrack(
+            [validPositionWithLowerTimestamp],
+            current,
+            observedAt.AddMilliseconds(-300),
+            observedAt,
+            out var sample);
+
+        Assert.True(selected);
+        Assert.Equal(validPositionWithLowerTimestamp.X, sample.X);
+        Assert.Equal(validPositionWithLowerTimestamp.Y, sample.Y);
+        Assert.True(sample.ClientTimestamp >= current.ClientTimestamp);
+    }
+
+    [Fact]
+    public void Tracker_NormalizesImplausibleTimestampJumpWithoutDroppingPosition()
+    {
+        var observedAt = DateTimeOffset.Parse("2026-08-24T00:00:01Z");
+        var current = Candidate(100, 100, 100, timestamp: 134f);
+        var validPositionWithPoisonedTimestamp = Candidate(140, 120, 100, timestamp: 229_678f);
+
+        var selected = LocalMovementTracker.TryContinueTrack(
+            [validPositionWithPoisonedTimestamp],
+            current,
+            observedAt.AddMilliseconds(-50),
+            observedAt,
+            out var sample);
+
+        Assert.True(selected);
+        Assert.Equal(validPositionWithPoisonedTimestamp.X, sample.X);
+        Assert.Equal(validPositionWithPoisonedTimestamp.Y, sample.Y);
+        Assert.InRange(sample.ClientTimestamp, 134f, 135f);
+    }
+
+    private static UnrealMovementCandidate Candidate(
+        double x,
+        double y,
+        double z,
+        float timestamp) => new(
+        x,
+        y,
+        z,
+        0d,
+        timestamp,
+        65,
+        380,
+        26);
 }

@@ -11,6 +11,7 @@ public sealed class NpcapLocalMovementSource : ILocalMovementSource
     public const string DefaultGameProcessName = "TheIsleClient-Win64-Shipping";
 
     private static readonly TimeSpan ProcessPollInterval = TimeSpan.FromSeconds(1);
+    private static readonly TimeSpan MinimumObservationInterval = TimeSpan.FromMilliseconds(50);
 
     private readonly string _processName;
     private readonly WindowsUdpPortOwnerResolver _portResolver;
@@ -55,6 +56,11 @@ public sealed class NpcapLocalMovementSource : ILocalMovementSource
                            .ConfigureAwait(false))
         {
             yield return observation;
+            // Npcap often delivers several saved-move packets in one burst.
+            // Pausing the single-slot reader lets DropOldest retain only the
+            // newest observation instead of making the marker replay the burst.
+            await Task.Delay(MinimumObservationInterval, linkedCancellation.Token)
+                .ConfigureAwait(false);
         }
 
         await captureTask.ConfigureAwait(false);
@@ -76,6 +82,7 @@ public sealed class NpcapLocalMovementSource : ILocalMovementSource
         ChannelWriter<LocalMovementObservation> writer,
         CancellationToken cancellationToken)
     {
+        int? trackedProcessId = null;
         try
         {
             while (!cancellationToken.IsCancellationRequested)
@@ -86,11 +93,22 @@ public sealed class NpcapLocalMovementSource : ILocalMovementSource
                     : _portResolver.GetOwnedPorts(processId.Value);
                 if (processId is null || ports.Count == 0)
                 {
+                    if (processId is null && trackedProcessId is not null)
+                    {
+                        _tracker.Reset();
+                        trackedProcessId = null;
+                    }
+
                     await Task.Delay(ProcessPollInterval, cancellationToken).ConfigureAwait(false);
                     continue;
                 }
 
-                _tracker.Reset();
+                if (trackedProcessId != processId)
+                {
+                    _tracker.Reset();
+                    trackedProcessId = processId;
+                }
+
                 await CaptureUntilEndpointChangesAsync(
                         processId.Value,
                         ports,

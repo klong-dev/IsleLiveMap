@@ -7,6 +7,10 @@ public sealed class LocalMovementTracker
     private static readonly TimeSpan MinimumBootstrapDuration = TimeSpan.FromMilliseconds(600);
     private static readonly TimeSpan MaximumReadyAge = TimeSpan.FromMilliseconds(250);
     private const int RequiredConsecutiveHits = 8;
+    private const float TimestampRegressionTolerance = 0.002f;
+    private const float TimestampAdvanceAllowanceSeconds = 2f;
+    private const float TimestampWallClockMultiplier = 4f;
+    private static readonly TimeSpan TimestampRecoveryAge = TimeSpan.FromMilliseconds(250);
     private const double MaximumBaseDelta = 5_000d;
     private const double MaximumUnitsPerSecond = 100_000d;
 
@@ -27,12 +31,24 @@ public sealed class LocalMovementTracker
     {
         var candidates = _decoder.Decode(payload);
         if (_current is { } current
-            && observedAt - _lastLockUpdate <= LockLifetime
-            && TryContinueTrack(candidates, current, observedAt, out sample))
+            && observedAt - _lastLockUpdate <= LockLifetime)
         {
-            _current = sample;
-            _lastLockUpdate = observedAt;
-            return true;
+            if (TryContinueTrack(candidates, current, _lastLockUpdate, observedAt, out sample))
+            {
+                _current = sample;
+                _lastLockUpdate = observedAt;
+                return true;
+            }
+
+            // UE may resend saved moves while airborne. Their positions are
+            // spatially plausible but older than the sample already rendered;
+            // never let the bootstrap hypotheses reacquire one of them.
+            if (candidates.Any(candidate =>
+                    IsContinuous(current, _lastLockUpdate, candidate, observedAt)))
+            {
+                sample = default;
+                return false;
+            }
         }
 
         if (_current is not null && observedAt - _lastLockUpdate > LockLifetime)
@@ -79,6 +95,7 @@ public sealed class LocalMovementTracker
         {
             _current = ready.Candidate;
             _lastLockUpdate = observedAt;
+            _hypotheses.Clear();
             sample = ready.Candidate;
             return true;
         }
@@ -94,16 +111,29 @@ public sealed class LocalMovementTracker
         _lastLockUpdate = default;
     }
 
-    private bool TryContinueTrack(
+    internal static bool TryContinueTrack(
         IReadOnlyList<UnrealMovementCandidate> candidates,
         UnrealMovementCandidate current,
+        DateTimeOffset lastUpdate,
         DateTimeOffset observedAt,
         out UnrealMovementCandidate sample)
     {
+        var elapsed = observedAt - lastUpdate;
+        var elapsedSeconds = Math.Max(0d, elapsed.TotalSeconds);
         var continuous = candidates
-            .Where(candidate => IsContinuous(current, _lastLockUpdate, candidate, observedAt))
-            .OrderByDescending(candidate => candidate.ClientTimestamp)
-            .ThenBy(candidate => Distance(current, candidate))
+            .Where(candidate => IsContinuous(current, lastUpdate, candidate, observedAt))
+            .Select(candidate => new TimestampRankedCandidate(
+                candidate,
+                IsPlausibleForwardTimestamp(current, candidate, elapsedSeconds)))
+            .Where(item =>
+                item.TimestampPlausible
+                || item.Candidate.ClientTimestamp + TimestampRegressionTolerance >= current.ClientTimestamp
+                || elapsed >= TimestampRecoveryAge)
+            .OrderByDescending(item => item.TimestampPlausible)
+            .ThenByDescending(item => item.TimestampPlausible
+                ? item.Candidate.ClientTimestamp
+                : float.MinValue)
+            .ThenBy(item => Distance(current, item.Candidate))
             .ThenBy(candidate => candidate.LocationBitOffset)
             .ToArray();
 
@@ -113,8 +143,25 @@ public sealed class LocalMovementTracker
             return false;
         }
 
-        sample = continuous[0];
+        var selected = continuous[0];
+        sample = selected.TimestampPlausible
+            ? selected.Candidate
+            : selected.Candidate with
+            {
+                ClientTimestamp = current.ClientTimestamp + (float)elapsedSeconds
+            };
         return true;
+    }
+
+    private static bool IsPlausibleForwardTimestamp(
+        UnrealMovementCandidate current,
+        UnrealMovementCandidate candidate,
+        double elapsedSeconds)
+    {
+        var delta = candidate.ClientTimestamp - current.ClientTimestamp;
+        var maximumAdvance = TimestampAdvanceAllowanceSeconds
+                             + (float)elapsedSeconds * TimestampWallClockMultiplier;
+        return delta >= -TimestampRegressionTolerance && delta <= maximumAdvance;
     }
 
     private static bool IsContinuous(
@@ -152,4 +199,11 @@ public sealed class LocalMovementTracker
         DateTimeOffset FirstSeen,
         DateTimeOffset LastSeen,
         int ConsecutiveHits);
+
+    private readonly record struct TimestampRankedCandidate(
+        UnrealMovementCandidate Candidate,
+        bool TimestampPlausible)
+    {
+        public int LocationBitOffset => Candidate.LocationBitOffset;
+    }
 }
