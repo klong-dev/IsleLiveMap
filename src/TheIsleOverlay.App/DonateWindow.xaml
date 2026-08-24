@@ -9,6 +9,7 @@
         FontFamily="Segoe UI" FontSize="13"
         TextOptions.TextFormattingMode="Display" TextOptions.TextHintingMode="Fixed"
         UseLayoutRounding="True" SnapsToDevicePixels="True"
+        Loaded="Window_Loaded" Closing="Window_Closing" Closed="Window_Closed"
         PreviewKeyDown="Window_PreviewKeyDown">
     <Window.Resources>
         <SolidColorBrush x:Key="Bone" Color="#E9F4EE" />
@@ -44,6 +45,10 @@
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
                                 <Setter TargetName="ButtonChrome" Property="Background" Value="#28544C" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.42" />
+                                <Setter Property="Cursor" Value="Arrow" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -97,6 +102,7 @@
                     <Button x:Name="TopCloseButton" Grid.Column="2"
                             Style="{StaticResource FieldButton}"
                             Content="×" Width="29" Height="25" Padding="0"
+                            IsEnabled="False" ToolTip="Có thể đóng sau 7 giây"
                             FontSize="15" AutomationProperties.Name="Đóng lời mời ủng hộ"
                             Click="CloseButton_Click" />
                 </Grid>
@@ -234,12 +240,13 @@
                                 Click="CopyAccountButton_Click" />
                         <Button x:Name="EnterToolButton" Grid.Column="2"
                                 Style="{StaticResource FieldButton}"
-                                Content="ĐÓNG · VÀO TOOL  →"
+                                Content="ĐÓNG SAU 7S  →"
                                 Height="42" Padding="17,0"
                                 Foreground="#F1FFFB"
                                 Background="#D41B4942"
                                 BorderBrush="#5C9D91"
                                 AutomationProperties.Name="Đóng lời mời và vào tool"
+                                IsEnabled="False"
                                 IsDefault="True"
                                 Click="CloseButton_Click" />
                     </Grid>

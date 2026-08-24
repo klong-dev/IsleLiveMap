@@ -30,7 +30,10 @@ public sealed class DonatePromptTests
         Assert.Equal(
             "/IsleLiveMap;component/Assets/cute_mouse.jpg",
             (string?)Control("DonateImage").Attribute("Source"));
-        Assert.Equal("ĐÓNG · VÀO TOOL  →", (string?)Control("EnterToolButton").Attribute("Content"));
+        Assert.Equal("ĐÓNG SAU 7S  →", (string?)Control("EnterToolButton").Attribute("Content"));
+        Assert.Equal("False", (string?)Control("EnterToolButton").Attribute("IsEnabled"));
+        Assert.Equal("False", (string?)Control("TopCloseButton").Attribute("IsEnabled"));
+        Assert.Equal(7, DonateWindow.CloseDelaySeconds);
         Assert.NotNull(Control("TopCloseButton"));
         Assert.NotNull(Control("CopyAccountButton"));
 
