@@ -4,7 +4,9 @@ public sealed class LocalMovementTracker
 {
     private static readonly TimeSpan HypothesisLifetime = TimeSpan.FromSeconds(1);
     private static readonly TimeSpan LockLifetime = TimeSpan.FromSeconds(2);
-    private const int RequiredConsecutiveHits = 4;
+    private static readonly TimeSpan MinimumBootstrapDuration = TimeSpan.FromMilliseconds(600);
+    private static readonly TimeSpan MaximumReadyAge = TimeSpan.FromMilliseconds(250);
+    private const int RequiredConsecutiveHits = 8;
     private const double MaximumBaseDelta = 5_000d;
     private const double MaximumUnitsPerSecond = 100_000d;
 
@@ -46,7 +48,11 @@ public sealed class LocalMovementTracker
                 || observedAt - hypothesis.LastSeen > HypothesisLifetime
                 || !IsContinuous(hypothesis.Candidate, hypothesis.LastSeen, candidate, observedAt))
             {
-                _hypotheses[candidate.Layout] = new Hypothesis(candidate, observedAt, 1);
+                _hypotheses[candidate.Layout] = new Hypothesis(
+                    candidate,
+                    observedAt,
+                    observedAt,
+                    1);
                 continue;
             }
 
@@ -57,14 +63,23 @@ public sealed class LocalMovementTracker
                 ConsecutiveHits = hypothesis.ConsecutiveHits + 1
             };
             _hypotheses[candidate.Layout] = hypothesis;
-            if (hypothesis.ConsecutiveHits < RequiredConsecutiveHits)
-            {
-                continue;
-            }
+        }
 
-            _current = candidate;
+        var ready = _hypotheses.Values
+            .Where(hypothesis =>
+                hypothesis.ConsecutiveHits >= RequiredConsecutiveHits
+                && observedAt - hypothesis.FirstSeen >= MinimumBootstrapDuration
+                && observedAt - hypothesis.LastSeen <= MaximumReadyAge)
+            .OrderByDescending(hypothesis => hypothesis.ConsecutiveHits)
+            .ThenByDescending(hypothesis => hypothesis.Candidate.ComponentBitCount)
+            .ThenByDescending(hypothesis =>
+                Math.Abs(hypothesis.Candidate.X) + Math.Abs(hypothesis.Candidate.Y))
+            .FirstOrDefault();
+        if (ready is not null)
+        {
+            _current = ready.Candidate;
             _lastLockUpdate = observedAt;
-            sample = candidate;
+            sample = ready.Candidate;
             return true;
         }
 
@@ -134,6 +149,7 @@ public sealed class LocalMovementTracker
 
     private sealed record Hypothesis(
         UnrealMovementCandidate Candidate,
+        DateTimeOffset FirstSeen,
         DateTimeOffset LastSeen,
         int ConsecutiveHits);
 }

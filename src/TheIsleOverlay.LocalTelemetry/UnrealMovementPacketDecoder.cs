@@ -10,6 +10,10 @@ public sealed class UnrealMovementPacketDecoder
 {
     private const int QuantizedVectorHeaderBits = 7;
     private const int FloatBits = 32;
+    // Even at Gateway's world origin, normal terrain altitude keeps the
+    // absolute location wider than tiny gameplay values. Starting at 18 bits
+    // avoids treating flags and zero-filled padding as world positions.
+    private const int MinimumLocationComponentBits = 18;
     private const int MinimumComponentBits = 1;
     private const int MaximumComponentBits = 31;
 
@@ -33,7 +37,7 @@ public sealed class UnrealMovementPacketDecoder
 
         var candidates = new List<UnrealMovementCandidate>();
         var payloadBits = payload.Length * 8;
-        var minimumMoveBits = QuantizedVectorHeaderBits + MinimumComponentBits * 3 + 3;
+        var minimumMoveBits = QuantizedVectorHeaderBits + MinimumLocationComponentBits * 3 + 3;
 
         for (var locationOffset = 0;
              locationOffset + minimumMoveBits <= payloadBits;
@@ -43,7 +47,7 @@ public sealed class UnrealMovementPacketDecoder
             var componentBits = header & 63;
             var usesScale = (header & 64) != 0;
             if (!usesScale
-                || componentBits is < MinimumComponentBits or > MaximumComponentBits
+                || componentBits is < MinimumLocationComponentBits or > MaximumComponentBits
                 || locationOffset + QuantizedVectorHeaderBits + componentBits * 3 + 3 > payloadBits)
             {
                 continue;

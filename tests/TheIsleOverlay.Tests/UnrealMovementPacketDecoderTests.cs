@@ -10,6 +10,9 @@ public sealed class UnrealMovementPacketDecoderTests
     private const string StationaryPayload =
         "000000000000000000000000000000000000000000000000000000000000000000000000B79D23434900002A6D63F044B54C8970F9D713D44FBFB122080960";
 
+    private const string CompetingCandidatePayload =
+        "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000004ADC1A424168F9F4A4110BA14D30DE832407D71F0006";
+
     private readonly UnrealMovementPacketDecoder _decoder = new();
 
     [Fact]
@@ -54,17 +57,46 @@ public sealed class UnrealMovementPacketDecoderTests
     }
 
     [Fact]
-    public void Tracker_LocksAfterFourConsistentPackets()
+    public void Tracker_LocksAfterStableBootstrapWindow()
     {
         var tracker = new LocalMovementTracker(_decoder);
         var payload = Convert.FromHexString(StationaryPayload);
         var startedAt = DateTimeOffset.Parse("2026-08-24T00:00:00Z");
 
-        Assert.False(tracker.TryTrack(payload, startedAt, out _));
-        Assert.False(tracker.TryTrack(payload, startedAt.AddMilliseconds(50), out _));
-        Assert.False(tracker.TryTrack(payload, startedAt.AddMilliseconds(100), out _));
-        Assert.True(tracker.TryTrack(payload, startedAt.AddMilliseconds(150), out var sample));
+        for (var index = 0; index < 12; index++)
+        {
+            Assert.False(tracker.TryTrack(
+                payload,
+                startedAt.AddMilliseconds(index * 50),
+                out _));
+        }
+
+        Assert.True(tracker.TryTrack(payload, startedAt.AddMilliseconds(600), out var sample));
         Assert.Equal(442_020.33d, sample.X, precision: 2);
         Assert.Equal(-162_148.37d, sample.Y, precision: 2);
+    }
+
+    [Fact]
+    public void Tracker_LocksRealWorldVectorFromLivePayload()
+    {
+        var tracker = new LocalMovementTracker(_decoder);
+        var payload = Convert.FromHexString(CompetingCandidatePayload);
+        var decoded = _decoder.Decode(payload);
+        Assert.Contains(decoded, candidate =>
+            Math.Abs(candidate.X - 137_939.16d) < 0.01d
+            && Math.Abs(candidate.Y - 285_822.42d) < 0.01d);
+        var startedAt = DateTimeOffset.Parse("2026-08-24T00:00:00Z");
+        UnrealMovementCandidate tracked = default;
+        for (var index = 0; index <= 12; index++)
+        {
+            tracker.TryTrack(
+                payload,
+                startedAt.AddMilliseconds(index * 50),
+                out tracked);
+        }
+
+        Assert.Equal(137_939.16d, tracked.X, precision: 2);
+        Assert.Equal(285_822.42d, tracked.Y, precision: 2);
+        Assert.Equal(22.38d, tracked.UnrealYawDegrees, precision: 2);
     }
 }

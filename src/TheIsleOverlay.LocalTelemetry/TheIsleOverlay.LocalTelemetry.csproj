@@ -4,6 +4,10 @@
     <ProjectReference Include="..\TheIsleOverlay.Core\TheIsleOverlay.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="SharpPcap" Version="6.3.1" />
+  </ItemGroup>
+
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
