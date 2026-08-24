@@ -1,21 +1,22 @@
 <Window x:Class="TheIsleOverlay.App.NpcapRequiredWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Cần Npcap" Width="448" Height="286"
+        Title="Cài Npcap" Width="548" Height="488"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
         ResizeMode="NoResize" WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
         FontFamily="Segoe UI" TextOptions.TextFormattingMode="Display"
-        UseLayoutRounding="True" SnapsToDevicePixels="True">
+        UseLayoutRounding="True" SnapsToDevicePixels="True"
+        Closing="Window_Closing">
     <Window.Resources>
-        <Style x:Key="PromptButton" TargetType="Button">
-            <Setter Property="Height" Value="38" />
-            <Setter Property="Padding" Value="14,0" />
+        <Style x:Key="SetupButton" TargetType="Button">
+            <Setter Property="Height" Value="42" />
+            <Setter Property="Padding" Value="17,0" />
             <Setter Property="Foreground" Value="#DCEBE6" />
             <Setter Property="Background" Value="#122C28" />
             <Setter Property="BorderBrush" Value="#466D65" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="FontFamily" Value="Bahnschrift SemiCondensed" />
-            <Setter Property="FontSize" Value="11.5" />
+            <Setter Property="FontSize" Value="12" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="Template">
@@ -24,7 +25,7 @@
                         <Border x:Name="Surface" Background="{TemplateBinding Background}"
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="2" Padding="{TemplateBinding Padding}">
+                                CornerRadius="3" Padding="{TemplateBinding Padding}">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
                         <ControlTemplate.Triggers>
@@ -35,70 +36,211 @@
                             <Trigger Property="IsPressed" Value="True">
                                 <Setter TargetName="Surface" Property="Background" Value="#25584F" />
                             </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Surface" Property="Opacity" Value="0.42" />
+                                <Setter Property="Cursor" Value="Arrow" />
+                            </Trigger>
                         </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="SetupProgress" TargetType="ProgressBar">
+            <Setter Property="Height" Value="4" />
+            <Setter Property="Foreground" Value="#37D4C6" />
+            <Setter Property="Background" Value="#17302C" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ProgressBar">
+                        <Border Background="{TemplateBinding Background}" CornerRadius="2"
+                                ClipToBounds="True">
+                            <Grid>
+                                <Rectangle x:Name="PART_Track" />
+                                <Rectangle x:Name="PART_Indicator"
+                                           Fill="{TemplateBinding Foreground}"
+                                           HorizontalAlignment="Left" />
+                            </Grid>
+                        </Border>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
         </Style>
     </Window.Resources>
 
-    <Border Margin="12" Background="#FA071716" BorderBrush="#725A7F77"
-            BorderThickness="1" CornerRadius="7">
+    <Border Margin="12" Background="#FC071716" BorderBrush="#725A7F77"
+            BorderThickness="1" CornerRadius="8">
         <Border.Effect>
-            <DropShadowEffect Color="#000000" BlurRadius="24" ShadowDepth="4" Opacity="0.72" />
+            <DropShadowEffect Color="#000000" BlurRadius="28" ShadowDepth="5" Opacity="0.76" />
         </Border.Effect>
         <Grid>
             <Grid.RowDefinitions>
-                <RowDefinition Height="42" />
+                <RowDefinition Height="44" />
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
 
             <Border BorderBrush="#31544D" BorderThickness="0,0,0,1"
                     MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
-                <Grid Margin="14,0,9,0">
+                <Grid Margin="15,0,10,0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <Ellipse Width="8" Height="8" Fill="#173A35" Stroke="#37D4C6" StrokeThickness="1.4" />
-                    <TextBlock Grid.Column="1" Text="LOCAL CAPTURE / SETUP" Foreground="#91AAA3"
-                               FontFamily="Bahnschrift SemiCondensed" FontSize="10" FontWeight="SemiBold"
-                               VerticalAlignment="Center" Margin="9,0,0,0" />
-                    <Button Grid.Column="2" Style="{StaticResource PromptButton}" Content="×"
-                            Width="27" Height="23" Padding="0" Click="CloseButton_Click" />
+                    <TextBlock Grid.Column="1" Text="LOCAL CAPTURE / THIẾT LẬP MỘT CHẠM"
+                               Foreground="#91AAA3" FontFamily="Bahnschrift SemiCondensed"
+                               FontSize="10.5" FontWeight="SemiBold" VerticalAlignment="Center"
+                               Margin="9,0,0,0" />
+                    <Button x:Name="TopCloseButton" Grid.Column="2" Style="{StaticResource SetupButton}"
+                            Content="×" Width="28" Height="24" Padding="0"
+                            Click="CloseButton_Click" />
                 </Grid>
             </Border>
 
-            <Grid Grid.Row="1" Margin="22,18,22,20">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="4" />
-                    <ColumnDefinition Width="*" />
-                </Grid.ColumnDefinitions>
-                <Rectangle Fill="#37D4C6" RadiusX="1" RadiusY="1" />
-                <Grid Grid.Column="1" Margin="16,0,0,0">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="*" />
-                        <RowDefinition Height="Auto" />
-                    </Grid.RowDefinitions>
-                    <TextBlock Text="CẦN NPCAP" Foreground="#E9F4EE"
-                               FontFamily="Bahnschrift SemiCondensed" FontSize="25" FontWeight="Bold" />
-                    <TextBlock Grid.Row="1"
-                               Text="Isle Live Map dùng Npcap để đọc movement trên chính máy bạn. Không inject và không đọc bộ nhớ game."
-                               Foreground="#AEC1BB" FontSize="12" FontWeight="Medium"
-                               TextWrapping="Wrap" Margin="0,6,0,0" />
-                    <TextBlock Grid.Row="2" Text="Cài miễn phí từ trang chính thức, sau đó mở lại app."
-                               Foreground="#7F9B93" FontSize="11" FontWeight="Medium"
-                               VerticalAlignment="Top" Margin="0,9,0,0" />
-                    <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right">
-                        <Button Style="{StaticResource PromptButton}" Content="ĐỂ SAU"
-                                Click="CloseButton_Click" />
-                        <Button Style="{StaticResource PromptButton}" Content="MỞ TRANG TẢI  →"
-                                Foreground="#E8FFFA" Background="#193E38" BorderBrush="#4A9588"
-                                Margin="8,0,0,0" Click="DownloadButton_Click" />
+            <Grid Grid.Row="1" Margin="24,20,24,22">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="5" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Rectangle Fill="#37D4C6" RadiusX="2" RadiusY="2" />
+                    <StackPanel Grid.Column="1" Margin="16,0,16,0">
+                        <TextBlock Text="CÀI NPCAP MỘT CHẠM" Foreground="#EFF8F3"
+                                   FontFamily="Bahnschrift SemiCondensed" FontSize="27"
+                                   FontWeight="Bold" />
+                        <TextBlock Text="Thiếu thành phần đọc vị trí trực tiếp từ game. Isle Live Map sẽ tự tải và mở bộ cài chính thức cho bạn."
+                                   Foreground="#ADC2BB" FontSize="12.2" FontWeight="Medium"
+                                   TextWrapping="Wrap" Margin="0,5,0,0" MaxWidth="388" />
                     </StackPanel>
+                    <Border Grid.Column="2" Background="#182C28" BorderBrush="#405D57"
+                            BorderThickness="1" CornerRadius="3" Padding="9,5"
+                            VerticalAlignment="Top">
+                        <TextBlock Text="BẮT BUỘC" Foreground="#FFE18A"
+                                   FontFamily="Bahnschrift SemiCondensed" FontSize="9.5"
+                                   FontWeight="Bold" />
+                    </Border>
+                </Grid>
+
+                <Border Grid.Row="1" Background="#0F2421" BorderBrush="#294A44"
+                        BorderThickness="1" CornerRadius="4" Margin="0,17,0,0" Padding="13,10">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="✓" Foreground="#37D4C6" FontSize="14" FontWeight="Bold"
+                                   VerticalAlignment="Center" />
+                        <StackPanel Grid.Column="1" Margin="9,0,0,0">
+                            <TextBlock Text="TẢI TỪ NPCAP.COM" Foreground="#DDEBE6"
+                                       FontFamily="Bahnschrift SemiCondensed" FontSize="11"
+                                       FontWeight="SemiBold" />
+                            <TextBlock Text="App kiểm tra file trước khi cho phép chạy"
+                                       Foreground="#78968E" FontSize="10.2" FontWeight="Medium" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="2" HorizontalAlignment="Right">
+                            <TextBlock Text="NPCAP 1.88" Foreground="#B9CEC7"
+                                       FontFamily="Bahnschrift SemiCondensed" FontSize="10.5"
+                                       FontWeight="SemiBold" HorizontalAlignment="Right" />
+                            <TextBlock Text="NMAP SOFTWARE LLC" Foreground="#65837B"
+                                       FontFamily="Bahnschrift SemiCondensed" FontSize="9"
+                                       HorizontalAlignment="Right" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <Grid Grid.Row="2" Margin="0,15,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="5" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="5" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="5" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Border x:Name="DownloadStep" Background="#193D37" BorderBrush="#37D4C6"
+                            BorderThickness="1" CornerRadius="3" Padding="7,7">
+                        <TextBlock x:Name="DownloadStepLabel" Text="01  TẢI" Foreground="#DFFFF9"
+                                   FontFamily="Bahnschrift SemiCondensed" FontSize="10"
+                                   FontWeight="SemiBold" HorizontalAlignment="Center" />
+                    </Border>
+                    <Border x:Name="VerifyStep" Grid.Column="2" Background="#101F1D" BorderBrush="#2A4540"
+                            BorderThickness="1" CornerRadius="3" Padding="7,7">
+                        <TextBlock x:Name="VerifyStepLabel" Text="02  KIỂM TRA" Foreground="#607B74"
+                                   FontFamily="Bahnschrift SemiCondensed" FontSize="10"
+                                   FontWeight="SemiBold" HorizontalAlignment="Center" />
+                    </Border>
+                    <Border x:Name="InstallStep" Grid.Column="4" Background="#101F1D" BorderBrush="#2A4540"
+                            BorderThickness="1" CornerRadius="3" Padding="7,7">
+                        <TextBlock x:Name="InstallStepLabel" Text="03  CÀI" Foreground="#607B74"
+                                   FontFamily="Bahnschrift SemiCondensed" FontSize="10"
+                                   FontWeight="SemiBold" HorizontalAlignment="Center" />
+                    </Border>
+                    <Border x:Name="CheckStep" Grid.Column="6" Background="#101F1D" BorderBrush="#2A4540"
+                            BorderThickness="1" CornerRadius="3" Padding="7,7">
+                        <TextBlock x:Name="CheckStepLabel" Text="04  SẴN SÀNG" Foreground="#607B74"
+                                   FontFamily="Bahnschrift SemiCondensed" FontSize="10"
+                                   FontWeight="SemiBold" HorizontalAlignment="Center" />
+                    </Border>
+                </Grid>
+
+                <Border Grid.Row="3" Background="#0B1D1B" BorderBrush="#27423D"
+                        BorderThickness="1" CornerRadius="4" Margin="0,14,0,0" Padding="14,11">
+                    <StackPanel>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Ellipse x:Name="SetupStatusDot" Width="7" Height="7" Fill="#37D4C6"
+                                     VerticalAlignment="Center" Margin="0,0,9,0" />
+                            <TextBlock x:Name="SetupStatusLabel" Grid.Column="1"
+                                       Text="SẴN SÀNG CÀI ĐẶT" Foreground="#D7E8E2"
+                                       FontFamily="Bahnschrift SemiCondensed" FontSize="11"
+                                       FontWeight="SemiBold" VerticalAlignment="Center" />
+                            <TextBlock x:Name="SetupPercentLabel" Grid.Column="2" Text=""
+                                       Foreground="#77A79D" FontFamily="Bahnschrift SemiCondensed"
+                                       FontSize="10.5" FontWeight="SemiBold" />
+                        </Grid>
+                        <ProgressBar x:Name="SetupProgressBar" Style="{StaticResource SetupProgress}"
+                                     Minimum="0" Maximum="100" Value="0" Margin="0,9,0,0" />
+                        <TextBlock x:Name="SetupDetailLabel"
+                                   Text="Windows sẽ hỏi quyền quản trị, sau đó bạn chỉ cần hoàn tất cửa sổ Npcap."
+                                   Foreground="#78968E" FontSize="10.5" FontWeight="Medium"
+                                   TextWrapping="Wrap" Margin="0,8,0,0" />
+                    </StackPanel>
+                </Border>
+
+                <TextBlock Grid.Row="4"
+                           Text="Không cần tự tải file hoặc mở lại app. Cài xong, thao tác MỞ MAP sẽ tự tiếp tục."
+                           Foreground="#66847C" FontSize="10.2" FontStyle="Italic"
+                           TextWrapping="Wrap" VerticalAlignment="Center" Margin="1,9,0,9" />
+
+                <Grid Grid.Row="5">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Button x:Name="LaterButton" Style="{StaticResource SetupButton}"
+                            Content="ĐỂ SAU" Click="CloseButton_Click" />
+                    <Button x:Name="InstallButton" Grid.Column="1" Style="{StaticResource SetupButton}"
+                            Content="TẢI &amp; CÀI NPCAP  →" Foreground="#071C19"
+                            Background="#37D4C6" BorderBrush="#76F0E4"
+                            FontSize="13" FontWeight="Bold" HorizontalAlignment="Stretch"
+                            Margin="10,0,0,0" Click="InstallButton_Click" />
                 </Grid>
             </Grid>
         </Grid>

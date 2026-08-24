@@ -263,11 +263,20 @@ public partial class HomeWindow : Window
         SourceStatusLabel.Text = availability.ErrorMessage
             ?? "Chưa thể đọc vị trí trực tiếp từ game.";
         var prompt = new NpcapRequiredWindow { Owner = this };
-        if (prompt.ShowDialog() == true)
+        if (prompt.ShowDialog() != true)
         {
-            OpenExternal("https://npcap.com/#download");
+            return false;
         }
 
+        availability = NpcapAvailabilityProbe.Check(refresh: true);
+        if (availability.IsAvailable)
+        {
+            SourceStatusLabel.Text = "Npcap đã sẵn sàng. Đang tiếp tục mở map…";
+            return true;
+        }
+
+        SourceStatusLabel.Text = availability.ErrorMessage
+            ?? "Npcap chưa hoạt động. Hãy khởi động lại Windows rồi thử lại.";
         return false;
     }
 

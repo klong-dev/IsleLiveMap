@@ -39,6 +39,9 @@
     <Content Include="..\..\src\TheIsleOverlay.App\ReleaseHighlightsWindow.xaml"
              Link="TestAssets\ReleaseHighlightsWindow.xaml"
              CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\src\TheIsleOverlay.App\NpcapRequiredWindow.xaml"
+             Link="TestAssets\NpcapRequiredWindow.xaml"
+             CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

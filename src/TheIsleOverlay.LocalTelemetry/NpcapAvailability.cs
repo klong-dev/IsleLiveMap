@@ -6,11 +6,23 @@ public readonly record struct NpcapAvailability(bool IsAvailable, string? ErrorM
 
 public static class NpcapAvailabilityProbe
 {
-    public static NpcapAvailability Check()
+    public static NpcapAvailability Check(bool refresh = false)
     {
+        var systemDirectory = Environment.GetFolderPath(Environment.SpecialFolder.System);
+        if (!HasRuntimeFiles(systemDirectory))
+        {
+            return Unavailable();
+        }
+
         try
         {
-            return CaptureDeviceList.Instance.Count > 0
+            var devices = CaptureDeviceList.Instance;
+            if (refresh)
+            {
+                devices.Refresh();
+            }
+
+            return devices.Count > 0
                 ? new NpcapAvailability(true)
                 : Unavailable();
         }
@@ -22,6 +34,10 @@ public static class NpcapAvailabilityProbe
             return Unavailable();
         }
     }
+
+    internal static bool HasRuntimeFiles(string systemDirectory) =>
+        File.Exists(Path.Combine(systemDirectory, "Npcap", "wpcap.dll"))
+        && File.Exists(Path.Combine(systemDirectory, "Npcap", "Packet.dll"));
 
     private static NpcapAvailability Unavailable() => new(
         false,
