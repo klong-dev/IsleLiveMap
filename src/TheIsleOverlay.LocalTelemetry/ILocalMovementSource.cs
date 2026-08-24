@@ -8,4 +8,5 @@ public interface ILocalMovementSource : IAsyncDisposable
 
 public readonly record struct LocalMovementObservation(
     DateTimeOffset ObservedAt,
-    UnrealMovementCandidate Movement);
+    UnrealMovementCandidate Movement,
+    string? ServerEndpoint = null);

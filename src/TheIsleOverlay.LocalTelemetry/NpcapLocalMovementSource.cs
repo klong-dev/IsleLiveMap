@@ -219,6 +219,7 @@ public sealed class NpcapLocalMovementSource : ILocalMovementSource
         {
             var rawPacket = packetCapture.GetPacket();
             var packet = Packet.ParsePacket(rawPacket.LinkLayerType, rawPacket.Data);
+            var ip = packet.Extract<IPPacket>();
             var udp = packet.Extract<UdpPacket>();
             if (udp is null || !ports.Contains(udp.SourcePort))
             {
@@ -236,7 +237,13 @@ public sealed class NpcapLocalMovementSource : ILocalMovementSource
             {
                 if (_tracker.TryTrack(payload, observedAt, out var movement))
                 {
-                    writer.TryWrite(new LocalMovementObservation(observedAt, movement));
+                    var serverEndpoint = ip is null
+                        ? null
+                        : $"{ip.DestinationAddress}:{udp.DestinationPort}";
+                    writer.TryWrite(new LocalMovementObservation(
+                        observedAt,
+                        movement,
+                        serverEndpoint));
                 }
             }
         }

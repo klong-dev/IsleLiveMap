@@ -10,6 +10,7 @@ using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using TheIsleOverlay.Core;
+using TheIsleOverlay.LocalTelemetry;
 
 namespace TheIsleOverlay.App;
 
@@ -129,6 +130,10 @@ public partial class MainWindow : Window
             MapStateLabel.Text = "CHƯA CÓ PHIÊN ĐĂNG NHẬP";
             return;
         }
+
+        _telemetrySession = new LocalPositionTelemetrySession(
+            _telemetrySession,
+            sourceName: _configuredSource);
 
         LoadMap();
         _telemetryWatchTask = WatchTelemetryAsync();
