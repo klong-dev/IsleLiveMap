@@ -70,7 +70,7 @@
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="9,0,0,0">
                         <TextBlock Text="PATCH NOTES // DEPLOYED" Foreground="{StaticResource ReleaseBone}"
                                    FontFamily="Bahnschrift SemiCondensed" FontSize="11.5" FontWeight="SemiBold" />
-                        <TextBlock x:Name="TitleVersionLabel" Text="   ISLE LIVE MAP · v1.3.0"
+                        <TextBlock x:Name="TitleVersionLabel" Text="   ISLE LIVE MAP · v1.3.1"
                                    Foreground="#7F9B94" FontFamily="Bahnschrift" FontSize="9.5"
                                    FontWeight="Medium" VerticalAlignment="Center" />
                     </StackPanel>
@@ -94,17 +94,17 @@
                 <Grid Margin="0,0,0,18">
                     <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                     <StackPanel>
-                        <TextBlock Text="SIÊU CẬP NHẬT TELEMETRY" Foreground="{StaticResource ReleaseTeal}"
+                        <TextBlock Text="HOTFIX TRẢI NGHIỆM CÀI ĐẶT" Foreground="{StaticResource ReleaseTeal}"
                                    FontFamily="Bahnschrift SemiCondensed" FontSize="11" FontWeight="SemiBold" />
-                        <TextBlock Text="MAP NHANH. STATUS ĐỦ."
+                        <TextBlock Text="NPCAP: MỘT NÚT."
                                    Foreground="{StaticResource ReleaseBone}" FontFamily="Bahnschrift SemiCondensed"
                                    FontSize="31" FontWeight="Bold" Margin="-1,2,0,0" />
-                        <TextBlock Text="Tọa độ và hướng quay đọc trực tiếp; HP, đói, nước và nhiệm vụ vẫn lấy từ server."
+                        <TextBlock Text="Máy thiếu Npcap? App tự tải, kiểm tra và mở bộ cài chính thức cho bạn."
                                    Foreground="{StaticResource ReleaseMuted}" FontSize="12.5" FontWeight="Medium" Margin="0,5,0,0" />
                     </StackPanel>
                     <StackPanel Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center">
                         <TextBlock Text="VERSION" Foreground="#6F8C84" FontFamily="Bahnschrift SemiCondensed" FontSize="9" HorizontalAlignment="Right" />
-                        <TextBlock x:Name="HeroVersionLabel" Text="1.3.0" Foreground="#FFE18A"
+                        <TextBlock x:Name="HeroVersionLabel" Text="1.3.1" Foreground="#FFE18A"
                                    FontFamily="Bahnschrift" FontSize="28" FontWeight="Bold" Margin="0,-3,0,0" />
                     </StackPanel>
                 </Grid>
@@ -117,33 +117,33 @@
                         <Grid Height="62">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="43" /><ColumnDefinition Width="190" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                             <TextBlock Text="01" Foreground="#E7B74E" FontFamily="Bahnschrift" FontSize="11" FontWeight="Bold" VerticalAlignment="Center" />
-                            <TextBlock Grid.Column="1" Text="GPS TRỰC TIẾP TỪ GAME" Foreground="#FFE18A" FontFamily="Bahnschrift SemiCondensed" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" />
-                            <TextBlock Grid.Column="2" Text="Không chờ website cập nhật marker" Foreground="{StaticResource ReleaseMuted}" FontSize="11.5" VerticalAlignment="Center" />
-                            <TextBlock Grid.Column="3" Text="LOCAL" Foreground="#FFE18A" FontFamily="Bahnschrift" FontSize="9.5" FontWeight="Bold" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="1" Text="CÀI NPCAP MỘT CHẠM" Foreground="#FFE18A" FontFamily="Bahnschrift SemiCondensed" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="2" Text="Bấm một lần, app tự tải và mở bộ cài" Foreground="{StaticResource ReleaseMuted}" FontSize="11.5" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="3" Text="SETUP" Foreground="#FFE18A" FontFamily="Bahnschrift" FontSize="9.5" FontWeight="Bold" VerticalAlignment="Center" />
                         </Grid>
                         <Rectangle Height="1" Fill="#304A45" />
                         <Grid Height="62">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="43" /><ColumnDefinition Width="190" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                             <TextBlock Text="02" Foreground="#E7B74E" FontFamily="Bahnschrift" FontSize="11" FontWeight="Bold" VerticalAlignment="Center" />
-                            <TextBlock Grid.Column="1" Text="STATUS DINO GIỮ NGUYÊN" Foreground="#E4EEE9" FontFamily="Bahnschrift SemiCondensed" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" />
-                            <TextBlock Grid.Column="2" Text="HP, đói, nước và nhiệm vụ vẫn đầy đủ" Foreground="{StaticResource ReleaseMuted}" FontSize="11.5" VerticalAlignment="Center" />
-                            <TextBlock Grid.Column="3" Text="DATA" Foreground="#7FA49B" FontFamily="Bahnschrift" FontSize="9.5" FontWeight="Bold" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="1" Text="NGUỒN CHÍNH THỨC" Foreground="#E4EEE9" FontFamily="Bahnschrift SemiCondensed" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="2" Text="Chỉ nhận file qua HTTPS từ npcap.com" Foreground="{StaticResource ReleaseMuted}" FontSize="11.5" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="3" Text="HTTPS" Foreground="#7FA49B" FontFamily="Bahnschrift" FontSize="9.5" FontWeight="Bold" VerticalAlignment="Center" />
                         </Grid>
                         <Rectangle Height="1" Fill="#304A45" />
                         <Grid Height="62">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="43" /><ColumnDefinition Width="190" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                             <TextBlock Text="03" Foreground="#37D4C6" FontFamily="Bahnschrift" FontSize="11" FontWeight="Bold" VerticalAlignment="Center" />
-                            <TextBlock Grid.Column="1" Text="BAY KHÔNG NHẢY MARKER" Foreground="#90E6DA" FontFamily="Bahnschrift SemiCondensed" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" />
-                            <TextBlock Grid.Column="2" Text="Lọc saved move và timestamp lỗi khi bay" Foreground="{StaticResource ReleaseMuted}" FontSize="11.5" VerticalAlignment="Center" />
-                            <TextBlock Grid.Column="3" Text="GPS" Foreground="#90E6DA" FontFamily="Bahnschrift" FontSize="9.5" FontWeight="Bold" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="1" Text="KIỂM TRA TRƯỚC KHI CHẠY" Foreground="#90E6DA" FontFamily="Bahnschrift SemiCondensed" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="2" Text="Đối chiếu SHA-256 và Nmap Software LLC" Foreground="{StaticResource ReleaseMuted}" FontSize="11.5" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="3" Text="VERIFY" Foreground="#90E6DA" FontFamily="Bahnschrift" FontSize="9.5" FontWeight="Bold" VerticalAlignment="Center" />
                         </Grid>
                         <Rectangle Height="1" Fill="#304A45" />
                         <Grid Height="62">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="43" /><ColumnDefinition Width="190" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                             <TextBlock Text="04" Foreground="#7A9B93" FontFamily="Bahnschrift" FontSize="11" FontWeight="Bold" VerticalAlignment="Center" />
-                            <TextBlock Grid.Column="1" Text="UPDATE XONG MỚI MỞ MAP" Foreground="#E4EEE9" FontFamily="Bahnschrift SemiCondensed" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" />
-                            <TextBlock Grid.Column="2" Text="Không còn restart giữa lúc đang chơi" Foreground="{StaticResource ReleaseMuted}" FontSize="11.5" VerticalAlignment="Center" />
-                            <TextBlock Grid.Column="3" Text="SAFE" Foreground="#7FA49B" FontFamily="Bahnschrift" FontSize="9.5" FontWeight="Bold" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="1" Text="CÀI XONG TỰ TIẾP TỤC" Foreground="#E4EEE9" FontFamily="Bahnschrift SemiCondensed" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="2" Text="Không mở lại app hoặc bấm MỞ MAP lần nữa" Foreground="{StaticResource ReleaseMuted}" FontSize="11.5" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="3" Text="FLOW" Foreground="#7FA49B" FontFamily="Bahnschrift" FontSize="9.5" FontWeight="Bold" VerticalAlignment="Center" />
                         </Grid>
                     </StackPanel>
                 </Border>

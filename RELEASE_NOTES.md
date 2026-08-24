@@ -1,10 +1,10 @@
-# Isle Live Map 1.3.0
+# Isle Live Map 1.3.1
 
-- Chỉ còn một nút **MỞ MAP**: tọa độ và hướng quay lấy trực tiếp từ game, còn HP, đói, nước, growth và nhiệm vụ vẫn lấy từ nguồn server đã chọn.
-- Không còn phụ thuộc tốc độ cập nhật marker của website; hỗ trợ cả server không cung cấp tọa độ qua live map.
-- Sửa marker giật hoặc văng vị trí khi Pteranodon bay bằng cách lọc saved move, timestamp cũ và burst packet.
-- Chặn MỞ MAP trong lúc kiểm tra/tải cập nhật; nếu có bản mới, app yêu cầu cập nhật trước để không restart giữa lúc đang chơi.
-- Kiểm tra update có timeout 15 giây và tự cho dùng khi GitHub tạm thời không phản hồi.
-- Modal donate có đếm ngược 7 giây trước khi cho phép đóng.
+- Máy chưa có Npcap giờ chỉ cần bấm **TẢI & CÀI NPCAP** ngay trong Isle Live Map; không còn phải tự tìm và tải installer.
+- App tải Npcap 1.88 trực tiếp qua HTTPS từ `npcap.com`, giới hạn chuyển hướng và kích thước file.
+- Bộ cài được đối chiếu SHA-256 và publisher **Nmap Software LLC** trước khi Windows cho phép chạy.
+- Hiển thị rõ từng bước tải, kiểm tra, cài đặt và sẵn sàng; có thể hủy an toàn trong lúc tải.
+- Cài xong, app tự kiểm tra lại Npcap và tiếp tục thao tác **MỞ MAP** đang dang dở — không cần mở lại app hay bấm lần hai.
+- Sửa nhận diện Npcap ngay sau khi vừa cài và bổ sung thông báo cụ thể cho UAC, timeout, reboot hoặc Windows Installer đang bận.
 
-> Tọa độ trực tiếp cần cài Npcap. Isle Live Map chỉ đọc movement packet trên chính máy người chơi, không inject và không đọc bộ nhớ game.
+> Windows vẫn sẽ hỏi quyền quản trị và hiện cửa sổ Npcap để người dùng xác nhận cài đặt. Isle Live Map không âm thầm thay đổi hệ thống.

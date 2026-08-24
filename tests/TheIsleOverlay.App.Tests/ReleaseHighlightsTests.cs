@@ -34,7 +34,7 @@ public sealed class ReleaseHighlightsTests
     }
 
     [Fact]
-    public void Modal_SummarizesVersion130DirectTelemetryUpdate()
+    public void Modal_SummarizesVersion131NpcapSetupHotfix()
     {
         var document = XDocument.Load(Path.Combine(
             AppContext.BaseDirectory,
@@ -57,11 +57,11 @@ public sealed class ReleaseHighlightsTests
                 (string?)element.Attribute("Content")
             }));
 
-        Assert.Equal("1.3.0", ReleaseHighlightsWindow.ReleaseVersion);
-        Assert.Contains("GPS TRỰC TIẾP TỪ GAME", allCopy, StringComparison.Ordinal);
-        Assert.Contains("STATUS DINO GIỮ NGUYÊN", allCopy, StringComparison.Ordinal);
-        Assert.Contains("BAY KHÔNG NHẢY MARKER", allCopy, StringComparison.Ordinal);
-        Assert.Contains("UPDATE XONG MỚI MỞ MAP", allCopy, StringComparison.Ordinal);
+        Assert.Equal("1.3.1", ReleaseHighlightsWindow.ReleaseVersion);
+        Assert.Contains("CÀI NPCAP MỘT CHẠM", allCopy, StringComparison.Ordinal);
+        Assert.Contains("NGUỒN CHÍNH THỨC", allCopy, StringComparison.Ordinal);
+        Assert.Contains("KIỂM TRA TRƯỚC KHI CHẠY", allCopy, StringComparison.Ordinal);
+        Assert.Contains("CÀI XONG TỰ TIẾP TỤC", allCopy, StringComparison.Ordinal);
         Assert.Equal("ĐÃ XEM · BẮT ĐẦU  →", (string?)Control("EnterToolButton").Attribute("Content"));
     }
 }
