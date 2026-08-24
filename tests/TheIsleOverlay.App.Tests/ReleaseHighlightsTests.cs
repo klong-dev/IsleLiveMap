@@ -34,7 +34,7 @@ public sealed class ReleaseHighlightsTests
     }
 
     [Fact]
-    public void Modal_SummarizesVersion121MapCoordinateHotfix()
+    public void Modal_SummarizesVersion130DirectTelemetryUpdate()
     {
         var document = XDocument.Load(Path.Combine(
             AppContext.BaseDirectory,
@@ -57,11 +57,11 @@ public sealed class ReleaseHighlightsTests
                 (string?)element.Attribute("Content")
             }));
 
-        Assert.Equal("1.2.1", ReleaseHighlightsWindow.ReleaseVersion);
-        Assert.Contains("MARKER PLAYER KHỚP MAP", allCopy, StringComparison.Ordinal);
-        Assert.Contains("MARKER ĐỒNG ĐỘI", allCopy, StringComparison.Ordinal);
-        Assert.Contains("LAT / LONG ĐÚNG THỨ TỰ", allCopy, StringComparison.Ordinal);
-        Assert.Contains("FALLBACK AN TOÀN", allCopy, StringComparison.Ordinal);
+        Assert.Equal("1.3.0", ReleaseHighlightsWindow.ReleaseVersion);
+        Assert.Contains("GPS TRỰC TIẾP TỪ GAME", allCopy, StringComparison.Ordinal);
+        Assert.Contains("STATUS DINO GIỮ NGUYÊN", allCopy, StringComparison.Ordinal);
+        Assert.Contains("BAY KHÔNG NHẢY MARKER", allCopy, StringComparison.Ordinal);
+        Assert.Contains("UPDATE XONG MỚI MỞ MAP", allCopy, StringComparison.Ordinal);
         Assert.Equal("ĐÃ XEM · BẮT ĐẦU  →", (string?)Control("EnterToolButton").Attribute("Content"));
     }
 }
