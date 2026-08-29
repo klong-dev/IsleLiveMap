@@ -1,8 +1,15 @@
-# Isle Live Map 1.4.0
+# Isle Live Map 1.4.1
+
+## Khôi phục dino stats ổn định
+
+- Growth, Health, Stamina, Hunger và Water tiếp tục được đồng bộ từ IslePilot thay vì decoder inbound đang thử nghiệm.
+- GPS và hướng vẫn đọc trực tiếp từ game bằng Npcap, vì vậy Live Map cơ bản tiếp tục hoạt động trên mọi server.
+- Nút mở Live Map sẽ dùng phiên Steam/IslePilot đã mã hóa hoặc hướng dẫn đăng nhập nếu chưa có phiên.
+- Decoder inbound vitals được giữ ngoài production để tiếp tục nghiên cứu Iris/GAS mà không hiển thị giá trị suy đoán cho người dùng.
 
 ## Live Map trên mọi server
 
-- Live Map giờ đọc trực tiếp dữ liệu inbound và outbound từ game, không còn phụ thuộc website map hoặc plugin riêng của từng server.
+- GPS của Live Map đọc trực tiếp dữ liệu game, không còn phụ thuộc website map hoặc plugin riêng của từng server.
 - Cải thiện pipeline Npcap, buffer packet và phục hồi replication để giảm mất marker khi reconnect, đổi khu vực hoặc gặp packet burst.
 - Ổn định GPS khi di chuyển, bay và respawn; hạn chế vị trí giả, saved move cũ và các bước nhảy marker bất thường.
 

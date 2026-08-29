@@ -314,11 +314,11 @@
                     <TextBlock Text="KÍCH HOẠT LIVE MAP" Foreground="#A8BDB7" FontSize="11.5"
                                FontWeight="SemiBold" Margin="0,0,0,9" />
 
-                    <StackPanel Margin="0,0,0,18">
+                    <StackPanel Margin="0,0,0,18" Loaded="SteamLoginPanel_Loaded">
                         <Button x:Name="SteamLoginButton" Style="{StaticResource SourceButton}"
                                 IsEnabled="False" Height="72"
-                                Click="OpenDirectMapButton_Click" Margin="0,0,0,8"
-                                AutomationProperties.Name="Mở Live Map Free bằng dữ liệu trực tiếp từ game">
+                                Click="SteamLoginButton_Click" Margin="0,0,0,8"
+                                AutomationProperties.Name="Đăng nhập Steam và mở Live Map với stats IslePilot">
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto" />
@@ -331,14 +331,14 @@
                                     <Ellipse Width="4" Height="4" Fill="#E7B74E" />
                                 </Grid>
                                 <StackPanel Grid.Column="1" Margin="14,0,10,0" VerticalAlignment="Center">
-                                    <TextBlock x:Name="SteamAccountLabel" Text="FREE / LOCAL TELEMETRY"
+                                    <TextBlock x:Name="SteamAccountLabel" Text="STEAM / ISLEPILOT STATS"
                                                Foreground="#69E2D6" FontFamily="Bahnschrift SemiCondensed"
                                                FontSize="10" FontWeight="SemiBold" />
                                     <TextBlock Text="MỞ LIVE MAP" Foreground="{StaticResource HomeBone}"
                                                FontFamily="Bahnschrift SemiCondensed" FontSize="16"
                                                FontWeight="SemiBold" Margin="0,2,0,0" />
                                     <TextBlock x:Name="SteamLoginDetailLabel"
-                                               Text="Đọc inbound + outbound trực tiếp từ game"
+                                               Text="GPS trực tiếp · Dino stats đồng bộ qua IslePilot"
                                                Foreground="#91AAA3" FontSize="10.5" FontWeight="Medium" />
                                 </StackPanel>
                                 <TextBlock x:Name="SteamLoginActionLabel" Grid.Column="2"
@@ -347,7 +347,7 @@
                                            FontWeight="SemiBold" VerticalAlignment="Center" Margin="10,0,0,0" />
                             </Grid>
                         </Button>
-                        <TextBlock Text="Miễn phí, không cần website riêng hay plugin server. Npcap phải sẵn sàng trên máy."
+                        <TextBlock Text="GPS hoạt động trên mọi server; stats được đồng bộ qua IslePilot khi khả dụng. Npcap phải sẵn sàng trên máy."
                                    Foreground="#78938C" FontSize="10.5" TextWrapping="Wrap" />
                         <Button x:Name="LogoutSteamButton" Visibility="Collapsed" />
                     </StackPanel>

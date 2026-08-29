@@ -175,39 +175,6 @@ public partial class HomeWindow : Window
         }
     }
 
-    private void OpenDirectMapButton_Click(object sender, RoutedEventArgs e)
-    {
-        if (!EnsureMapLaunchAvailable() || _connecting)
-        {
-            return;
-        }
-
-        if (!EnsureLocalCaptureAvailable())
-        {
-            return;
-        }
-
-        _connecting = true;
-        RefreshMapLaunchControls();
-        try
-        {
-            var overlay = new MainWindow(
-                new LocalPositionTelemetrySession(
-                    localSource: App.CurrentApp.TakeLocalTelemetrySource(),
-                    remotePlayerSource: CreateProPlayerSource()),
-                "DIRECT");
-            Application.Current.MainWindow = overlay;
-            overlay.Show();
-            Close();
-        }
-        catch (Exception exception)
-        {
-            _connecting = false;
-            SourceStatusLabel.Text = $"Không mở được Live Map: {FriendlyError(exception)}";
-            RefreshMapLaunchControls();
-        }
-    }
-
     private async void SourceButton_Click(object sender, RoutedEventArgs e)
     {
         if (!EnsureMapLaunchAvailable()
@@ -362,16 +329,18 @@ public partial class HomeWindow : Window
     {
         var enabled = MapLaunchGatePolicy.AllowsMap(_mapLaunchGateState)
                       && !_connecting;
-        SteamLoginButton.IsEnabled = enabled;
+        SteamLoginButton.IsEnabled = enabled && !_islePilotConnecting;
         LogoutSteamButton.IsEnabled = !_islePilotConnecting && _islePilotCredentials is not null;
         ProAccessButton.IsEnabled = !_proAccessLoading && !_connecting && !_islePilotConnecting;
         LogoutProButton.IsEnabled = !_proAccessLoading;
 
-        SteamLoginActionLabel.Text = _mapLaunchGateState switch
+        SteamLoginActionLabel.Text = _islePilotConnecting
+            ? "ĐANG KẾT NỐI…"
+            : _mapLaunchGateState switch
         {
             MapLaunchGateState.Checking => "ĐỢI KIỂM TRA…",
             MapLaunchGateState.UpdateRequired => "CẬP NHẬT TRƯỚC",
-            _ => "MỞ MAP  →"
+            _ => _islePilotCredentials is null ? "ĐĂNG NHẬP  →" : "MỞ MAP  →"
         };
     }
 

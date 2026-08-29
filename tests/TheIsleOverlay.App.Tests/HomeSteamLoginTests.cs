@@ -6,7 +6,7 @@ namespace TheIsleOverlay.App.Tests;
 public sealed class HomeSteamLoginTests
 {
     [Fact]
-    public void Home_UsesDirectFreeActivationAndRemovesWebsiteSourceBlocks()
+    public void Home_UsesIslePilotStatsWithDirectGpsAndRemovesWebsiteSourceBlocks()
     {
         var document = XDocument.Load(Path.Combine(
             AppContext.BaseDirectory,
@@ -18,9 +18,12 @@ public sealed class HomeSteamLoginTests
             document.Descendants(),
             element => string.Equals((string?)element.Attribute(nameAttribute), name, StringComparison.Ordinal));
 
-        var directButton = Control("SteamLoginButton");
-        Assert.NotEqual("Collapsed", (string?)directButton.Attribute("Visibility"));
-        Assert.Equal("OpenDirectMapButton_Click", (string?)directButton.Attribute("Click"));
+        var liveMapButton = Control("SteamLoginButton");
+        Assert.NotEqual("Collapsed", (string?)liveMapButton.Attribute("Visibility"));
+        Assert.Equal("SteamLoginButton_Click", (string?)liveMapButton.Attribute("Click"));
+        Assert.Equal(
+            "SteamLoginPanel_Loaded",
+            (string?)liveMapButton.Parent?.Attribute("Loaded"));
         Assert.DoesNotContain(
             document.Descendants(),
             element => new[] { "EraSourceButton", "PandoraSourceButton" }
@@ -36,7 +39,22 @@ public sealed class HomeSteamLoginTests
             .ToArray();
         Assert.Contains("KÍCH HOẠT LIVE MAP", text);
         Assert.Contains("KÍCH HOẠT PRO", text);
+        Assert.Contains("GPS trực tiếp · Dino stats đồng bộ qua IslePilot", text);
         Assert.DoesNotContain("SERVER DÙNG WEBSITE RIÊNG", text);
+    }
+
+    [Fact]
+    public void LiveMapHandler_ComposesIslePilotStatsWithLocalPositionAndProEntities()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            AppContext.BaseDirectory,
+            "TestAssets",
+            "HomeWindow.IslePilot.cs"));
+
+        Assert.Contains("IslePilotRealtimeSession.Create", source, StringComparison.Ordinal);
+        Assert.Contains("new LocalPositionTelemetrySession(", source, StringComparison.Ordinal);
+        Assert.Contains("App.CurrentApp.TakeLocalTelemetrySource()", source, StringComparison.Ordinal);
+        Assert.Contains("CreateProPlayerSource()", source, StringComparison.Ordinal);
     }
 
     [Fact]

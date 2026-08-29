@@ -104,7 +104,7 @@
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="9,0,0,0">
                         <TextBlock Text="FIELD INTELLIGENCE // PRO" Foreground="{StaticResource ReleaseBone}"
                                    FontFamily="Bahnschrift SemiCondensed" FontSize="11.5" FontWeight="SemiBold" />
-                        <TextBlock x:Name="TitleVersionLabel" Text="   ISLE LIVE MAP · v1.4.0"
+                        <TextBlock x:Name="TitleVersionLabel" Text="   ISLE LIVE MAP · v1.4.1"
                                    Foreground="#728E87" FontFamily="Bahnschrift" FontSize="9.5"
                                    FontWeight="Medium" VerticalAlignment="Center" />
                     </StackPanel>
