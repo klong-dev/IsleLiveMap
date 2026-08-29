@@ -6,31 +6,19 @@ namespace TheIsleOverlay.App.Tests;
 public sealed class ReleaseHighlightsTests
 {
     [Fact]
-    public void Store_ShowsEachNewerVersionOnlyOnce()
+    public void Home_ShowsProAnnouncementOnEveryStartupWithoutVersionMarker()
     {
-        var directory = Path.Combine(
-            Path.GetTempPath(),
-            "IsleLiveMap.Tests",
-            Guid.NewGuid().ToString("N"));
-        var path = Path.Combine(directory, "last-release-highlights.txt");
-        try
-        {
-            var store = new ReleaseHighlightsStore(path);
-            Assert.True(store.ShouldShow("1.2.0"));
+        var source = File.ReadAllText(Path.Combine(
+            AppContext.BaseDirectory,
+            "TestAssets",
+            "HomeWindow.xaml.cs"));
 
-            store.MarkShown("1.2.0");
-
-            Assert.False(store.ShouldShow("1.2.0"));
-            Assert.False(store.ShouldShow("1.1.3"));
-            Assert.True(store.ShouldShow("1.2.1"));
-        }
-        finally
-        {
-            if (Directory.Exists(directory))
-            {
-                Directory.Delete(directory, recursive: true);
-            }
-        }
+        Assert.Contains(
+            "new ReleaseHighlightsWindow(currentVersion)",
+            source,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain("ShouldShow(currentVersion)", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("MarkShown(currentVersion)", source, StringComparison.Ordinal);
     }
 
     [Fact]

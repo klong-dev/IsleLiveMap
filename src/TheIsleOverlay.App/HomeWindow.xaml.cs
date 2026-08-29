@@ -16,8 +16,6 @@ public partial class HomeWindow : Window
 {
     private readonly CancellationTokenSource _shutdown = new();
     private readonly GitHubUpdateService _updateService = new();
-    private readonly ReleaseHighlightsStore _releaseHighlightsStore = new(
-        AppPaths.ProLaunchAnnouncement);
     private bool _connecting;
     private MapLaunchGateState _mapLaunchGateState = MapLaunchGateState.Checking;
 
@@ -98,18 +96,14 @@ public partial class HomeWindow : Window
         }
 
         var currentVersion = CurrentVersion();
-        if (_releaseHighlightsStore.ShouldShow(currentVersion))
+        var highlightsWindow = new ReleaseHighlightsWindow(currentVersion)
         {
-            var highlightsWindow = new ReleaseHighlightsWindow(currentVersion)
-            {
-                Owner = this
-            };
-            highlightsWindow.ShowDialog();
-            _releaseHighlightsStore.MarkShown(currentVersion);
-            if (highlightsWindow.WantsProDetails)
-            {
-                ProSectionHeading.BringIntoView();
-            }
+            Owner = this
+        };
+        highlightsWindow.ShowDialog();
+        if (highlightsWindow.WantsProDetails)
+        {
+            ProSectionHeading.BringIntoView();
         }
 
         try

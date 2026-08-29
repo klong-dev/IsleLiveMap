@@ -27,6 +27,9 @@
     <Content Include="..\..\src\TheIsleOverlay.App\HomeWindow.xaml"
              Link="TestAssets\HomeWindow.xaml"
              CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\src\TheIsleOverlay.App\HomeWindow.xaml.cs"
+             Link="TestAssets\HomeWindow.xaml.cs"
+             CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\..\src\TheIsleOverlay.App\MainWindow.xaml"
              Link="TestAssets\MainWindow.xaml"
              CopyToOutputDirectory="PreserveNewest" />

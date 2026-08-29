@@ -19,7 +19,4 @@ public static class AppPaths
         Root,
         "overlay-layout.json");
 
-    public static string ProLaunchAnnouncement { get; } = Path.Combine(
-        Root,
-        "pro-launch-announcement.txt");
 }
