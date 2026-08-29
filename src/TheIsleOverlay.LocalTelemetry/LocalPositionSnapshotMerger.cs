@@ -6,6 +6,7 @@ public static class LocalPositionSnapshotMerger
 {
     public static readonly TimeSpan LocalFreshness = TimeSpan.FromSeconds(2);
     public static readonly TimeSpan RemotePlayerFreshness = TimeSpan.FromSeconds(2);
+    public const double MaximumRemoteEntityDistance = 50_000d;
 
     public static TelemetrySnapshot Merge(
         TelemetrySnapshot? remote,
@@ -74,7 +75,7 @@ public static class LocalPositionSnapshotMerger
             PlayerOnline = true,
             UpdatedAt = observedAt,
             Player = player,
-            Map = MergeRemotePlayers(baseSnapshot.Map, remotePlayers),
+            Map = MergeRemotePlayers(baseSnapshot.Map, remotePlayers, location),
             ProPlayerTrackingActive = remotePlayers is not null,
             SessionState = TelemetrySessionState.Live,
             LiveDataStale = false,
@@ -86,7 +87,8 @@ public static class LocalPositionSnapshotMerger
 
     private static MapTelemetry? MergeRemotePlayers(
         MapTelemetry? map,
-        IReadOnlyList<VerifiedRemoteEntityTelemetry>? remotePlayers)
+        IReadOnlyList<VerifiedRemoteEntityTelemetry>? remotePlayers,
+        WorldLocation localLocation)
     {
         if (remotePlayers is null)
         {
@@ -107,7 +109,9 @@ public static class LocalPositionSnapshotMerger
         // label. AI is accepted only when the signed Pro Agent classified an
         // exact non-player fauna archetype.
         var proMarkers = remotePlayers
-            .Where(IsMapReady)
+            .Where(entity =>
+                IsMapReady(entity)
+                && IsWithinRemoteEntityDistance(entity.Location, localLocation))
             .Select(entity =>
             {
                 var speciesLabel = string.IsNullOrWhiteSpace(entity.SpeciesShortName)
@@ -147,6 +151,17 @@ public static class LocalPositionSnapshotMerger
             && !string.IsNullOrWhiteSpace(entity.SpeciesShortName)
             || entity.Kind == RemoteEntityKind.Player
             && !string.IsNullOrWhiteSpace(entity.PlayerProofName));
+
+    private static bool IsWithinRemoteEntityDistance(
+        WorldLocation entity,
+        WorldLocation local)
+    {
+        var deltaX = entity.X - local.X;
+        var deltaY = entity.Y - local.Y;
+        var deltaZ = (entity.Z ?? 0d) - (local.Z ?? 0d);
+        return deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ
+               <= MaximumRemoteEntityDistance * MaximumRemoteEntityDistance;
+    }
 
     private static bool IsFinite(WorldLocation location) =>
         double.IsFinite(location.X)

@@ -267,7 +267,7 @@ public sealed class LocalPositionSnapshotMergerTests
                 PointsOfInterest = [pointOfInterest]
             }
         };
-        var local = Observation(100, 200, 300, 45);
+        var local = Observation(12_000, -67_500, 1_200, 45);
         VerifiedRemoteEntityTelemetry[] remotePlayers =
         [
             new VerifiedRemoteEntityTelemetry(
@@ -408,7 +408,7 @@ public sealed class LocalPositionSnapshotMergerTests
 
         var merged = LocalPositionSnapshotMerger.Merge(
             null,
-            Observation(100, 200, 300, 45),
+            Observation(12_000, -67_500, 1_200, 45),
             Now,
             remotePlayers: entities);
 
@@ -436,7 +436,7 @@ public sealed class LocalPositionSnapshotMergerTests
 
         var merged = LocalPositionSnapshotMerger.Merge(
             null,
-            Observation(100, 200, 300, 45),
+            Observation(12_000, -67_500, 1_200, 45),
             Now,
             remotePlayers: entities);
 
@@ -444,6 +444,48 @@ public sealed class LocalPositionSnapshotMergerTests
         Assert.Equal("pro-entity:ai:41", marker.SteamId);
         Assert.Equal("Fish 12.4K", marker.Label);
         Assert.Equal(RemoteEntityKind.Ai, marker.ProEntityKind);
+    }
+
+    [Fact]
+    public void Merge_CullsTransportedEntitiesUsingFreshHostGps()
+    {
+        var local = Observation(100_000, -240_000, 30_000, 45);
+        VerifiedRemoteEntityTelemetry[] entities =
+        [
+            new VerifiedRemoteEntityTelemetry(
+                51,
+                RemoteEntityKind.Player,
+                "near-player-proof",
+                "deinosuchus",
+                "Deino",
+                CreatureDiet.Carnivore,
+                null,
+                new WorldLocation { X = 105_000, Y = -242_000, Z = 29_000 },
+                250_000,
+                3,
+                Now),
+            new VerifiedRemoteEntityTelemetry(
+                52,
+                RemoteEntityKind.Player,
+                "far-player-proof",
+                "pteranodon",
+                "Ptera",
+                CreatureDiet.Carnivore,
+                null,
+                new WorldLocation { X = 16_000, Y = 300, Z = 4_000 },
+                100,
+                3,
+                Now)
+        ];
+
+        var merged = LocalPositionSnapshotMerger.Merge(
+            null,
+            local,
+            Now,
+            remotePlayers: entities);
+
+        var marker = Assert.Single(merged.Map!.Markers);
+        Assert.Equal("pro-entity:player:51", marker.SteamId);
     }
 
     private static LocalMovementObservation Observation(
