@@ -52,8 +52,9 @@ public sealed class ReleaseHighlightsTests
         Assert.Contains("LOÀI + CÂN NẶNG", allCopy, StringComparison.Ordinal);
         Assert.Contains("MỌI SERVER · MỘT LIVE MAP", allCopy, StringComparison.Ordinal);
         Assert.Equal(
-            "XEM PRO TRÊN HOME  →",
+            "KÍCH HOẠT PRO NGAY  →",
             (string?)Control("EnterToolButton").Attribute("Content"));
+        Assert.Equal("https://isle.klong.dev/", ReleaseHighlightsWindow.ProLandingPageUri.AbsoluteUri);
 
         var preview = Assert.Single(
             document.Descendants(),

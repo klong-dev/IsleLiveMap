@@ -101,10 +101,6 @@ public partial class HomeWindow : Window
             Owner = this
         };
         highlightsWindow.ShowDialog();
-        if (highlightsWindow.WantsProDetails)
-        {
-            ProSectionHeading.BringIntoView();
-        }
 
         try
         {

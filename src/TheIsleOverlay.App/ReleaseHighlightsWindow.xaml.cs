@@ -1,6 +1,8 @@
+using System.Diagnostics;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media.Animation;
+using TheIsleOverlay.ProClient;
 
 namespace TheIsleOverlay.App;
 
@@ -8,8 +10,7 @@ public partial class ReleaseHighlightsWindow : Window
 {
     public const string ReleaseVersion = "1.4.0";
     public const string ProPreviewResourcePath = "Assets/ProMapPreview.png";
-
-    public bool WantsProDetails { get; private set; }
+    public static Uri ProLandingPageUri => ProClientOptions.ProductionBaseUri;
 
     public ReleaseHighlightsWindow(string version)
     {
@@ -58,8 +59,23 @@ public partial class ReleaseHighlightsWindow : Window
 
     private void ShowProButton_Click(object sender, RoutedEventArgs e)
     {
-        WantsProDetails = true;
-        Close();
+        try
+        {
+            Process.Start(new ProcessStartInfo(ProLandingPageUri.AbsoluteUri)
+            {
+                UseShellExecute = true
+            });
+            Close();
+        }
+        catch (Exception exception)
+        {
+            MessageBox.Show(
+                this,
+                $"Không thể mở trang kích hoạt Pro.\n\n{exception.Message}",
+                "Isle Live Map",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
     }
 
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)

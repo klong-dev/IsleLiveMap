@@ -269,8 +269,8 @@
                                    Foreground="#6F8A83" FontFamily="Bahnschrift SemiCondensed"
                                    FontSize="9.5" VerticalAlignment="Center" HorizontalAlignment="Center" />
                         <Button x:Name="EnterToolButton" Grid.Column="2" Style="{StaticResource ReleaseButton}"
-                                Content="XEM PRO TRÊN HOME  →" Height="43" Padding="17,0"
-                                IsDefault="True" AutomationProperties.Name="Xem khu vực kích hoạt Pro"
+                                Content="KÍCH HOẠT PRO NGAY  →" Height="43" Padding="17,0"
+                                IsDefault="True" AutomationProperties.Name="Mở trang kích hoạt Pro"
                                 Click="ShowProButton_Click" />
                     </Grid>
                 </Grid>
