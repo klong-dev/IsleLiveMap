@@ -6,6 +6,7 @@
     <ProjectReference Include="..\TheIsleOverlay.IslePilot\TheIsleOverlay.IslePilot.csproj" />
     <ProjectReference Include="..\TheIsleOverlay.LocalTelemetry\TheIsleOverlay.LocalTelemetry.csproj" />
     <ProjectReference Include="..\TheIsleOverlay.Pandora\TheIsleOverlay.Pandora.csproj" />
+    <ProjectReference Include="..\TheIsleOverlay.ProClient\TheIsleOverlay.ProClient.csproj" />
     <ProjectReference Include="..\TheIsleOverlay.TeamRelay\TheIsleOverlay.TeamRelay.csproj" />
   </ItemGroup>
 
@@ -17,6 +18,7 @@
   <ItemGroup>
     <Resource Include="Assets\GatewayMap.jpg" />
     <Resource Include="Assets\cute_mouse.jpg" />
+    <Resource Include="Assets\ProMapPreview.png" />
   </ItemGroup>
 
   <PropertyGroup>
@@ -31,7 +33,7 @@
     <Product>Isle Live Map</Product>
     <Description>Open-source live map overlay for The Isle Evrima.</Description>
     <Authors>klong-dev</Authors>
-    <Version>1.3.1</Version>
+    <Version>1.4.0</Version>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
     <ApplicationIcon>Assets\IsleLiveMap.ico</ApplicationIcon>
   </PropertyGroup>

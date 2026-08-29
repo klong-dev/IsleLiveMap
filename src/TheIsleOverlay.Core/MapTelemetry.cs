@@ -15,6 +15,11 @@ public sealed record MapMarkerTelemetry
     public MapPoint? MapLocation { get; init; }
     public double? ExactMapHeadingDegrees { get; init; }
     public IReadOnlyList<MapPoint> Path { get; init; } = [];
+    public RemoteEntityKind? ProEntityKind { get; init; }
+    public string? CreatureSpeciesId { get; init; }
+    public string? CreatureSpeciesShortName { get; init; }
+    public CreatureDiet? ProCreatureDiet { get; init; }
+    public double? CreatureMassKg { get; init; }
 }
 
 public sealed record MapPointOfInterestTelemetry

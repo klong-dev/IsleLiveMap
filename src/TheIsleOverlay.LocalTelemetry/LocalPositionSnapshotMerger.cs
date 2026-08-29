@@ -5,33 +5,62 @@ namespace TheIsleOverlay.LocalTelemetry;
 public static class LocalPositionSnapshotMerger
 {
     public static readonly TimeSpan LocalFreshness = TimeSpan.FromSeconds(2);
+    public static readonly TimeSpan RemotePlayerFreshness = TimeSpan.FromSeconds(2);
 
     public static TelemetrySnapshot Merge(
         TelemetrySnapshot? remote,
         LocalMovementObservation? local,
         DateTimeOffset now,
-        string sourceName = "LOCAL")
+        string sourceName = "LOCAL",
+        IReadOnlyList<VerifiedRemoteEntityTelemetry>? remotePlayers = null,
+        string? verifiedLocalSpeciesId = null,
+        RemotePlayerTelemetryFrame? verifiedLocalFallback = null)
     {
-        if (local is not { } observation
-            || now - observation.ObservedAt > LocalFreshness)
+        var localObservation = local.GetValueOrDefault();
+        var fallback = verifiedLocalFallback;
+        var hasFreshLocal = local.HasValue
+                            && now - localObservation.ObservedAt <= LocalFreshness;
+        var hasFreshVerifiedFallback = fallback is not null
+                                       && now - fallback.ObservedAt <= RemotePlayerFreshness
+                                       && IsFinite(fallback.LocalLocation)
+                                       && double.IsFinite(fallback.MapHeadingDegrees);
+        if (!hasFreshLocal && !hasFreshVerifiedFallback)
         {
-            return remote ?? Waiting(sourceName);
+            return remote is null
+                ? Waiting(sourceName)
+                : remote;
         }
 
-        var baseSnapshot = remote ?? new TelemetrySnapshot();
+        var baseSnapshot = remote is null
+            ? new TelemetrySnapshot()
+            : remote;
         var remotePlayer = baseSnapshot.Player;
-        var movement = observation.Movement;
+        var location = hasFreshLocal
+            ? localObservation.Movement.Location
+            : verifiedLocalFallback!.LocalLocation;
+        var mapHeadingDegrees = hasFreshLocal
+            ? localObservation.Movement.MapHeadingDegrees
+            : MapHeading.Normalize(verifiedLocalFallback!.MapHeadingDegrees);
+        var serverEndpoint = hasFreshLocal
+            ? localObservation.ServerEndpoint
+            : verifiedLocalFallback!.ServerEndpoint;
+        var observedAt = hasFreshLocal
+            ? localObservation.ObservedAt
+            : verifiedLocalFallback!.ObservedAt;
         var player = (remotePlayer ?? new PlayerTelemetry
         {
             Name = "LOCAL PLAYER"
         }) with
         {
             Server = string.IsNullOrWhiteSpace(remotePlayer?.Server)
-                ? observation.ServerEndpoint
+                ? serverEndpoint
                 : remotePlayer.Server,
-            Location = movement.Location,
+            Class = string.IsNullOrWhiteSpace(verifiedLocalSpeciesId)
+                ? remotePlayer?.Class
+                : verifiedLocalSpeciesId.Trim(),
+            Location = location,
             MapLocation = null,
-            ExactMapHeadingDegrees = movement.MapHeadingDegrees
+            ExactMapHeadingDegrees = mapHeadingDegrees
         };
 
         return baseSnapshot with
@@ -43,15 +72,86 @@ public static class LocalPositionSnapshotMerger
             Success = true,
             ServerOnline = true,
             PlayerOnline = true,
-            UpdatedAt = observation.ObservedAt,
+            UpdatedAt = observedAt,
             Player = player,
+            Map = MergeRemotePlayers(baseSnapshot.Map, remotePlayers),
+            ProPlayerTrackingActive = remotePlayers is not null,
             SessionState = TelemetrySessionState.Live,
             LiveDataStale = false,
             StatusMessage = baseSnapshot.SessionState == TelemetrySessionState.UnsupportedServer
-                ? "Vị trí trực tiếp đang hoạt động; server không cung cấp status."
+                ? "Map trực tiếp đang hoạt động; status và nhiệm vụ IslePilot không khả dụng trên server này."
                 : baseSnapshot.StatusMessage
         };
     }
+
+    private static MapTelemetry? MergeRemotePlayers(
+        MapTelemetry? map,
+        IReadOnlyList<VerifiedRemoteEntityTelemetry>? remotePlayers)
+    {
+        if (remotePlayers is null)
+        {
+            return map;
+        }
+
+        var providerMarkers = (map?.Markers ?? [])
+            .Where(marker => marker.SteamId is null
+                             || (!marker.SteamId.StartsWith(
+                                     "pro-player:",
+                                     StringComparison.Ordinal)
+                                 && !marker.SteamId.StartsWith(
+                                     "pro-entity:",
+                                     StringComparison.Ordinal)))
+            .ToArray();
+        // The ingame name remains a private proof field. It gates player
+        // markers here but is deliberately not copied into MapTelemetry or a
+        // label. AI is accepted only when the signed Pro Agent classified an
+        // exact non-player fauna archetype.
+        var proMarkers = remotePlayers
+            .Where(IsMapReady)
+            .Select(entity =>
+            {
+                var speciesLabel = string.IsNullOrWhiteSpace(entity.SpeciesShortName)
+                    ? "Player ?"
+                    : entity.SpeciesShortName;
+                return new MapMarkerTelemetry
+                {
+                    SteamId = $"pro-entity:{entity.Kind.ToString().ToLowerInvariant()}:{entity.TrackId}",
+                    Label = CreatureMarkerLabelFormatter.Format(
+                        speciesLabel,
+                        entity.MassKg),
+                    Self = false,
+                    Location = entity.Location,
+                    ProEntityKind = entity.Kind,
+                    CreatureSpeciesId = entity.SpeciesId,
+                    CreatureSpeciesShortName = entity.SpeciesShortName,
+                    ProCreatureDiet = entity.Diet,
+                    CreatureMassKg = entity.MassKg
+                };
+            })
+            .ToArray();
+        if (map is null && proMarkers.Length == 0)
+        {
+            return null;
+        }
+
+        return (map ?? new MapTelemetry()) with
+        {
+            Markers = [.. providerMarkers, .. proMarkers]
+        };
+    }
+
+    private static bool IsMapReady(VerifiedRemoteEntityTelemetry entity) =>
+        entity.TrackId > 0
+        && (entity.Kind == RemoteEntityKind.Ai
+            && !string.IsNullOrWhiteSpace(entity.SpeciesId)
+            && !string.IsNullOrWhiteSpace(entity.SpeciesShortName)
+            || entity.Kind == RemoteEntityKind.Player
+            && !string.IsNullOrWhiteSpace(entity.PlayerProofName));
+
+    private static bool IsFinite(WorldLocation location) =>
+        double.IsFinite(location.X)
+        && double.IsFinite(location.Y)
+        && (location.Z is null || double.IsFinite(location.Z.Value));
 
     public static TelemetrySnapshot Waiting(string sourceName, string? statusMessage = null) => new()
     {

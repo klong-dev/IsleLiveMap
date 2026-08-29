@@ -53,6 +53,20 @@ public static class OverlayLayoutRules
         value is { } number && double.IsFinite(number) ? number : null;
 }
 
+public static class MapZoomRules
+{
+    public const double DefaultZoom = 4d;
+    public const double MinimumZoom = 1d;
+    public const double MaximumZoom = 9d;
+    public const double WheelStep = 0.35d;
+
+    public static double ZoomIn(double current) =>
+        Math.Min(MaximumZoom, current + WheelStep);
+
+    public static double ZoomOut(double current) =>
+        Math.Max(MinimumZoom, current - WheelStep);
+}
+
 public sealed class OverlayLayoutSettingsStore
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)

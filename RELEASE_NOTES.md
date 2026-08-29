@@ -1,10 +1,23 @@
-# Isle Live Map 1.3.1
+# Isle Live Map 1.4.0
 
-- Máy chưa có Npcap giờ chỉ cần bấm **TẢI & CÀI NPCAP** ngay trong Isle Live Map; không còn phải tự tìm và tải installer.
-- App tải Npcap 1.88 trực tiếp qua HTTPS từ `npcap.com`, giới hạn chuyển hướng và kích thước file.
-- Bộ cài được đối chiếu SHA-256 và publisher **Nmap Software LLC** trước khi Windows cho phép chạy.
-- Hiển thị rõ từng bước tải, kiểm tra, cài đặt và sẵn sàng; có thể hủy an toàn trong lúc tải.
-- Cài xong, app tự kiểm tra lại Npcap và tiếp tục thao tác **MỞ MAP** đang dang dở — không cần mở lại app hay bấm lần hai.
-- Sửa nhận diện Npcap ngay sau khi vừa cài và bổ sung thông báo cụ thể cho UAC, timeout, reboot hoặc Windows Installer đang bận.
+## Live Map trên mọi server
 
-> Windows vẫn sẽ hỏi quyền quản trị và hiện cửa sổ Npcap để người dùng xác nhận cài đặt. Isle Live Map không âm thầm thay đổi hệ thống.
+- Live Map giờ đọc trực tiếp dữ liệu inbound và outbound từ game, không còn phụ thuộc website map hoặc plugin riêng của từng server.
+- Cải thiện pipeline Npcap, buffer packet và phục hồi replication để giảm mất marker khi reconnect, đổi khu vực hoặc gặp packet burst.
+- Ổn định GPS khi di chuyển, bay và respawn; hạn chế vị trí giả, saved move cũ và các bước nhảy marker bất thường.
+
+## Isle Live Map Pro
+
+- Thêm đăng nhập Steam và quyền Pro gắn theo SteamID64, không giới hạn thiết bị.
+- Hiển thị player và AI gần bạn trên minimap, phân màu theo cùng loài, ăn thịt, ăn cỏ và AI.
+- Bổ sung nhãn loài cùng cân nặng rút gọn để nhận diện mục tiêu nhanh hơn.
+- Pro Agent được tải và kiểm tra chữ ký riêng; tính năng Pro không được đóng gói trực tiếp trong bản Free.
+- Thêm màn giới thiệu Pro với ảnh Live Map thực tế và nút **KÍCH HOẠT PRO NGAY** mở trang mua Pro.
+
+## Trải nghiệm và độ ổn định
+
+- Tự khởi động lại capture khi process game hoặc UDP endpoint thay đổi sau reconnect.
+- Giữ trạng thái telemetry qua nhiều replication batch và loại marker cũ khi session thay đổi.
+- Tiếp tục hỗ trợ tự động kiểm tra, tải và cài đặt bản cập nhật qua Isle Live Map.
+
+> Bản Free vẫn dùng được Live Map và GPS cơ bản. Player/AI tracking, phân loại loài và cân nặng là quyền Pro theo tài khoản Steam.

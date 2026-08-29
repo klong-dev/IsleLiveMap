@@ -137,7 +137,7 @@ public sealed class UnrealMovementPacketDecoderTests
     }
 
     [Fact]
-    public void Tracker_RecoversFromUnreliableTimestampWithoutLongPositionFreeze()
+    public void Tracker_RejectsTimestampRegressionEvenAfterWallClockDelay()
     {
         var observedAt = DateTimeOffset.Parse("2026-08-24T00:00:01Z");
         var current = Candidate(100, 100, 100, timestamp: 229_678f);
@@ -150,14 +150,11 @@ public sealed class UnrealMovementPacketDecoderTests
             observedAt,
             out var sample);
 
-        Assert.True(selected);
-        Assert.Equal(validPositionWithLowerTimestamp.X, sample.X);
-        Assert.Equal(validPositionWithLowerTimestamp.Y, sample.Y);
-        Assert.True(sample.ClientTimestamp >= current.ClientTimestamp);
+        Assert.False(selected);
     }
 
     [Fact]
-    public void Tracker_NormalizesImplausibleTimestampJumpWithoutDroppingPosition()
+    public void Tracker_RejectsImplausibleTimestampJump()
     {
         var observedAt = DateTimeOffset.Parse("2026-08-24T00:00:01Z");
         var current = Candidate(100, 100, 100, timestamp: 134f);
@@ -170,17 +167,259 @@ public sealed class UnrealMovementPacketDecoderTests
             observedAt,
             out var sample);
 
-        Assert.True(selected);
-        Assert.Equal(validPositionWithPoisonedTimestamp.X, sample.X);
-        Assert.Equal(validPositionWithPoisonedTimestamp.Y, sample.Y);
-        Assert.InRange(sample.ClientTimestamp, 134f, 135f);
+        Assert.False(selected);
+    }
+
+    [Fact]
+    public void Tracker_RejectsDifferentPositionWithDuplicateTimestamp()
+    {
+        var observedAt = DateTimeOffset.Parse("2026-08-27T04:00:01Z");
+        var current = Candidate(138_577, -209_973, 26_537, timestamp: 333.630f);
+        var duplicateMove = Candidate(138_673, -209_973, 26_537, timestamp: 333.630f);
+
+        Assert.False(LocalMovementTracker.TryContinueTrack(
+            [duplicateMove],
+            current,
+            observedAt.AddMilliseconds(-60),
+            observedAt,
+            out _));
+    }
+
+    [Fact]
+    public void Tracker_DoesNotRebootstrapDistantLayoutAfterLongStationaryGap()
+    {
+        var tracker = new LocalMovementTracker(_decoder);
+        var startedAt = DateTimeOffset.Parse("2026-08-27T04:00:00Z");
+        var initialPayload = Convert.FromHexString(MovingPayload);
+        for (var index = 0; index <= 12; index++)
+        {
+            tracker.TryTrack(
+                initialPayload,
+                startedAt.AddMilliseconds(index * 50),
+                out _);
+        }
+
+        var distantPayload = Convert.FromHexString(StationaryPayload);
+        for (var index = 0; index <= 12; index++)
+        {
+            Assert.False(tracker.TryTrack(
+                distantPayload,
+                startedAt.AddSeconds(31).AddMilliseconds(index * 50),
+                out _));
+        }
+    }
+
+    [Fact]
+    public void Tracker_ReacquiresStableNearbyCanonicalMovementAfterLosingContinuity()
+    {
+        var tracker = new LocalMovementTracker(_decoder);
+        var current = Candidate(152_631, -255_094, 37_011, timestamp: 40f);
+        var startedAt = DateTimeOffset.Parse("2026-08-27T06:00:00Z");
+
+        for (var index = 0; index < 12; index++)
+        {
+            var candidate = Candidate(
+                159_018 + index * 40,
+                -271_844 + index * 50,
+                33_040,
+                timestamp: 172f + index * 0.05f);
+            Assert.False(tracker.TryRecoverTrack(
+                [candidate],
+                current,
+                startedAt.AddMilliseconds(index * 50),
+                out _));
+        }
+
+        var recovered = Candidate(
+            159_498,
+            -271_244,
+            33_040,
+            timestamp: 172.6f);
+        Assert.True(tracker.TryRecoverTrack(
+            [recovered],
+            current,
+            startedAt.AddMilliseconds(600),
+            out var sample));
+        Assert.Equal(recovered, sample);
+    }
+
+    [Fact]
+    public void Tracker_DoesNotRecoverFromStableLowBitOverlap()
+    {
+        var tracker = new LocalMovementTracker(_decoder);
+        var current = Candidate(138_577, -209_973, 26_537, timestamp: 336.745f);
+        var startedAt = DateTimeOffset.Parse("2026-08-27T06:00:00Z");
+
+        for (var index = 0; index <= 20; index++)
+        {
+            var overlap = Candidate(
+                137_000 + index,
+                -208_000 + index,
+                4_085,
+                timestamp: 337f + index * 0.05f,
+                componentBits: 20);
+            Assert.False(tracker.TryRecoverTrack(
+                [overlap],
+                current,
+                startedAt.AddMilliseconds(index * 50),
+                out _));
+        }
+    }
+
+    [Fact]
+    public void Tracker_ReplacesDistantStaleLockAfterSustainedCanonicalChain()
+    {
+        var tracker = new LocalMovementTracker(_decoder);
+        var wrongLock = Candidate(
+            34_079,
+            -28_844,
+            4_085,
+            timestamp: 40f,
+            componentBits: 23);
+        var startedAt = DateTimeOffset.Parse("2026-08-27T06:00:00Z");
+        UnrealMovementCandidate recovered = default;
+        var didRecover = false;
+
+        for (var index = 0; index < 24; index++)
+        {
+            var candidate = Candidate(
+                111_344.3,
+                -246_597.7,
+                30_289.4,
+                timestamp: 159f + index * 0.075f);
+            didRecover = tracker.TryRecoverDistantTrack(
+                [candidate],
+                wrongLock,
+                startedAt,
+                startedAt.AddSeconds(2).AddMilliseconds(index * 75),
+                out recovered);
+            if (index < 23)
+            {
+                Assert.False(didRecover);
+            }
+        }
+
+        Assert.True(didRecover);
+        Assert.Equal(111_344.3, recovered.X, precision: 1);
+        Assert.Equal(-246_597.7, recovered.Y, precision: 1);
+    }
+
+    [Fact]
+    public void Tracker_ReacquiresLowerBitCanonicalLayoutAfterRespawn()
+    {
+        var tracker = new LocalMovementTracker(_decoder);
+        var oldPawn = Candidate(
+            140_424.3,
+            -210_803.2,
+            26_262.5,
+            timestamp: 900f,
+            componentBits: 26);
+        var lastOldMoveAt = DateTimeOffset.Parse("2026-08-28T07:12:00Z");
+        UnrealMovementCandidate recovered = default;
+        var didRecover = false;
+
+        // Captured after an actual respawn: the new pawn used a 24-bit layout
+        // at (53330, -32144, 38832) with a steadily advancing timestamp.
+        for (var index = 0; index < 24; index++)
+        {
+            var newPawn = Candidate(
+                53_330.12,
+                -32_143.69,
+                38_831.91,
+                timestamp: 65.62f + index * 0.21f,
+                componentBits: 24);
+            didRecover = tracker.TryRecoverDistantTrack(
+                [newPawn],
+                oldPawn,
+                lastOldMoveAt,
+                lastOldMoveAt.AddSeconds(2).AddMilliseconds(index * 75),
+                out recovered);
+            if (index < 23)
+            {
+                Assert.False(didRecover);
+            }
+        }
+
+        Assert.True(didRecover);
+        Assert.Equal(53_330.12, recovered.X, precision: 1);
+        Assert.Equal(-32_143.69, recovered.Y, precision: 1);
+        Assert.Equal(24, recovered.ComponentBitCount);
+    }
+
+    [Fact]
+    public void Tracker_DoesNotReplaceDistantLockWhileItIsStillFresh()
+    {
+        var tracker = new LocalMovementTracker(_decoder);
+        var current = Candidate(140_424, -210_803, 26_263, timestamp: 900f);
+        var observedAt = DateTimeOffset.Parse("2026-08-28T07:12:01Z");
+
+        Assert.False(tracker.TryRecoverDistantTrack(
+            [Candidate(53_330, -32_144, 38_832, timestamp: 65.62f, componentBits: 24)],
+            current,
+            observedAt.AddMilliseconds(-500),
+            observedAt,
+            out _));
+    }
+
+    [Fact]
+    public void Tracker_DoesNotReplaceDistantLockFromReplayedDuplicatePacket()
+    {
+        var tracker = new LocalMovementTracker(_decoder);
+        var current = Candidate(140_424, -210_803, 26_263, timestamp: 900f);
+        var lastOldMoveAt = DateTimeOffset.Parse("2026-08-28T07:12:00Z");
+        var duplicate = Candidate(
+            53_330,
+            -32_144,
+            38_832,
+            timestamp: 65.62f,
+            componentBits: 24);
+
+        for (var index = 0; index < 40; index++)
+        {
+            Assert.False(tracker.TryRecoverDistantTrack(
+                [duplicate],
+                current,
+                lastOldMoveAt,
+                lastOldMoveAt.AddSeconds(2).AddMilliseconds(index * 75),
+                out _));
+        }
+    }
+
+    [Fact]
+    public void Tracker_DoesNotReplaceDistantLockFromShortOrLowBitChain()
+    {
+        var tracker = new LocalMovementTracker(_decoder);
+        var current = Candidate(
+            111_344,
+            -246_598,
+            30_289,
+            timestamp: 159f,
+            componentBits: 23);
+        var startedAt = DateTimeOffset.Parse("2026-08-27T06:00:00Z");
+        for (var index = 0; index < 40; index++)
+        {
+            var componentBits = index < 16 ? 26 : 20;
+            var overlap = Candidate(
+                34_079,
+                -28_844,
+                4_085,
+                timestamp: 160f + index * 0.075f,
+                componentBits: componentBits);
+            Assert.False(tracker.TryRecoverDistantTrack(
+                [overlap],
+                current,
+                startedAt,
+                startedAt.AddSeconds(2).AddMilliseconds(index * 75),
+                out _));
+        }
     }
 
     private static UnrealMovementCandidate Candidate(
         double x,
         double y,
         double z,
-        float timestamp) => new(
+        float timestamp,
+        int componentBits = 26) => new(
         x,
         y,
         z,
@@ -188,5 +427,5 @@ public sealed class UnrealMovementPacketDecoderTests
         timestamp,
         65,
         380,
-        26);
+        componentBits);
 }

@@ -2,6 +2,7 @@ using System.Net.Http;
 using System.Windows;
 using TheIsleOverlay.Core;
 using TheIsleOverlay.IslePilot;
+using TheIsleOverlay.LocalTelemetry;
 
 namespace TheIsleOverlay.App;
 
@@ -135,7 +136,13 @@ public partial class HomeWindow
 
         try
         {
-            var overlay = new MainWindow(session, "ISLEPILOT");
+            var overlay = new MainWindow(
+                new LocalPositionTelemetrySession(
+                    session,
+                    App.CurrentApp.TakeLocalTelemetrySource(),
+                    "ISLEPILOT",
+                    CreateProPlayerSource()),
+                "ISLEPILOT");
             Application.Current.MainWindow = overlay;
             overlay.Show();
             Close();

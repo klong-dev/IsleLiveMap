@@ -9,6 +9,7 @@ public sealed class LocalPositionTelemetrySession : ITelemetrySession
 
     private readonly ITelemetrySession? _remoteSession;
     private readonly ILocalMovementSource _localSource;
+    private readonly IRemotePlayerTelemetrySource? _remotePlayerSource;
     private readonly string _sourceName;
     private readonly CancellationTokenSource _disposeCancellation = new();
     private int _watchStarted;
@@ -17,11 +18,13 @@ public sealed class LocalPositionTelemetrySession : ITelemetrySession
     public LocalPositionTelemetrySession(
         ITelemetrySession? remoteSession = null,
         ILocalMovementSource? localSource = null,
-        string sourceName = "LOCAL")
+        string sourceName = "LOCAL",
+        IRemotePlayerTelemetrySource? remotePlayerSource = null)
     {
         _remoteSession = remoteSession;
         _localSource = localSource ?? new NpcapLocalMovementSource();
         _sourceName = sourceName;
+        _remotePlayerSource = remotePlayerSource;
     }
 
     public async IAsyncEnumerable<TelemetrySnapshot> WatchAsync(
@@ -52,9 +55,14 @@ public sealed class LocalPositionTelemetrySession : ITelemetrySession
         {
             tasks.Add(PumpRemoteAsync(channel.Writer, linkedCancellation.Token));
         }
+        if (_remotePlayerSource is not null)
+        {
+            tasks.Add(PumpRemotePlayersAsync(channel.Writer, linkedCancellation.Token));
+        }
 
         TelemetrySnapshot? remote = null;
         LocalMovementObservation? local = null;
+        RemotePlayerTelemetryFrame? remotePlayerFrame = null;
         string? localError = null;
         try
         {
@@ -75,13 +83,35 @@ public sealed class LocalPositionTelemetrySession : ITelemetrySession
                     case LocalFailureEvent failureEvent:
                         localError = failureEvent.Message;
                         break;
+                    case RemotePlayersEvent remotePlayersEvent:
+                        remotePlayerFrame = remotePlayersEvent.Frame;
+                        break;
+                    case RemotePlayersFailureEvent:
+                        remotePlayerFrame = null;
+                        break;
                 }
 
+                var now = DateTimeOffset.UtcNow;
+                IReadOnlyList<VerifiedRemoteEntityTelemetry>? remotePlayers =
+                    _remotePlayerSource is null
+                        ? null
+                        : remotePlayerFrame is { } frame &&
+                          now - frame.ObservedAt <= LocalPositionSnapshotMerger.RemotePlayerFreshness
+                            ? frame.RemoteEntities
+                            : [];
+                var verifiedLocalSpeciesId = remotePlayerFrame is { } localSpeciesFrame
+                                             && now - localSpeciesFrame.ObservedAt
+                                             <= LocalPositionSnapshotMerger.RemotePlayerFreshness
+                    ? localSpeciesFrame.LocalSpeciesId
+                    : null;
                 var merged = LocalPositionSnapshotMerger.Merge(
                     remote,
                     local,
-                    DateTimeOffset.UtcNow,
-                    _sourceName);
+                    now,
+                    _sourceName,
+                    remotePlayers,
+                    verifiedLocalSpeciesId,
+                    remotePlayerFrame);
                 if (remote is null
                     && local is null
                     && !string.IsNullOrWhiteSpace(localError))
@@ -117,6 +147,10 @@ public sealed class LocalPositionTelemetrySession : ITelemetrySession
         if (_remoteSession is not null)
         {
             await _remoteSession.DisposeAsync().ConfigureAwait(false);
+        }
+        if (_remotePlayerSource is not null)
+        {
+            await _remotePlayerSource.DisposeAsync().ConfigureAwait(false);
         }
         _disposeCancellation.Dispose();
     }
@@ -168,7 +202,7 @@ public sealed class LocalPositionTelemetrySession : ITelemetrySession
         catch (Exception)
         {
             writer.TryWrite(new LocalFailureEvent(
-                "Không đọc được movement cục bộ; nguồn website vẫn tiếp tục."));
+                "Không đọc được telemetry trực tiếp từ game."));
         }
     }
 
@@ -189,10 +223,40 @@ public sealed class LocalPositionTelemetrySession : ITelemetrySession
         }
     }
 
+    private async Task PumpRemotePlayersAsync(
+        ChannelWriter<SessionEvent> writer,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await foreach (var frame in _remotePlayerSource!
+                               .WatchAsync(cancellationToken)
+                               .ConfigureAwait(false))
+            {
+                await writer.WriteAsync(
+                        new RemotePlayersEvent(frame),
+                        cancellationToken)
+                    .ConfigureAwait(false);
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
+        catch (Exception)
+        {
+            writer.TryWrite(RemotePlayersFailureEvent.Instance);
+        }
+    }
+
     private abstract record SessionEvent;
     private sealed record RemoteSnapshotEvent(TelemetrySnapshot Snapshot) : SessionEvent;
     private sealed record LocalMovementEvent(LocalMovementObservation Observation) : SessionEvent;
     private sealed record LocalFailureEvent(string Message) : SessionEvent;
+    private sealed record RemotePlayersEvent(RemotePlayerTelemetryFrame Frame) : SessionEvent;
+    private sealed record RemotePlayersFailureEvent : SessionEvent
+    {
+        public static RemotePlayersFailureEvent Instance { get; } = new();
+    }
     private sealed record TickEvent : SessionEvent
     {
         public static TickEvent Instance { get; } = new();

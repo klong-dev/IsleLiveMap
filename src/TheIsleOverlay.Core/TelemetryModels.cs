@@ -12,6 +12,7 @@ public sealed record TelemetrySnapshot
     public TelemetrySessionState SessionState { get; init; } = TelemetrySessionState.Polling;
     public bool LiveDataStale { get; init; }
     public string? StatusMessage { get; init; }
+    public bool ProPlayerTrackingActive { get; init; }
 }
 
 public sealed record PlayerTelemetry

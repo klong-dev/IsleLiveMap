@@ -113,7 +113,8 @@
                 </Grid>
             </Border>
 
-            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <ScrollViewer x:Name="HomeContentScrollViewer" Grid.Row="1"
+                          VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                 <StackPanel Margin="22,22,22,18">
                     <Grid>
                         <Grid.ColumnDefinitions>
@@ -310,33 +311,84 @@
                         </Grid>
                     </Border>
 
-                    <TextBlock Text="ISLEPILOT NETWORK" Foreground="#A8BDB7" FontSize="11.5" FontWeight="SemiBold" Margin="0,0,0,9" />
+                    <TextBlock Text="KÍCH HOẠT LIVE MAP" Foreground="#A8BDB7" FontSize="11.5"
+                               FontWeight="SemiBold" Margin="0,0,0,9" />
 
-                    <StackPanel Loaded="SteamLoginPanel_Loaded">
+                    <StackPanel Margin="0,0,0,18">
                         <Button x:Name="SteamLoginButton" Style="{StaticResource SourceButton}"
-                                IsEnabled="False"
-                                Height="66" Click="SteamLoginButton_Click" Margin="0,0,0,8">
+                                IsEnabled="False" Height="72"
+                                Click="OpenDirectMapButton_Click" Margin="0,0,0,8"
+                                AutomationProperties.Name="Mở Live Map Free bằng dữ liệu trực tiếp từ game">
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto" />
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-                                <Ellipse Width="9" Height="9" Fill="#37D4C6" Stroke="#A3FFF5"
-                                         StrokeThickness="1" VerticalAlignment="Center" />
-                                <StackPanel Grid.Column="1" Margin="14,0,0,0" VerticalAlignment="Center">
-                                    <TextBlock x:Name="SteamAccountLabel" Text="CHƯA ĐĂNG NHẬP STEAM"
-                                               Foreground="{StaticResource HomeBone}"
-                                               FontFamily="Bahnschrift SemiCondensed" FontSize="15"
-                                               FontWeight="SemiBold" />
+                                <Grid Width="31" Height="31" VerticalAlignment="Center">
+                                    <Ellipse Stroke="#4F8F84" StrokeThickness="1" />
+                                    <Ellipse Width="13" Height="13" Stroke="#37D4C6" StrokeThickness="1" />
+                                    <Ellipse Width="4" Height="4" Fill="#E7B74E" />
+                                </Grid>
+                                <StackPanel Grid.Column="1" Margin="14,0,10,0" VerticalAlignment="Center">
+                                    <TextBlock x:Name="SteamAccountLabel" Text="FREE / LOCAL TELEMETRY"
+                                               Foreground="#69E2D6" FontFamily="Bahnschrift SemiCondensed"
+                                               FontSize="10" FontWeight="SemiBold" />
+                                    <TextBlock Text="MỞ LIVE MAP" Foreground="{StaticResource HomeBone}"
+                                               FontFamily="Bahnschrift SemiCondensed" FontSize="16"
+                                               FontWeight="SemiBold" Margin="0,2,0,0" />
                                     <TextBlock x:Name="SteamLoginDetailLabel"
-                                               Text="Một phiên cho mọi server đã cài IslePilot"
+                                               Text="Đọc inbound + outbound trực tiếp từ game"
                                                Foreground="#91AAA3" FontSize="10.5" FontWeight="Medium" />
                                 </StackPanel>
                                 <TextBlock x:Name="SteamLoginActionLabel" Grid.Column="2"
                                            Text="ĐỢI KIỂM TRA…" Foreground="#A0D2C8"
-                                           FontFamily="Bahnschrift SemiCondensed" FontSize="13"
-                                           FontWeight="SemiBold" VerticalAlignment="Center" Margin="12,0,0,0" />
+                                           FontFamily="Bahnschrift SemiCondensed" FontSize="12.5"
+                                           FontWeight="SemiBold" VerticalAlignment="Center" Margin="10,0,0,0" />
+                            </Grid>
+                        </Button>
+                        <TextBlock Text="Miễn phí, không cần website riêng hay plugin server. Npcap phải sẵn sàng trên máy."
+                                   Foreground="#78938C" FontSize="10.5" TextWrapping="Wrap" />
+                        <Button x:Name="LogoutSteamButton" Visibility="Collapsed" />
+                    </StackPanel>
+
+                    <Rectangle Height="1" Fill="#2F514B" Margin="0,0,0,14" />
+
+                    <TextBlock x:Name="ProSectionHeading" Text="KÍCH HOẠT PRO"
+                               Foreground="#E8C86E" FontSize="11.5"
+                               FontWeight="SemiBold" Margin="0,0,0,9" />
+
+                    <StackPanel Loaded="ProAccessPanel_Loaded" Margin="0,0,0,4">
+                        <Button x:Name="ProAccessButton" Style="{StaticResource SourceButton}"
+                                Height="78" Click="ProAccessButton_Click" Margin="0,0,0,8">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="4" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <Rectangle x:Name="ProAccessStateBar" Fill="#6F6D55" RadiusX="1" RadiusY="1" Margin="0,9" />
+                                <StackPanel Grid.Column="1" Margin="13,0,10,0" VerticalAlignment="Center">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock x:Name="ProTierLabel" Text="FREE / CHƯA KIỂM TRA"
+                                                   Foreground="#B4B89F" FontFamily="Bahnschrift SemiCondensed"
+                                                   FontSize="10" FontWeight="SemiBold" />
+                                        <TextBlock x:Name="ProAccountLabel" Text="  ·  CHƯA ĐĂNG NHẬP STEAM"
+                                                   Foreground="#748B83" FontFamily="Bahnschrift SemiCondensed"
+                                                   FontSize="10" FontWeight="SemiBold" />
+                                    </StackPanel>
+                                    <TextBlock Text="PLAYER + AI TRACKING" Foreground="{StaticResource HomeBone}"
+                                               FontFamily="Bahnschrift SemiCondensed" FontSize="15"
+                                               FontWeight="SemiBold" Margin="0,2,0,0" />
+                                    <TextBlock x:Name="ProAccessDetailLabel"
+                                               Text="Đăng nhập Steam để kiểm tra quyền theo tài khoản"
+                                               Foreground="#91A09A" FontSize="10.5" FontWeight="Medium"
+                                               TextTrimming="CharacterEllipsis" />
+                                </StackPanel>
+                                <TextBlock x:Name="ProAccessActionLabel" Grid.Column="2"
+                                           Text="ĐĂNG NHẬP  →" Foreground="#FFE18A"
+                                           FontFamily="Bahnschrift SemiCondensed" FontSize="12"
+                                           FontWeight="SemiBold" VerticalAlignment="Center" Margin="8,0,0,0" />
                             </Grid>
                         </Button>
 
@@ -345,93 +397,18 @@
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <TextBlock Text="Chỉ đọc tọa độ, hướng quay và status dino. Tự nhận server."
+                            <TextBlock Text="Nâng cấp tùy chọn: phân loại player, AI, loài và cân nặng. Free luôn hoạt động độc lập."
                                        Foreground="#78938C" FontSize="10.5" TextWrapping="Wrap"
                                        VerticalAlignment="Center" />
-                            <Button x:Name="LogoutSteamButton" Grid.Column="1"
-                                    Style="{StaticResource HomeChromeButton}" Content="ĐĂNG XUẤT"
+                            <Button x:Name="LogoutProButton" Grid.Column="1"
+                                    Style="{StaticResource HomeChromeButton}" Content="XÓA PHIÊN PRO"
                                     Padding="10,5" Margin="10,0,0,0" Visibility="Collapsed"
-                                    Click="LogoutSteamButton_Click" />
+                                    Click="LogoutProButton_Click" />
                         </Grid>
                     </StackPanel>
 
-                    <Rectangle Height="1" Fill="#2F514B" Margin="0,17,0,14" />
-
-                    <Grid Margin="0,0,0,9">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Text="SERVER DÙNG WEBSITE RIÊNG" Foreground="#A8BDB7"
-                                   FontSize="11.5" FontWeight="SemiBold" />
-                        <TextBlock Grid.Column="1" Text="2 NGUỒN RIÊNG" Foreground="#6F8C84"
-                                   FontFamily="Bahnschrift SemiCondensed" FontSize="10"
-                                   FontWeight="SemiBold" VerticalAlignment="Center" />
-                    </Grid>
-
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="10" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-
-                        <Button x:Name="EraSourceButton" Style="{StaticResource SourceButton}" Tag="era"
-                                IsEnabled="False"
-                                Height="64" Margin="0" Padding="12,0"
-                                AutomationProperties.Name="Kết nối trực tiếp EraGaming"
-                                Click="SourceButton_Click">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="3" />
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <Rectangle Fill="#37D4C6" RadiusX="1" RadiusY="1" Margin="0,10" />
-                                <StackPanel Grid.Column="1" Margin="10,0,5,0" VerticalAlignment="Center">
-                                    <TextBlock Text="ERAGAMING" Foreground="{StaticResource HomeBone}"
-                                               FontFamily="Bahnschrift SemiCondensed" FontSize="14"
-                                               FontWeight="SemiBold" />
-                                    <TextBlock Text="eragamingvn.net" Foreground="#93AAA4"
-                                               FontSize="10.5" FontWeight="Medium" />
-                                </StackPanel>
-                                <TextBlock Grid.Column="2" Text="→" Foreground="#37D4C6"
-                                           FontSize="18" VerticalAlignment="Center" />
-                            </Grid>
-                        </Button>
-
-                        <Button x:Name="PandoraSourceButton" Grid.Column="2"
-                                Style="{StaticResource SourceButton}" Tag="pandora"
-                                IsEnabled="False"
-                                Height="64" Margin="0" Padding="12,0"
-                                AutomationProperties.Name="Kết nối trực tiếp PANDORA"
-                                Click="SourceButton_Click">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="3" />
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <Rectangle Fill="#E7B74E" RadiusX="1" RadiusY="1" Margin="0,10" />
-                                <StackPanel Grid.Column="1" Margin="10,0,5,0" VerticalAlignment="Center">
-                                    <TextBlock Text="PANDORA" Foreground="{StaticResource HomeBone}"
-                                               FontFamily="Bahnschrift SemiCondensed" FontSize="14"
-                                               FontWeight="SemiBold" />
-                                    <TextBlock Text="islapandora.eu" Foreground="#C5B77A"
-                                               FontSize="10.5" FontWeight="Medium" />
-                                </StackPanel>
-                                <TextBlock Grid.Column="2" Text="→" Foreground="#E7B74E"
-                                           FontSize="18" VerticalAlignment="Center" />
-                            </Grid>
-                        </Button>
-                    </Grid>
-
-                    <TextBlock Text="Hai server này dùng phiên đăng nhập riêng trên live map của họ."
-                               Foreground="#78938C" FontSize="10.5" TextWrapping="Wrap"
-                               Margin="0,8,0,0" />
-
                     <TextBlock x:Name="SourceStatusLabel"
-                               Text="Chọn IslePilot hoặc kết nối trực tiếp đúng server bạn đang chơi."
+                               Text="Free đã sẵn sàng cho mọi server. Pro chỉ được ghép thêm sau khi xác minh quyền."
                                Foreground="#9CB2AC" FontSize="11.5" FontWeight="Medium"
                                TextWrapping="Wrap" Margin="0,12,0,0" />
                 </StackPanel>

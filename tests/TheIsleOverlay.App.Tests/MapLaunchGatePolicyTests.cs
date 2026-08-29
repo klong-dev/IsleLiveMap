@@ -45,17 +45,12 @@ public sealed class MapLaunchGatePolicyTests
                 StringComparison.Ordinal));
 
         Assert.Equal("False", (string?)Control("SteamLoginButton").Attribute("IsEnabled"));
-        Assert.Equal("False", (string?)Control("EraSourceButton").Attribute("IsEnabled"));
-        Assert.Equal("False", (string?)Control("PandoraSourceButton").Attribute("IsEnabled"));
         Assert.Contains(
             "tự mở khóa",
             (string?)Control("MapLaunchStateDetail").Attribute("Text"),
             StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain(
-            document.Descendants(),
-            element => string.Equals(
-                (string?)element.Attribute(nameAttribute),
-                "DirectMapButton",
-                StringComparison.Ordinal));
+        Assert.Equal(
+            "OpenDirectMapButton_Click",
+            (string?)Control("SteamLoginButton").Attribute("Click"));
     }
 }

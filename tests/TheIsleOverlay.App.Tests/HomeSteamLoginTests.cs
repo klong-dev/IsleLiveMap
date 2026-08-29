@@ -6,7 +6,7 @@ namespace TheIsleOverlay.App.Tests;
 public sealed class HomeSteamLoginTests
 {
     [Fact]
-    public void Home_ShowsIslePilotAndTheTwoRequiredDirectWebsiteConnections()
+    public void Home_UsesDirectFreeActivationAndRemovesWebsiteSourceBlocks()
     {
         var document = XDocument.Load(Path.Combine(
             AppContext.BaseDirectory,
@@ -18,15 +18,25 @@ public sealed class HomeSteamLoginTests
             document.Descendants(),
             element => string.Equals((string?)element.Attribute(nameAttribute), name, StringComparison.Ordinal));
 
-        Assert.NotEqual("Collapsed", (string?)Control("SteamLoginButton").Attribute("Visibility"));
-        Assert.NotEqual("Collapsed", (string?)Control("EraSourceButton").Attribute("Visibility"));
-        Assert.Equal("era", (string?)Control("EraSourceButton").Attribute("Tag"));
-        Assert.NotEqual("Collapsed", (string?)Control("PandoraSourceButton").Attribute("Visibility"));
-        Assert.Equal("pandora", (string?)Control("PandoraSourceButton").Attribute("Tag"));
+        var directButton = Control("SteamLoginButton");
+        Assert.NotEqual("Collapsed", (string?)directButton.Attribute("Visibility"));
+        Assert.Equal("OpenDirectMapButton_Click", (string?)directButton.Attribute("Click"));
+        Assert.DoesNotContain(
+            document.Descendants(),
+            element => new[] { "EraSourceButton", "PandoraSourceButton" }
+                .Contains((string?)element.Attribute(nameAttribute), StringComparer.Ordinal));
         Assert.DoesNotContain(
             document.Descendants(),
             element => new[] { "DinoSourceButton", "PremiumSourceButton", "HoHoSourceButton" }
                 .Contains((string?)element.Attribute(nameAttribute), StringComparer.Ordinal));
+
+        var text = document.Descendants()
+            .Select(element => (string?)element.Attribute("Text"))
+            .Where(value => value is not null)
+            .ToArray();
+        Assert.Contains("KÍCH HOẠT LIVE MAP", text);
+        Assert.Contains("KÍCH HOẠT PRO", text);
+        Assert.DoesNotContain("SERVER DÙNG WEBSITE RIÊNG", text);
     }
 
     [Fact]

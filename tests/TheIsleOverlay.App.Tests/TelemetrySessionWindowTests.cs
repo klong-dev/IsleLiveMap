@@ -25,6 +25,17 @@ public sealed class TelemetrySessionWindowTests
             BindingFlags.Static | BindingFlags.NonPublic);
         var duration = Assert.IsType<TimeSpan>(durationField?.GetValue(null));
 
-        Assert.InRange(duration.TotalMilliseconds, 1d, 80d);
+        Assert.InRange(duration.TotalMilliseconds, 1d, 40d);
+    }
+
+    [Fact]
+    public void MovementHeading_AnimatesFastEnoughToAvoidVisibleLag()
+    {
+        var durationField = typeof(MainWindow).GetField(
+            "MovementHeadingAnimationDuration",
+            BindingFlags.Static | BindingFlags.NonPublic);
+        var duration = Assert.IsType<TimeSpan>(durationField?.GetValue(null));
+
+        Assert.InRange(duration.TotalMilliseconds, 1d, 100d);
     }
 }
