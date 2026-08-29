@@ -455,13 +455,25 @@ public sealed class LocalPositionSnapshotMergerTests
             new VerifiedRemoteEntityTelemetry(
                 51,
                 RemoteEntityKind.Player,
-                "near-player-proof",
+                "player-at-800m-proof",
                 "deinosuchus",
                 "Deino",
                 CreatureDiet.Carnivore,
                 null,
-                new WorldLocation { X = 105_000, Y = -242_000, Z = 29_000 },
+                new WorldLocation { X = 180_000, Y = -240_000, Z = 30_000 },
                 250_000,
+                3,
+                Now),
+            new VerifiedRemoteEntityTelemetry(
+                53,
+                RemoteEntityKind.Ai,
+                null,
+                "coelacanth",
+                "Coel",
+                CreatureDiet.Unknown,
+                null,
+                new WorldLocation { X = 100_000, Y = -150_000, Z = 30_000 },
+                300_000,
                 3,
                 Now),
             new VerifiedRemoteEntityTelemetry(
@@ -484,8 +496,10 @@ public sealed class LocalPositionSnapshotMergerTests
             Now,
             remotePlayers: entities);
 
-        var marker = Assert.Single(merged.Map!.Markers);
-        Assert.Equal("pro-entity:player:51", marker.SteamId);
+        var markers = merged.Map!.Markers;
+        Assert.Equal(2, markers.Count);
+        Assert.Contains(markers, marker => marker.SteamId == "pro-entity:player:51");
+        Assert.Contains(markers, marker => marker.SteamId == "pro-entity:ai:53");
     }
 
     private static LocalMovementObservation Observation(

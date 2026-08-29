@@ -6,7 +6,8 @@ public static class LocalPositionSnapshotMerger
 {
     public static readonly TimeSpan LocalFreshness = TimeSpan.FromSeconds(2);
     public static readonly TimeSpan RemotePlayerFreshness = TimeSpan.FromSeconds(2);
-    public const double MaximumRemoteEntityDistance = 50_000d;
+    // Unreal coordinates are centimetres: 100,000 units = 1 kilometre.
+    public const double MaximumRemoteEntityDistance = 100_000d;
 
     public static TelemetrySnapshot Merge(
         TelemetrySnapshot? remote,
