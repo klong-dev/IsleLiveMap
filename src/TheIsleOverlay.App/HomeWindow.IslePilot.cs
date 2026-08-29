@@ -166,8 +166,8 @@ public partial class HomeWindow
             ? $"STEAM · ••••{credentials!.SteamId[^4..]}"
             : "CHƯA ĐĂNG NHẬP STEAM";
         SteamLoginDetailLabel.Text = authenticated
-            ? "Phiên IslePilot đã được mã hóa bằng Windows DPAPI"
-            : "Một phiên cho mọi server đã cài IslePilot";
+            ? "GPS trực tiếp · Dino stats qua phiên IslePilot đã mã hóa"
+            : "Đăng nhập Steam để đồng bộ dino stats từ IslePilot";
         LogoutSteamButton.Visibility = authenticated ? Visibility.Visible : Visibility.Collapsed;
         RefreshMapLaunchControls();
     }

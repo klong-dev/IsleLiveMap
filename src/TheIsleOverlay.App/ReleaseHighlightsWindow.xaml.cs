@@ -8,7 +8,7 @@ namespace TheIsleOverlay.App;
 
 public partial class ReleaseHighlightsWindow : Window
 {
-    public const string ReleaseVersion = "1.4.0";
+    public const string ReleaseVersion = "1.4.1";
     public const string ProPreviewResourcePath = "Assets/ProMapPreview.png";
     public static Uri ProLandingPageUri => ProClientOptions.ProductionBaseUri;
 

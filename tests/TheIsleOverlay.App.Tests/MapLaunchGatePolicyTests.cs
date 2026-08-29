@@ -50,7 +50,7 @@ public sealed class MapLaunchGatePolicyTests
             (string?)Control("MapLaunchStateDetail").Attribute("Text"),
             StringComparison.OrdinalIgnoreCase);
         Assert.Equal(
-            "OpenDirectMapButton_Click",
+            "SteamLoginButton_Click",
             (string?)Control("SteamLoginButton").Attribute("Click"));
     }
 }
