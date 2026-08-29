@@ -22,6 +22,10 @@ public sealed class OverlayTeamPanelTests
                 StringComparison.Ordinal));
 
         Assert.Equal("Collapsed", (string?)Control("TeamPanel").Attribute("Visibility"));
+        Assert.NotNull(Control("RemotePlayerMarkerLayer"));
+        Assert.Equal(
+            "Collapsed",
+            (string?)Control("RemotePlayerCountLabel").Attribute("Visibility"));
         Assert.NotNull(Control("TeamMarkerLayer"));
         Assert.NotNull(Control("TeamMembersList"));
         Assert.NotNull(Control("TeamCodeLabel"));

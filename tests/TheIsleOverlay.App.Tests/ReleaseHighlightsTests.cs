@@ -34,7 +34,7 @@ public sealed class ReleaseHighlightsTests
     }
 
     [Fact]
-    public void Modal_SummarizesVersion131NpcapSetupHotfix()
+    public void Modal_SummarizesVersion140PlayerTrackingPro()
     {
         var document = XDocument.Load(Path.Combine(
             AppContext.BaseDirectory,
@@ -57,11 +57,22 @@ public sealed class ReleaseHighlightsTests
                 (string?)element.Attribute("Content")
             }));
 
-        Assert.Equal("1.3.1", ReleaseHighlightsWindow.ReleaseVersion);
-        Assert.Contains("CÀI NPCAP MỘT CHẠM", allCopy, StringComparison.Ordinal);
-        Assert.Contains("NGUỒN CHÍNH THỨC", allCopy, StringComparison.Ordinal);
-        Assert.Contains("KIỂM TRA TRƯỚC KHI CHẠY", allCopy, StringComparison.Ordinal);
-        Assert.Contains("CÀI XONG TỰ TIẾP TỤC", allCopy, StringComparison.Ordinal);
-        Assert.Equal("ĐÃ XEM · BẮT ĐẦU  →", (string?)Control("EnterToolButton").Attribute("Content"));
+        Assert.Equal("1.4.0", ReleaseHighlightsWindow.ReleaseVersion);
+        Assert.Contains("ISLE LIVE MAP PRO", allCopy, StringComparison.Ordinal);
+        Assert.Contains("PLAYER ĐÃ XÁC MINH", allCopy, StringComparison.Ordinal);
+        Assert.Contains("AI TÁCH BIỆT", allCopy, StringComparison.Ordinal);
+        Assert.Contains("LOÀI + CÂN NẶNG", allCopy, StringComparison.Ordinal);
+        Assert.Contains("MỌI SERVER · MỘT LIVE MAP", allCopy, StringComparison.Ordinal);
+        Assert.Equal(
+            "XEM PRO TRÊN HOME  →",
+            (string?)Control("EnterToolButton").Attribute("Content"));
+
+        var preview = Assert.Single(
+            document.Descendants(),
+            element => string.Equals(
+                (string?)element.Attribute("Source"),
+                ReleaseHighlightsWindow.ProPreviewResourcePath,
+                StringComparison.Ordinal));
+        Assert.Equal("Image", preview.Name.LocalName);
     }
 }

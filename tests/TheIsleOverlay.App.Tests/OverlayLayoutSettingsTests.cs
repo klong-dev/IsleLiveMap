@@ -33,6 +33,24 @@ public sealed class OverlayLayoutSettingsTests
     }
 
     [Fact]
+    public void MapZoom_ExtendsPreviousSixTimesLimitByFiftyPercent()
+    {
+        Assert.Equal(9d, MapZoomRules.MaximumZoom);
+        Assert.Equal(6d * 1.5d, MapZoomRules.MaximumZoom);
+
+        var zoom = MapZoomRules.DefaultZoom;
+        for (var index = 0; index < 100; index++)
+        {
+            zoom = MapZoomRules.ZoomIn(zoom);
+        }
+
+        Assert.Equal(MapZoomRules.MaximumZoom, zoom);
+        Assert.Equal(
+            MapZoomRules.MinimumZoom,
+            MapZoomRules.ZoomOut(MapZoomRules.MinimumZoom));
+    }
+
+    [Fact]
     public void Store_RoundTripsScaleAndPositionAndRecoversFromMalformedJson()
     {
         var directory = Path.Combine(

@@ -9,14 +9,20 @@ namespace TheIsleOverlay.LocalTelemetry;
 public sealed class NpcapLocalMovementSource : ILocalMovementSource
 {
     public const string DefaultGameProcessName = "TheIsleClient-Win64-Shipping";
-
     private static readonly TimeSpan ProcessPollInterval = TimeSpan.FromSeconds(1);
-    private static readonly TimeSpan MinimumObservationInterval = TimeSpan.FromMilliseconds(50);
-
+    private static readonly TimeSpan MinimumObservationInterval = TimeSpan.FromMilliseconds(25);
+    private const int CaptureReadTimeoutMilliseconds = 25;
     private readonly string _processName;
     private readonly WindowsUdpPortOwnerResolver _portResolver;
     private readonly LocalMovementTracker _tracker;
+    private readonly UnrealIrisPacketParser _irisPacketParser = new();
+    private readonly IrisPacketSequenceTracker _sequenceTracker = new();
+    private readonly object _movementTrackerGate = new();
     private readonly CancellationTokenSource _disposeCancellation = new();
+    private BoundedPacketIntake? _activePacketIntake;
+    private PacketPipelineDiagnostics _lastPipelineDiagnostics;
+    private long _npcapDroppedPackets;
+    private long _interfaceDroppedPackets;
     private int _watchStarted;
     private int _disposed;
 
@@ -59,6 +65,8 @@ public sealed class NpcapLocalMovementSource : ILocalMovementSource
             // Npcap often delivers several saved-move packets in one burst.
             // Pausing the single-slot reader lets DropOldest retain only the
             // newest observation instead of making the marker replay the burst.
+            // Keep this short enough for camera yaw and ground movement to feel
+            // live in the overlay.
             await Task.Delay(MinimumObservationInterval, linkedCancellation.Token)
                 .ConfigureAwait(false);
         }
@@ -78,6 +86,16 @@ public sealed class NpcapLocalMovementSource : ILocalMovementSource
         return ValueTask.CompletedTask;
     }
 
+    public PacketPipelineDiagnostics GetPipelineDiagnostics()
+    {
+        var intake = Volatile.Read(ref _activePacketIntake);
+        return intake?.Snapshot(
+                   _sequenceTracker.Snapshot(),
+                   Interlocked.Read(ref _npcapDroppedPackets),
+                   Interlocked.Read(ref _interfaceDroppedPackets))
+               ?? _lastPipelineDiagnostics;
+    }
+
     private async Task RunAsync(
         ChannelWriter<LocalMovementObservation> writer,
         CancellationToken cancellationToken)
@@ -95,7 +113,7 @@ public sealed class NpcapLocalMovementSource : ILocalMovementSource
                 {
                     if (processId is null && trackedProcessId is not null)
                     {
-                        _tracker.Reset();
+                        ResetTrackers();
                         trackedProcessId = null;
                     }
 
@@ -105,7 +123,7 @@ public sealed class NpcapLocalMovementSource : ILocalMovementSource
 
                 if (trackedProcessId != processId)
                 {
-                    _tracker.Reset();
+                    ResetTrackers();
                     trackedProcessId = processId;
                 }
 
@@ -135,7 +153,13 @@ public sealed class NpcapLocalMovementSource : ILocalMovementSource
         ChannelWriter<LocalMovementObservation> writer,
         CancellationToken cancellationToken)
     {
-        var devices = OpenCaptureDevices(ports, writer);
+        var rawPackets = new BoundedPacketIntake();
+        Volatile.Write(ref _activePacketIntake, rawPackets);
+        var decoderTask = ProcessPacketQueueAsync(
+            rawPackets,
+            writer,
+            cancellationToken);
+        var devices = OpenCaptureDevices(ports, rawPackets);
         try
         {
             while (!cancellationToken.IsCancellationRequested)
@@ -161,6 +185,8 @@ public sealed class NpcapLocalMovementSource : ILocalMovementSource
                 {
                 }
 
+                RecordCaptureStatistics(capture.Device);
+
                 try
                 {
                     capture.Device.Close();
@@ -169,12 +195,27 @@ public sealed class NpcapLocalMovementSource : ILocalMovementSource
                 {
                 }
             }
+
+            rawPackets.Complete();
+            try
+            {
+                await decoderTask.ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+            }
+
+            _lastPipelineDiagnostics = rawPackets.Snapshot(
+                _sequenceTracker.Snapshot(),
+                Interlocked.Read(ref _npcapDroppedPackets),
+                Interlocked.Read(ref _interfaceDroppedPackets));
+            Interlocked.CompareExchange(ref _activePacketIntake, null, rawPackets);
         }
     }
 
     private IReadOnlyList<OpenedCapture> OpenCaptureDevices(
         IReadOnlySet<int> ports,
-        ChannelWriter<LocalMovementObservation> writer)
+        BoundedPacketIntake rawPackets)
     {
         CaptureDeviceList devices;
         try
@@ -193,14 +234,16 @@ public sealed class NpcapLocalMovementSource : ILocalMovementSource
 
         var candidates = SelectActiveDevices(devices).ToArray();
         var opened = new List<OpenedCapture>();
-        var filter = $"udp and ({string.Join(" or ", ports.Select(port => $"src port {port}"))})";
+        // Direct telemetry is GPS-only. Website/IslePilot owns dinosaur
+        // vitals, so inbound game replication must not enter this pipeline.
+        var filter = BuildCaptureFilter(ports);
         foreach (var device in candidates)
         {
             PacketArrivalEventHandler handler = (_, packetCapture) =>
-                HandlePacket(packetCapture, ports, writer);
+                EnqueuePacket(packetCapture, ports, rawPackets);
             try
             {
-                device.Open(DeviceModes.None, read_timeout: 250);
+                device.Open(DeviceModes.None, read_timeout: CaptureReadTimeoutMilliseconds);
                 device.Filter = filter;
                 device.OnPacketArrival += handler;
                 device.StartCapture();
@@ -228,10 +271,10 @@ public sealed class NpcapLocalMovementSource : ILocalMovementSource
         return opened;
     }
 
-    private void HandlePacket(
+    private void EnqueuePacket(
         PacketCapture packetCapture,
         IReadOnlySet<int> ports,
-        ChannelWriter<LocalMovementObservation> writer)
+        BoundedPacketIntake rawPackets)
     {
         try
         {
@@ -239,7 +282,7 @@ public sealed class NpcapLocalMovementSource : ILocalMovementSource
             var packet = Packet.ParsePacket(rawPacket.LinkLayerType, rawPacket.Data);
             var ip = packet.Extract<IPPacket>();
             var udp = packet.Extract<UdpPacket>();
-            if (udp is null || !ports.Contains(udp.SourcePort))
+            if (udp is null)
             {
                 return;
             }
@@ -250,24 +293,129 @@ public sealed class NpcapLocalMovementSource : ILocalMovementSource
                 return;
             }
 
-            var observedAt = DateTimeOffset.UtcNow;
-            lock (_tracker)
+            var outbound = ports.Contains(udp.SourcePort);
+            if (!outbound)
             {
-                if (_tracker.TryTrack(payload, observedAt, out var movement))
-                {
-                    var serverEndpoint = ip is null
-                        ? null
-                        : $"{ip.DestinationAddress}:{udp.DestinationPort}";
-                    writer.TryWrite(new LocalMovementObservation(
-                        observedAt,
-                        movement,
-                        serverEndpoint));
-                }
+                return;
             }
+
+            _ = rawPackets.TryEnqueue(new CapturedUdpDatagram(
+                DateTimeOffset.UtcNow,
+                ip?.SourceAddress.ToString(),
+                udp.SourcePort,
+                ip?.DestinationAddress.ToString(),
+                udp.DestinationPort,
+                payload.ToArray(),
+                Inbound: false,
+                Outbound: true));
         }
         catch
         {
             // Malformed or unrelated UDP traffic must not stop local tracking.
+        }
+    }
+
+    private async Task ProcessPacketQueueAsync(
+        BoundedPacketIntake rawPackets,
+        ChannelWriter<LocalMovementObservation> writer,
+        CancellationToken cancellationToken)
+    {
+        await foreach (var packet in rawPackets
+                           .ReadAllAsync(cancellationToken)
+                           .ConfigureAwait(false))
+        {
+            ProcessPacket(packet, writer);
+        }
+    }
+
+    private void ProcessPacket(
+        CapturedUdpDatagram packet,
+        ChannelWriter<LocalMovementObservation> writer)
+    {
+        try
+        {
+            var payload = packet.Payload;
+            var observedAt = packet.ObservedAt;
+            if (packet.Outbound)
+            {
+                ObserveIrisSequence(packet, inbound: false);
+            }
+
+            if (!packet.Outbound)
+            {
+                return;
+            }
+
+            UnrealMovementCandidate movement;
+            lock (_movementTrackerGate)
+            {
+                if (!_tracker.TryTrack(payload, observedAt, out movement))
+                {
+                    return;
+                }
+            }
+
+            var serverEndpoint = packet.DestinationAddress is null
+                ? null
+                : $"{packet.DestinationAddress}:{packet.DestinationPort}";
+            writer.TryWrite(new LocalMovementObservation(
+                observedAt,
+                movement,
+                serverEndpoint));
+        }
+        catch
+        {
+            // One malformed datagram must not stop the ordered worker.
+        }
+    }
+
+    private void ObserveIrisSequence(CapturedUdpDatagram packet, bool inbound)
+    {
+        if (!_irisPacketParser.TryParse(packet.Payload, out var irisPacket))
+        {
+            return;
+        }
+
+        _sequenceTracker.Observe(
+            new PacketFlowKey(
+                inbound ? packet.SourceAddress ?? string.Empty : packet.DestinationAddress ?? string.Empty,
+                inbound ? packet.SourcePort : packet.DestinationPort,
+                inbound ? packet.DestinationPort : packet.SourcePort,
+                inbound ? PacketDirection.Inbound : PacketDirection.Outbound),
+            irisPacket.PacketSequence,
+            irisPacket.IsComplete);
+    }
+
+    private void ResetTrackers()
+    {
+        lock (_movementTrackerGate)
+        {
+            _tracker.Reset();
+        }
+
+        _sequenceTracker.Reset();
+        Interlocked.Exchange(ref _npcapDroppedPackets, 0);
+        Interlocked.Exchange(ref _interfaceDroppedPackets, 0);
+    }
+
+    private void RecordCaptureStatistics(ILiveDevice device)
+    {
+        try
+        {
+            var statistics = device.Statistics;
+            if (statistics is null)
+            {
+                return;
+            }
+
+            Interlocked.Add(ref _npcapDroppedPackets, statistics.DroppedPackets);
+            Interlocked.Add(
+                ref _interfaceDroppedPackets,
+                statistics.InterfaceDroppedPackets);
+        }
+        catch
+        {
+            // Some adapters/drivers do not expose capture statistics.
         }
     }
 
@@ -290,10 +438,9 @@ public sealed class NpcapLocalMovementSource : ILocalMovementSource
     private static IEnumerable<ILiveDevice> SelectActiveDevices(CaptureDeviceList devices)
     {
         var activeDescriptions = NetworkInterface.GetAllNetworkInterfaces()
-            .Where(network =>
-                network.OperationalStatus == OperationalStatus.Up
-                && network.NetworkInterfaceType != NetworkInterfaceType.Loopback
-                && network.GetIPProperties().GatewayAddresses.Count > 0)
+            .Where(network => IsEligibleCaptureNetwork(
+                network.OperationalStatus,
+                network.NetworkInterfaceType))
             .Select(network => network.Description)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
         var active = devices
@@ -304,7 +451,17 @@ public sealed class NpcapLocalMovementSource : ILocalMovementSource
         return active.Length > 0 ? active : devices;
     }
 
+    internal static bool IsEligibleCaptureNetwork(
+        OperationalStatus operationalStatus,
+        NetworkInterfaceType networkInterfaceType) =>
+        operationalStatus == OperationalStatus.Up
+        && networkInterfaceType != NetworkInterfaceType.Loopback;
+
+    internal static string BuildCaptureFilter(IEnumerable<int> ports) =>
+        $"udp and ({string.Join(" or ", ports.Order().Select(port => $"src port {port}"))})";
+
     private sealed record OpenedCapture(
         ILiveDevice Device,
         PacketArrivalEventHandler Handler);
+
 }

@@ -17,8 +17,8 @@ namespace TheIsleOverlay.App;
 public partial class MainWindow : Window
 {
     private static readonly Uri GatewayMapResourceUri = new("Assets/GatewayMap.jpg", UriKind.Relative);
-    private static readonly TimeSpan LiveHeadingAnimationDuration = TimeSpan.FromMilliseconds(70);
-    private static readonly TimeSpan MovementHeadingAnimationDuration = TimeSpan.FromMilliseconds(220);
+    private static readonly TimeSpan LiveHeadingAnimationDuration = TimeSpan.FromMilliseconds(35);
+    private static readonly TimeSpan MovementHeadingAnimationDuration = TimeSpan.FromMilliseconds(80);
 
     private const int EditHotkeyId = 0x714;
     private const int ToggleMissionsNHotkeyId = 0x715;
@@ -43,9 +43,13 @@ public partial class MainWindow : Window
     private readonly TelemetrySourceDefinition? _requestedSource;
     private readonly string? _providedCookie;
     private readonly ITelemetrySession? _providedSession;
+    private readonly IRemotePlayerTelemetrySource? _remotePlayerSource;
+    private readonly ILocalMovementSource? _providedLocalSource;
     private readonly OverlayLayoutSettingsStore _layoutSettingsStore = new();
+    private readonly object _renderSnapshotGate = new();
     private ITelemetrySession? _telemetrySession;
     private Task? _telemetryWatchTask;
+    private TelemetrySnapshot? _pendingRenderSnapshot;
     private OverlayLayoutSettings _layoutSettings = new();
     private string _configuredSource = "ERA";
     private WorldLocation? _location;
@@ -53,7 +57,7 @@ public partial class MainWindow : Window
     private WorldLocation? _previousLocation;
     private GlobalMouseShortcutHook? _mouseShortcuts;
     private HwndSource? _windowSource;
-    private double _mapZoom = 2.25d;
+    private double _mapZoom = MapZoomRules.DefaultZoom;
     private double _headingDegrees;
     private double _overlayScale = OverlayLayoutRules.DefaultScale;
     private double _resizeStartingScale;
@@ -65,13 +69,32 @@ public partial class MainWindow : Window
     private bool _toggleMissionsNHotkeyRegistered;
     private bool _toggleHudHotkeyRegistered;
     private bool _hudVisible = true;
+    private bool _remotePlayerSourceOwnedBySession;
+    private bool _renderSnapshotScheduled;
 
-    public MainWindow() : this(null, null, null, null)
+    public MainWindow() : this(null, null, null, null, null, null)
     {
     }
 
     public MainWindow(TelemetrySourceDefinition? source, string? cookieValue)
-        : this(source, cookieValue, null, null)
+        : this(source, cookieValue, null, null, null, null)
+    {
+    }
+
+    public MainWindow(
+        TelemetrySourceDefinition? source,
+        string? cookieValue,
+        IRemotePlayerTelemetrySource? remotePlayerSource)
+        : this(source, cookieValue, null, null, remotePlayerSource, null)
+    {
+    }
+
+    public MainWindow(
+        TelemetrySourceDefinition? source,
+        string? cookieValue,
+        IRemotePlayerTelemetrySource? remotePlayerSource,
+        ILocalMovementSource localSource)
+        : this(source, cookieValue, null, null, remotePlayerSource, localSource)
     {
     }
 
@@ -80,7 +103,23 @@ public partial class MainWindow : Window
             null,
             null,
             telemetrySession ?? throw new ArgumentNullException(nameof(telemetrySession)),
-            displayName)
+            displayName,
+            null,
+            null)
+    {
+    }
+
+    public MainWindow(
+        ITelemetrySession telemetrySession,
+        string displayName,
+        IRemotePlayerTelemetrySource? remotePlayerSource)
+        : this(
+            null,
+            null,
+            telemetrySession ?? throw new ArgumentNullException(nameof(telemetrySession)),
+            displayName,
+            remotePlayerSource,
+            null)
     {
     }
 
@@ -88,11 +127,15 @@ public partial class MainWindow : Window
         TelemetrySourceDefinition? source,
         string? cookieValue,
         ITelemetrySession? telemetrySession,
-        string? displayName)
+        string? displayName,
+        IRemotePlayerTelemetrySource? remotePlayerSource,
+        ILocalMovementSource? localSource)
     {
         _requestedSource = source;
         _providedCookie = cookieValue;
         _providedSession = telemetrySession;
+        _remotePlayerSource = remotePlayerSource;
+        _providedLocalSource = localSource;
         if (!string.IsNullOrWhiteSpace(displayName))
         {
             _configuredSource = displayName;
@@ -135,7 +178,10 @@ public partial class MainWindow : Window
         {
             _telemetrySession = new LocalPositionTelemetrySession(
                 _telemetrySession,
-                sourceName: _configuredSource);
+                _providedLocalSource,
+                sourceName: _configuredSource,
+                remotePlayerSource: _remotePlayerSource);
+            _remotePlayerSourceOwnedBySession = _remotePlayerSource is not null;
         }
 
         LoadMap();
@@ -242,7 +288,7 @@ public partial class MainWindow : Window
                                .WatchAsync(_shutdown.Token)
                                .ConfigureAwait(false))
             {
-                await Dispatcher.InvokeAsync(() => RenderSnapshot(snapshot));
+                QueueRenderSnapshot(snapshot);
             }
         }
         catch (OperationCanceledException) when (_shutdown.IsCancellationRequested)
@@ -253,6 +299,59 @@ public partial class MainWindow : Window
             await Dispatcher.InvokeAsync(() =>
                 ShowTelemetryUnavailable("MẤT KẾT NỐI", "Telemetry session đã dừng"));
         }
+    }
+
+    private void QueueRenderSnapshot(TelemetrySnapshot snapshot)
+    {
+        lock (_renderSnapshotGate)
+        {
+            _pendingRenderSnapshot = snapshot;
+            if (_renderSnapshotScheduled)
+            {
+                return;
+            }
+
+            _renderSnapshotScheduled = true;
+        }
+
+        Dispatcher.BeginInvoke(
+            RenderPendingSnapshot,
+            DispatcherPriority.Render);
+    }
+
+    private void RenderPendingSnapshot()
+    {
+        TelemetrySnapshot? snapshot;
+        lock (_renderSnapshotGate)
+        {
+            snapshot = _pendingRenderSnapshot;
+            _pendingRenderSnapshot = null;
+        }
+
+        if (snapshot is not null)
+        {
+            try
+            {
+                RenderSnapshot(snapshot);
+            }
+            catch
+            {
+                ShowTelemetryUnavailable("MẤT KẾT NỐI", "Telemetry session đã dừng");
+            }
+        }
+
+        lock (_renderSnapshotGate)
+        {
+            if (_pendingRenderSnapshot is null)
+            {
+                _renderSnapshotScheduled = false;
+                return;
+            }
+        }
+
+        Dispatcher.BeginInvoke(
+            RenderPendingSnapshot,
+            DispatcherPriority.Render);
     }
 
     private void RenderSnapshot(TelemetrySnapshot snapshot)
@@ -298,12 +397,16 @@ public partial class MainWindow : Window
 
             var degraded = snapshot.SessionState is TelemetrySessionState.Reconnecting or TelemetrySessionState.Stale;
             SetTelemetryOpacity(degraded ? 0.58d : 1d);
-            SetConnectionState(ConnectionText(snapshot.SessionState), degraded ? WaitingBrush : OnlineBrush);
+            SetConnectionState(
+                ConnectionText(snapshot.SessionState, player.ExactVitalsSource),
+                degraded ? WaitingBrush : OnlineBrush);
             SpeciesLabel.Text = FriendlySpecies(player.Class);
             PlayerNameLabel.Text = string.IsNullOrWhiteSpace(player.Name) ? "ACTIVE PLAYER" : player.Name;
 
             var growth = exact?.Growth ?? player.GrowthPercent;
-            GrowthLabel.Text = $"{NormalizePercent(growth):0.#}%";
+            GrowthLabel.Text = growth is null
+                ? "—"
+                : $"{NormalizePercent(growth):0.#}%";
 
             RenderVital(HealthBar, HealthValue, exact?.Health, exact?.MaxHealth, player.HealthPercent);
             RenderVital(StaminaBar, StaminaValue, exact?.Stamina, exact?.MaxStamina, player.StaminaPercent);
@@ -317,6 +420,7 @@ public partial class MainWindow : Window
             UpdateHeading(player);
             _location = player.Location;
             _mapLocation = player.MapLocation;
+            SyncRemotePlayerMarkers(snapshot);
             if (_location is not null)
             {
                 var altitude = _location.Z is null ? "—" : $"{_location.Z.Value / 1000d:0.0}";
@@ -420,6 +524,8 @@ public partial class MainWindow : Window
         bar.Value = percent;
         label.Text = current is not null && maximum is > 0
             ? $"{FormatNumber(current.Value)} / {FormatNumber(maximum.Value)}"
+            : current is not null
+                ? FormatNumber(current.Value)
             : $"{percent:0.#}%";
     }
 
@@ -442,6 +548,7 @@ public partial class MainWindow : Window
         _mapLocation = null;
         _previousLocation = null;
         _hasMovementHeading = false;
+        ClearRemotePlayerMarkers();
         PlayerMarker.Visibility = Visibility.Collapsed;
         HeadingModeLabel.Text = "COURSE · WAITING";
         ClearVitals();
@@ -459,6 +566,7 @@ public partial class MainWindow : Window
         _mapLocation = null;
         _previousLocation = null;
         _hasMovementHeading = false;
+        ClearRemotePlayerMarkers();
         PlayerMarker.Visibility = Visibility.Collapsed;
         HeadingModeLabel.Text = "COURSE · WAITING";
         ClearVitals();
@@ -466,18 +574,27 @@ public partial class MainWindow : Window
         PositionMap();
     }
 
-    private string ConnectionText(TelemetrySessionState state) => state switch
+    private string ConnectionText(
+        TelemetrySessionState state,
+        string? directVitalsSource = null)
     {
-        TelemetrySessionState.Live => $"{_configuredSource} · LIVE",
-        TelemetrySessionState.Reconnecting => $"{_configuredSource} · RECONNECTING",
-        TelemetrySessionState.Stale => $"{_configuredSource} · DATA STALE",
-        TelemetrySessionState.Polling => $"{_configuredSource} · POLL 2S",
-        _ => $"{_configuredSource} · {state.ToString().ToUpperInvariant()}"
-    };
+        var source = string.IsNullOrWhiteSpace(directVitalsSource)
+            ? _configuredSource
+            : directVitalsSource.Trim();
+        return state switch
+        {
+            TelemetrySessionState.Live => $"{source} · LIVE",
+            TelemetrySessionState.Reconnecting => $"{source} · RECONNECTING",
+            TelemetrySessionState.Stale => $"{source} · DATA STALE",
+            TelemetrySessionState.Polling => $"{source} · POLL 2S",
+            _ => $"{source} · {state.ToString().ToUpperInvariant()}"
+        };
+    }
 
     private void SetTelemetryOpacity(double opacity)
     {
         PlayerMarker.Opacity = opacity;
+        RemotePlayerMarkerLayer.Opacity = opacity;
         HealthBar.Opacity = StaminaBar.Opacity = HungerBar.Opacity = WaterBar.Opacity = opacity;
         HealthValue.Opacity = StaminaValue.Opacity = HungerValue.Opacity = WaterValue.Opacity = opacity;
         GrowthLabel.Opacity = CoordinateLabel.Opacity = opacity;
@@ -517,6 +634,7 @@ public partial class MainWindow : Window
 
         Canvas.SetLeft(PlayerMarker, left + point.Left * imageWidth - PlayerMarker.Width / 2d);
         Canvas.SetTop(PlayerMarker, top + point.Top * imageHeight - PlayerMarker.Height / 2d);
+        PositionRemotePlayerMarkers(left, top, imageWidth, imageHeight);
         PositionTeamMarkers(left, top, imageWidth, imageHeight);
         PositionRoute(playerPoint, left, top, imageWidth, imageHeight);
     }
@@ -562,13 +680,13 @@ public partial class MainWindow : Window
 
     private void ZoomInMap()
     {
-        _mapZoom = Math.Min(6d, _mapZoom + 0.35d);
+        _mapZoom = MapZoomRules.ZoomIn(_mapZoom);
         PositionMap();
     }
 
     private void ZoomOutMap()
     {
-        _mapZoom = Math.Max(1d, _mapZoom - 0.35d);
+        _mapZoom = MapZoomRules.ZoomOut(_mapZoom);
         PositionMap();
     }
 
@@ -839,6 +957,10 @@ public partial class MainWindow : Window
         if (_telemetrySession is not null)
         {
             await _telemetrySession.DisposeAsync();
+        }
+        if (!_remotePlayerSourceOwnedBySession && _remotePlayerSource is not null)
+        {
+            await _remotePlayerSource.DisposeAsync();
         }
 
         var handle = new WindowInteropHelper(this).Handle;

@@ -10,10 +10,11 @@ public sealed class UnrealMovementPacketDecoder
 {
     private const int QuantizedVectorHeaderBits = 7;
     private const int FloatBits = 32;
-    // Even at Gateway's world origin, normal terrain altitude keeps the
-    // absolute location wider than tiny gameplay values. Starting at 18 bits
-    // avoids treating flags and zero-filled padding as world positions.
-    private const int MinimumLocationComponentBits = 18;
+    // Live probes proved that recurring 18-22 bit candidates are overlapping
+    // flags/state rather than Gateway world positions. Real movement samples
+    // in the captured sessions use 26 bits; terrain altitude also keeps a
+    // canonical world vector at 23 bits or wider near the map origin.
+    private const int MinimumLocationComponentBits = 23;
     private const int MinimumComponentBits = 1;
     private const int MaximumComponentBits = 31;
 
@@ -23,8 +24,11 @@ public sealed class UnrealMovementPacketDecoder
     private const double MaximumWorldX = 800_000d;
     private const double MinimumWorldY = -800_000d;
     private const double MaximumWorldY = 800_000d;
-    private const double MinimumWorldZ = -300_000d;
-    private const double MaximumWorldZ = 300_000d;
+    // Gateway's replicated actors stay close to terrain height. Large
+    // positive/negative Z values are a recurring bit-overlap signature, not
+    // valid movement (for example the live false lock at Z=-86,221).
+    private const double MinimumWorldZ = -10_000d;
+    private const double MaximumWorldZ = 100_000d;
     private const double MaximumAcceleration = 100_000d;
     private const float MaximumClientTimestamp = 10_000_000f;
 
@@ -132,7 +136,7 @@ public sealed class UnrealMovementPacketDecoder
             var timestampBits = (uint)ReadBits(payload, timestampOffset, FloatBits);
             var timestamp = BitConverter.Int32BitsToSingle((int)timestampBits);
             if (!float.IsFinite(timestamp)
-                || timestamp < 0f
+                || timestamp <= 0f
                 || timestamp > MaximumClientTimestamp)
             {
                 continue;

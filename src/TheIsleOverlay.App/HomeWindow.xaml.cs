@@ -8,6 +8,7 @@ using TheIsleOverlay.EraGaming;
 using TheIsleOverlay.IslePilot;
 using TheIsleOverlay.LocalTelemetry;
 using TheIsleOverlay.Pandora;
+using TheIsleOverlay.ProClient;
 
 namespace TheIsleOverlay.App;
 
@@ -15,7 +16,8 @@ public partial class HomeWindow : Window
 {
     private readonly CancellationTokenSource _shutdown = new();
     private readonly GitHubUpdateService _updateService = new();
-    private readonly ReleaseHighlightsStore _releaseHighlightsStore = new();
+    private readonly ReleaseHighlightsStore _releaseHighlightsStore = new(
+        AppPaths.ProLaunchAnnouncement);
     private bool _connecting;
     private MapLaunchGateState _mapLaunchGateState = MapLaunchGateState.Checking;
 
@@ -27,6 +29,12 @@ public partial class HomeWindow : Window
     private async void Window_Loaded(object sender, RoutedEventArgs e)
     {
         InitializeTeamPanel();
+        if (NpcapAvailabilityProbe.Check().IsAvailable)
+        {
+            // Begin outbound movement capture before update/donate/help modals
+            // so direct GPS is ready as soon as the overlay opens.
+            App.CurrentApp.EnsureLocalTelemetryWarmup();
+        }
 
         if (string.Equals(
                 Environment.GetEnvironmentVariable("ISLELIVEMAP_DEV_AUTO_CONNECT"),
@@ -34,8 +42,31 @@ public partial class HomeWindow : Window
                 StringComparison.Ordinal))
         {
             Environment.SetEnvironmentVariable("ISLELIVEMAP_DEV_AUTO_CONNECT", null);
+            try
+            {
+                _proAccess = await _proAccessService.InitializeAsync(
+                    CurrentVersion(),
+                    _shutdown.Token);
+            }
+            catch (OperationCanceledException) when (_shutdown.IsCancellationRequested)
+            {
+                return;
+            }
+            catch
+            {
+                // Development auto-connect must still open local telemetry if
+                // the license/update service is temporarily unavailable.
+                _proAccess = ProAccessSnapshot.SignedOut with
+                {
+                    IsOffline = true,
+                    StatusCode = "license_service_unavailable"
+                };
+            }
+
             var overlay = new MainWindow(
-                new LocalPositionTelemetrySession(),
+                new LocalPositionTelemetrySession(
+                    localSource: App.CurrentApp.TakeLocalTelemetrySource(),
+                    remotePlayerSource: CreateProPlayerSource()),
                 "DIRECT");
             Application.Current.MainWindow = overlay;
             overlay.Show();
@@ -75,6 +106,10 @@ public partial class HomeWindow : Window
             };
             highlightsWindow.ShowDialog();
             _releaseHighlightsStore.MarkShown(currentVersion);
+            if (highlightsWindow.WantsProDetails)
+            {
+                ProSectionHeading.BringIntoView();
+            }
         }
 
         try
@@ -128,7 +163,7 @@ public partial class HomeWindow : Window
                 ApplyMapLaunchGate(
                     MapLaunchGatePolicy.FromUpdate(result.State),
                     "BẢN CHẠY THỬ · MỞ MAP ĐÃ SẴN SÀNG",
-                    "Tọa độ lấy trực tiếp từ game; status lấy từ nguồn bạn chọn.",
+                    "Inbound và outbound được đọc trực tiếp từ game trên mọi server.",
                     "#37D4C6");
                 break;
             case UpdatePreparationState.Unavailable:
@@ -144,9 +179,42 @@ public partial class HomeWindow : Window
                 ApplyMapLaunchGate(
                     MapLaunchGatePolicy.FromUpdate(result.State),
                     "MỞ MAP ĐÃ SẴN SÀNG",
-                    "Tọa độ lấy trực tiếp từ game; status lấy từ nguồn bạn chọn.",
+                    "Inbound và outbound được đọc trực tiếp từ game trên mọi server.",
                     "#37D4C6");
                 break;
+        }
+    }
+
+    private void OpenDirectMapButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (!EnsureMapLaunchAvailable() || _connecting)
+        {
+            return;
+        }
+
+        if (!EnsureLocalCaptureAvailable())
+        {
+            return;
+        }
+
+        _connecting = true;
+        RefreshMapLaunchControls();
+        try
+        {
+            var overlay = new MainWindow(
+                new LocalPositionTelemetrySession(
+                    localSource: App.CurrentApp.TakeLocalTelemetrySource(),
+                    remotePlayerSource: CreateProPlayerSource()),
+                "DIRECT");
+            Application.Current.MainWindow = overlay;
+            overlay.Show();
+            Close();
+        }
+        catch (Exception exception)
+        {
+            _connecting = false;
+            SourceStatusLabel.Text = $"Không mở được Live Map: {FriendlyError(exception)}";
+            RefreshMapLaunchControls();
         }
     }
 
@@ -186,7 +254,11 @@ public partial class HomeWindow : Window
                 return;
             }
 
-            var overlay = new MainWindow(source, loginWindow.CookieValue);
+            var overlay = new MainWindow(
+                source,
+                loginWindow.CookieValue,
+                CreateProPlayerSource(),
+                App.CurrentApp.TakeLocalTelemetrySource());
             Application.Current.MainWindow = overlay;
             overlay.Show();
             Close();
@@ -271,6 +343,7 @@ public partial class HomeWindow : Window
         availability = NpcapAvailabilityProbe.Check(refresh: true);
         if (availability.IsAvailable)
         {
+            App.CurrentApp.EnsureLocalTelemetryWarmup();
             SourceStatusLabel.Text = "Npcap đã sẵn sàng. Đang tiếp tục mở map…";
             return true;
         }
@@ -298,18 +371,17 @@ public partial class HomeWindow : Window
     private void RefreshMapLaunchControls()
     {
         var enabled = MapLaunchGatePolicy.AllowsMap(_mapLaunchGateState)
-                      && !_connecting
-                      && !_islePilotConnecting;
+                      && !_connecting;
         SteamLoginButton.IsEnabled = enabled;
-        EraSourceButton.IsEnabled = enabled;
-        PandoraSourceButton.IsEnabled = enabled;
         LogoutSteamButton.IsEnabled = !_islePilotConnecting && _islePilotCredentials is not null;
+        ProAccessButton.IsEnabled = !_proAccessLoading && !_connecting && !_islePilotConnecting;
+        LogoutProButton.IsEnabled = !_proAccessLoading;
 
         SteamLoginActionLabel.Text = _mapLaunchGateState switch
         {
             MapLaunchGateState.Checking => "ĐỢI KIỂM TRA…",
             MapLaunchGateState.UpdateRequired => "CẬP NHẬT TRƯỚC",
-            _ => _islePilotCredentials is null ? "ĐĂNG NHẬP  →" : "MỞ MAP  →"
+            _ => "MỞ MAP  →"
         };
     }
 
@@ -354,6 +426,7 @@ public partial class HomeWindow : Window
     {
         DetachTeamPanel();
         _shutdown.Cancel();
+        _proAccessService.Dispose();
         _shutdown.Dispose();
     }
 }

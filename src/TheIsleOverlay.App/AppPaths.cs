@@ -18,4 +18,8 @@ public static class AppPaths
     public static string OverlayLayoutSettings { get; } = Path.Combine(
         Root,
         "overlay-layout.json");
+
+    public static string ProLaunchAnnouncement { get; } = Path.Combine(
+        Root,
+        "pro-launch-announcement.txt");
 }

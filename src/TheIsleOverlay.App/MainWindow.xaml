@@ -48,8 +48,9 @@
                         <Line X1="0" Y1="14" X2="7" Y2="14" Stroke="#FFE18A" StrokeThickness="1" />
                         <Line X1="21" Y1="14" X2="28" Y2="14" Stroke="#FFE18A" StrokeThickness="1" />
                     </Grid>
-                    <Canvas x:Name="TeamMarkerLayer" IsHitTestVisible="False" />
-                    <Grid x:Name="PlayerMarker" Width="38" Height="38" IsHitTestVisible="False">
+                    <Canvas x:Name="RemotePlayerMarkerLayer" Panel.ZIndex="4" IsHitTestVisible="False" />
+                    <Canvas x:Name="TeamMarkerLayer" Panel.ZIndex="3" IsHitTestVisible="False" />
+                    <Grid x:Name="PlayerMarker" Panel.ZIndex="2" Width="38" Height="38" IsHitTestVisible="False">
                         <Ellipse Width="31" Height="31" Stroke="#B037D4C6" StrokeThickness="1" />
                         <Ellipse Width="18" Height="18" Fill="#2B071719" Stroke="#ECF5F2" StrokeThickness="1" />
                         <Grid x:Name="DirectionNeedle" Width="38" Height="38" RenderTransformOrigin="0.5,0.5">
@@ -66,6 +67,15 @@
                     <StackPanel>
                         <TextBlock Text="GATEWAY / LIVE" Foreground="#DCE8E0" FontFamily="Bahnschrift SemiCondensed" FontSize="11" FontWeight="SemiBold" />
                         <TextBlock x:Name="CoordinateLabel" Text="X —  Y —  Z —" Foreground="#82A49B" FontFamily="Bahnschrift" FontSize="9" Margin="0,2,0,0" />
+                        <TextBlock x:Name="RemotePlayerCountLabel" Text="PLAYER 0 · AI 0" Visibility="Collapsed"
+                                   Foreground="#BBD1C9" FontFamily="Bahnschrift SemiCondensed" FontSize="9" Margin="0,2,0,0" />
+                        <WrapPanel x:Name="RemoteEntityLegend" Visibility="Collapsed" Margin="0,3,0,0" MaxWidth="230">
+                            <TextBlock Text="● ĂN THỊT" Foreground="#F04444" FontFamily="Bahnschrift SemiCondensed" FontSize="7.5" Margin="0,0,7,1" />
+                            <TextBlock Text="● CÙNG LOÀI" Foreground="#42D66B" FontFamily="Bahnschrift SemiCondensed" FontSize="7.5" Margin="0,0,7,1" />
+                            <TextBlock Text="● ĂN CỎ" Foreground="#3EA6FF" FontFamily="Bahnschrift SemiCondensed" FontSize="7.5" Margin="0,0,7,1" />
+                            <TextBlock Text="● AI" Foreground="#F5C542" FontFamily="Bahnschrift SemiCondensed" FontSize="7.5" Margin="0,0,0,1" />
+                            <TextBlock Text="● CHƯA RÕ" Foreground="#C7D0D4" FontFamily="Bahnschrift SemiCondensed" FontSize="7.5" Margin="7,0,0,1" />
+                        </WrapPanel>
                     </StackPanel>
                 </Border>
 
@@ -267,7 +277,7 @@
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <Ellipse Width="6" Height="6" Fill="#E7B74E" Margin="0,0,7,0" VerticalAlignment="Center" />
-                    <TextBlock Grid.Column="1" Text="NHIỆM VỤ PRIME" Foreground="#E9F4EE"
+                    <TextBlock Grid.Column="1" Text="NHIỆM VỤ PRIME · ISLEPILOT" Foreground="#E9F4EE"
                                FontFamily="Bahnschrift SemiCondensed" FontSize="10" FontWeight="SemiBold" />
                     <TextBlock x:Name="MissionProgressLabel" Grid.Column="2" Text="0 / 0"
                                Foreground="#FFE18A" FontFamily="Bahnschrift" FontSize="9" FontWeight="SemiBold" />
