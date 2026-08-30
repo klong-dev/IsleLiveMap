@@ -5,7 +5,12 @@ namespace TheIsleOverlay.LocalTelemetry;
 public static class LocalPositionSnapshotMerger
 {
     public static readonly TimeSpan LocalFreshness = TimeSpan.FromSeconds(2);
-    public static readonly TimeSpan RemotePlayerFreshness = TimeSpan.FromSeconds(2);
+    // Pro/Iris frames arrive in sparse bursts and live measurements after a
+    // reconnect showed healthy gaps of roughly 1.1-4.3 seconds. Two seconds
+    // made an unchanged player roster flash to zero between valid frames.
+    // Endpoint changes still publish an empty roster immediately; this grace
+    // period is only the pipeline-liveness fallback for a stalled frame.
+    public static readonly TimeSpan RemotePlayerFreshness = TimeSpan.FromSeconds(6);
     // Unreal coordinates are centimetres: 100,000 units = 1 kilometre.
     public const double MaximumRemoteEntityDistance = 100_000d;
 

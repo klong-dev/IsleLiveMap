@@ -225,6 +225,29 @@ public sealed class LocalPositionSnapshotMergerTests
     }
 
     [Fact]
+    public void Merge_KeepsSparseVerifiedProFrameWithinReconnectGraceWindow()
+    {
+        var observedAt = Now - TimeSpan.FromSeconds(5);
+        var frame = RemoteFrame(
+            observedAt,
+            98_700,
+            -247_700,
+            27_800,
+            312.5,
+            "15.235.226.35:7777");
+
+        var merged = LocalPositionSnapshotMerger.Merge(
+            null,
+            null,
+            Now,
+            verifiedLocalFallback: frame);
+
+        Assert.True(merged.PlayerOnline);
+        Assert.Equal(TelemetrySessionState.Live, merged.SessionState);
+        Assert.Equal(observedAt, merged.UpdatedAt);
+    }
+
+    [Fact]
     public void Merge_DoesNotUseExpiredVerifiedProFrameAsLocalPosition()
     {
         var remote = new TelemetrySnapshot
