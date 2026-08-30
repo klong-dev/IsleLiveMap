@@ -28,7 +28,7 @@ public static class LocalPositionSnapshotMerger
         var hasFreshLocal = local.HasValue
                             && now - localObservation.ObservedAt <= LocalFreshness;
         var hasFreshVerifiedFallback = fallback is not null
-                                       && now - fallback.ObservedAt <= RemotePlayerFreshness
+                                       && IsRemoteFrameFresh(fallback, now)
                                        && IsFinite(fallback.LocalLocation)
                                        && double.IsFinite(fallback.MapHeadingDegrees);
         if (!hasFreshLocal && !hasFreshVerifiedFallback)
@@ -173,6 +173,15 @@ public static class LocalPositionSnapshotMerger
         double.IsFinite(location.X)
         && double.IsFinite(location.Y)
         && (location.Z is null || double.IsFinite(location.Z.Value));
+
+    internal static bool IsRemoteFrameFresh(
+        RemotePlayerTelemetryFrame frame,
+        DateTimeOffset now)
+    {
+        var freshnessTimestamp = frame.ReceivedAt ?? frame.ObservedAt;
+        return now >= freshnessTimestamp
+               && now - freshnessTimestamp <= RemotePlayerFreshness;
+    }
 
     public static TelemetrySnapshot Waiting(string sourceName, string? statusMessage = null) => new()
     {

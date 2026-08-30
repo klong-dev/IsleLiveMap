@@ -274,6 +274,42 @@ public sealed class LocalPositionSnapshotMergerTests
     }
 
     [Fact]
+    public void RemoteRosterFreshness_UsesIpcReceiptInsteadOfBackloggedCaptureTime()
+    {
+        var frame = RemoteFrame(
+            Now - TimeSpan.FromSeconds(20),
+            98_700,
+            -247_700,
+            27_800,
+            312.5,
+            "115.72.226.156:7777") with
+        {
+            ReceivedAt = Now - TimeSpan.FromSeconds(1)
+        };
+
+        Assert.True(LocalPositionSnapshotMerger.IsRemoteFrameFresh(frame, Now));
+    }
+
+    [Fact]
+    public void RemoteRosterFreshness_ExpiresWhenAgentStopsDeliveringFrames()
+    {
+        var frame = RemoteFrame(
+            Now,
+            98_700,
+            -247_700,
+            27_800,
+            312.5,
+            "115.72.226.156:7777") with
+        {
+            ReceivedAt = Now
+                         - LocalPositionSnapshotMerger.RemotePlayerFreshness
+                         - TimeSpan.FromMilliseconds(1)
+        };
+
+        Assert.False(LocalPositionSnapshotMerger.IsRemoteFrameFresh(frame, Now));
+    }
+
+    [Fact]
     public void Merge_AddsInboundRemotePlayersWithoutDroppingProviderMapData()
     {
         var pointOfInterest = new MapPointOfInterestTelemetry { Id = "water" };

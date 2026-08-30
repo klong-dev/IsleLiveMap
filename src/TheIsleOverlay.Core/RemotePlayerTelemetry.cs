@@ -14,7 +14,11 @@ public sealed record RemotePlayerTelemetryFrame(
     double MapHeadingDegrees,
     IReadOnlyList<VerifiedRemoteEntityTelemetry> RemoteEntities,
     string? LocalSpeciesId = null,
-    string? LocalSpeciesShortName = null);
+    string? LocalSpeciesShortName = null,
+    // Capture time can trail wall clock while the stateful Iris decoder
+    // drains a burst. Receipt time proves IPC liveness without pretending the
+    // underlying GPS or entity samples were captured more recently.
+    DateTimeOffset? ReceivedAt = null);
 
 public enum RemoteEntityKind
 {

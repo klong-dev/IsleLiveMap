@@ -96,12 +96,13 @@ public sealed class LocalPositionTelemetrySession : ITelemetrySession
                     _remotePlayerSource is null
                         ? null
                         : remotePlayerFrame is { } frame &&
-                          now - frame.ObservedAt <= LocalPositionSnapshotMerger.RemotePlayerFreshness
+                          LocalPositionSnapshotMerger.IsRemoteFrameFresh(frame, now)
                             ? frame.RemoteEntities
                             : [];
                 var verifiedLocalSpeciesId = remotePlayerFrame is { } localSpeciesFrame
-                                             && now - localSpeciesFrame.ObservedAt
-                                             <= LocalPositionSnapshotMerger.RemotePlayerFreshness
+                                             && LocalPositionSnapshotMerger.IsRemoteFrameFresh(
+                                                 localSpeciesFrame,
+                                                 now)
                     ? localSpeciesFrame.LocalSpeciesId
                     : null;
                 var merged = LocalPositionSnapshotMerger.Merge(

@@ -214,7 +214,8 @@ public sealed class ProAgentRemotePlayerSource : IRemotePlayerTelemetrySource
             frame.MapHeadingDegrees,
             entities,
             hasValidLocalSpecies ? frame.LocalSpeciesId!.Trim() : null,
-            hasValidLocalSpecies ? frame.LocalSpeciesShortName!.Trim() : null);
+            hasValidLocalSpecies ? frame.LocalSpeciesShortName!.Trim() : null,
+            DateTimeOffset.UtcNow);
     }
 
     private static bool IsValidEntity(VerifiedMapEntity entity) =>
