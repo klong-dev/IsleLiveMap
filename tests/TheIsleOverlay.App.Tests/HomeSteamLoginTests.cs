@@ -19,11 +19,18 @@ public sealed class HomeSteamLoginTests
             element => string.Equals((string?)element.Attribute(nameAttribute), name, StringComparison.Ordinal));
 
         var liveMapButton = Control("SteamLoginButton");
+        var liveMapTitle = Control("SteamLoginTitleLabel");
+        var logoutSteamButton = Control("LogoutSteamButton");
+        var logoutProButton = Control("LogoutProButton");
         Assert.NotEqual("Collapsed", (string?)liveMapButton.Attribute("Visibility"));
         Assert.Equal("SteamLoginButton_Click", (string?)liveMapButton.Attribute("Click"));
         Assert.Equal(
             "SteamLoginPanel_Loaded",
             (string?)liveMapButton.Parent?.Attribute("Loaded"));
+        Assert.Equal("MỞ LIVE MAP", (string?)liveMapTitle.Attribute("Text"));
+        Assert.Equal("ĐĂNG XUẤT STEAM", (string?)logoutSteamButton.Attribute("Content"));
+        Assert.Equal("LogoutSteamButton_Click", (string?)logoutSteamButton.Attribute("Click"));
+        Assert.Equal("ĐĂNG XUẤT PRO", (string?)logoutProButton.Attribute("Content"));
         Assert.DoesNotContain(
             document.Descendants(),
             element => new[] { "EraSourceButton", "PandoraSourceButton" }

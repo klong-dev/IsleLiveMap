@@ -4,6 +4,7 @@ using System.Reflection;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
 using TheIsleOverlay.EraGaming;
 using TheIsleOverlay.IslePilot;
 using TheIsleOverlay.LocalTelemetry;
@@ -18,10 +19,12 @@ public partial class HomeWindow : Window
     private readonly GitHubUpdateService _updateService = new();
     private bool _connecting;
     private MapLaunchGateState _mapLaunchGateState = MapLaunchGateState.Checking;
+    private string _mapLaunchAccentColor = "#E7B74E";
 
     public HomeWindow()
     {
         InitializeComponent();
+        InitializeProPresentation();
     }
 
     private async void Window_Loaded(object sender, RoutedEventArgs e)
@@ -42,9 +45,7 @@ public partial class HomeWindow : Window
             Environment.SetEnvironmentVariable("ISLELIVEMAP_DEV_AUTO_CONNECT", null);
             try
             {
-                _proAccess = await _proAccessService.InitializeAsync(
-                    CurrentVersion(),
-                    _shutdown.Token);
+                _proAccess = await EnsureProAccessInitializedAsync();
             }
             catch (OperationCanceledException) when (_shutdown.IsCancellationRequested)
             {
@@ -95,12 +96,18 @@ public partial class HomeWindow : Window
             guideWindow.ShowDialog();
         }
 
-        var currentVersion = CurrentVersion();
-        var highlightsWindow = new ReleaseHighlightsWindow(currentVersion)
+        var access = await EnsureProAccessInitializedAsync();
+        if (!HomeProPresentationPolicy.Evaluate(
+                access,
+                DateTimeOffset.UtcNow).HasCurrentProAccess)
         {
-            Owner = this
-        };
-        highlightsWindow.ShowDialog();
+            var currentVersion = CurrentVersion();
+            var highlightsWindow = new ReleaseHighlightsWindow(currentVersion)
+            {
+                Owner = this
+            };
+            highlightsWindow.ShowDialog();
+        }
 
         try
         {
@@ -317,16 +324,28 @@ public partial class HomeWindow : Window
         string accentColor)
     {
         _mapLaunchGateState = state;
+        _mapLaunchAccentColor = accentColor;
         MapLaunchStateLabel.Text = title;
         MapLaunchStateDetail.Text = detail;
-        MapLaunchStateLabel.Foreground = HomeBrush(accentColor);
-        MapLaunchStateDot.Fill = HomeBrush(accentColor);
-        MapLaunchStateBar.Fill = HomeBrush(accentColor);
+        ApplyMapLaunchAccent();
         RefreshMapLaunchControls();
+    }
+
+    private void ApplyMapLaunchAccent()
+    {
+        var accent = _premiumHomeTheme
+            ? (Brush)FindResource("HomeAccent")
+            : HomeBrush(_mapLaunchAccentColor);
+        MapLaunchStateLabel.Foreground = accent;
+        MapLaunchStateDot.Fill = accent;
+        MapLaunchStateBar.Fill = accent;
     }
 
     private void RefreshMapLaunchControls()
     {
+        var proPresentation = HomeProPresentationPolicy.Evaluate(
+            _proAccess,
+            DateTimeOffset.UtcNow);
         var enabled = MapLaunchGatePolicy.AllowsMap(_mapLaunchGateState)
                       && !_connecting;
         SteamLoginButton.IsEnabled = enabled
@@ -334,8 +353,16 @@ public partial class HomeWindow : Window
                                      && _proAccessInitialized
                                      && !_proAccessLoading;
         LogoutSteamButton.IsEnabled = !_islePilotConnecting && _islePilotCredentials is not null;
-        ProAccessButton.IsEnabled = !_proAccessLoading && !_connecting && !_islePilotConnecting;
+        ProAccessButton.IsEnabled = !_proAccessLoading
+                                    && !_connecting
+                                    && !_islePilotConnecting
+                                    && !proPresentation.HasCurrentProAccess;
+        ProAccessButton.Opacity = 1d;
+        ProAccessButton.Cursor = proPresentation.HasCurrentProAccess
+            ? Cursors.Arrow
+            : Cursors.Hand;
         LogoutProButton.IsEnabled = !_proAccessLoading;
+        SteamLoginTitleLabel.Text = proPresentation.MapTitle;
 
         SteamLoginActionLabel.Text = _islePilotConnecting
             ? "ĐANG KẾT NỐI…"
@@ -345,7 +372,7 @@ public partial class HomeWindow : Window
         {
             MapLaunchGateState.Checking => "ĐỢI KIỂM TRA…",
             MapLaunchGateState.UpdateRequired => "CẬP NHẬT TRƯỚC",
-            _ => _islePilotCredentials is null ? "ĐĂNG NHẬP  →" : "MỞ MAP  →"
+            _ => _islePilotCredentials is null ? "ĐĂNG NHẬP  →" : proPresentation.MapAction
         };
     }
 
@@ -389,6 +416,7 @@ public partial class HomeWindow : Window
     private void Window_Closed(object? sender, EventArgs e)
     {
         DetachTeamPanel();
+        StopProPresentationMonitoring();
         _shutdown.Cancel();
         _proAccessService.Dispose();
         _shutdown.Dispose();

@@ -6,7 +6,7 @@ namespace TheIsleOverlay.App.Tests;
 public sealed class ReleaseHighlightsTests
 {
     [Fact]
-    public void Home_ShowsProAnnouncementOnEveryStartupWithoutVersionMarker()
+    public void Home_ShowsProAnnouncementOnlyWithoutCurrentProAccess()
     {
         var source = File.ReadAllText(Path.Combine(
             AppContext.BaseDirectory,
@@ -17,12 +17,20 @@ public sealed class ReleaseHighlightsTests
             "new ReleaseHighlightsWindow(currentVersion)",
             source,
             StringComparison.Ordinal);
+        Assert.Contains(
+            "HomeProPresentationPolicy.Evaluate(",
+            source,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            ").HasCurrentProAccess",
+            source,
+            StringComparison.Ordinal);
         Assert.DoesNotContain("ShouldShow(currentVersion)", source, StringComparison.Ordinal);
         Assert.DoesNotContain("MarkShown(currentVersion)", source, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void Modal_SummarizesVersion141PlayerTrackingPro()
+    public void Modal_SummarizesVersion142PlayerTrackingPro()
     {
         var document = XDocument.Load(Path.Combine(
             AppContext.BaseDirectory,
@@ -45,7 +53,7 @@ public sealed class ReleaseHighlightsTests
                 (string?)element.Attribute("Content")
             }));
 
-        Assert.Equal("1.4.1", ReleaseHighlightsWindow.ReleaseVersion);
+        Assert.Equal("1.4.2", ReleaseHighlightsWindow.ReleaseVersion);
         Assert.Contains("ISLE LIVE MAP PRO", allCopy, StringComparison.Ordinal);
         Assert.Contains("PLAYER ĐÃ XÁC MINH", allCopy, StringComparison.Ordinal);
         Assert.Contains("AI TÁCH BIỆT", allCopy, StringComparison.Ordinal);

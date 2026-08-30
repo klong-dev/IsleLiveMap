@@ -8,14 +8,28 @@
         UseLayoutRounding="True" SnapsToDevicePixels="True"
         Loaded="Window_Loaded" Closed="Window_Closed">
     <Window.Resources>
+        <SolidColorBrush x:Key="HomeSurface" Color="#F2071716" />
+        <SolidColorBrush x:Key="HomePanel" Color="#C50B2421" />
+        <SolidColorBrush x:Key="HomePanelSoft" Color="#A50A211F" />
+        <SolidColorBrush x:Key="HomeInputSurface" Color="#A5071716" />
         <SolidColorBrush x:Key="HomeBone" Color="#E9F4EE" />
         <SolidColorBrush x:Key="HomeMuted" Color="#9EB3AD" />
+        <SolidColorBrush x:Key="HomeSubtle" Color="#78938C" />
         <SolidColorBrush x:Key="HomeLine" Color="#35554F" />
+        <SolidColorBrush x:Key="HomeLineStrong" Color="#486C64" />
+        <SolidColorBrush x:Key="HomeShellLine" Color="#6A58736C" />
+        <SolidColorBrush x:Key="HomeAccent" Color="#37D4C6" />
+        <SolidColorBrush x:Key="HomeAccentBright" Color="#E8FFFA" />
+        <SolidColorBrush x:Key="HomeAccentDeep" Color="#163C38" />
+        <SolidColorBrush x:Key="HomeSelection" Color="#6A37D4C6" />
+        <SolidColorBrush x:Key="HomeButtonFill" Color="#C5193E38" />
+        <SolidColorBrush x:Key="HomeHover" Color="#183631" />
+        <SolidColorBrush x:Key="HomePressed" Color="#265048" />
 
         <Style x:Key="HomeChromeButton" TargetType="Button">
-            <Setter Property="Foreground" Value="#AFC3BC" />
+            <Setter Property="Foreground" Value="{DynamicResource HomeMuted}" />
             <Setter Property="Background" Value="Transparent" />
-            <Setter Property="BorderBrush" Value="#35554F" />
+            <Setter Property="BorderBrush" Value="{DynamicResource HomeLine}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="FontFamily" Value="Bahnschrift SemiCondensed" />
             <Setter Property="FontSize" Value="11" />
@@ -30,11 +44,11 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Chrome" Property="Background" Value="#183631" />
-                                <Setter Property="Foreground" Value="#F3FFF9" />
+                                <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource HomeHover}" />
+                                <Setter Property="Foreground" Value="{DynamicResource HomeBone}" />
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="Chrome" Property="Background" Value="#265048" />
+                                <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource HomePressed}" />
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter Property="Opacity" Value="0.45" />
@@ -48,7 +62,7 @@
         <Style x:Key="LinkButton" TargetType="Button" BasedOn="{StaticResource HomeChromeButton}">
             <Setter Property="HorizontalContentAlignment" Value="Stretch" />
             <Setter Property="Padding" Value="14,11" />
-            <Setter Property="Background" Value="#A50A211F" />
+            <Setter Property="Background" Value="{DynamicResource HomePanelSoft}" />
         </Style>
 
         <Style x:Key="SourceButton" TargetType="Button" BasedOn="{StaticResource HomeChromeButton}">
@@ -56,16 +70,16 @@
             <Setter Property="Margin" Value="0,0,0,8" />
             <Setter Property="Padding" Value="14,0" />
             <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-            <Setter Property="Background" Value="#C50B2421" />
-            <Setter Property="BorderBrush" Value="#486C64" />
+            <Setter Property="Background" Value="{DynamicResource HomePanel}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource HomeLineStrong}" />
         </Style>
 
         <Style x:Key="TeamInput" TargetType="TextBox">
-            <Setter Property="Foreground" Value="#E9F4EE" />
+            <Setter Property="Foreground" Value="{DynamicResource HomeBone}" />
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0" />
-            <Setter Property="CaretBrush" Value="#37D4C6" />
-            <Setter Property="SelectionBrush" Value="#6A37D4C6" />
+            <Setter Property="CaretBrush" Value="{DynamicResource HomeAccent}" />
+            <Setter Property="SelectionBrush" Value="{DynamicResource HomeSelection}" />
             <Setter Property="FontFamily" Value="Bahnschrift" />
             <Setter Property="FontSize" Value="13" />
             <Setter Property="FontWeight" Value="SemiBold" />
@@ -76,14 +90,14 @@
         <Style x:Key="TeamPrimaryButton" TargetType="Button" BasedOn="{StaticResource HomeChromeButton}">
             <Setter Property="Height" Value="38" />
             <Setter Property="Padding" Value="13,0" />
-            <Setter Property="Foreground" Value="#E8FFFA" />
-            <Setter Property="Background" Value="#C5193E38" />
-            <Setter Property="BorderBrush" Value="#478D82" />
+            <Setter Property="Foreground" Value="{DynamicResource HomeAccentBright}" />
+            <Setter Property="Background" Value="{DynamicResource HomeButtonFill}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource HomeLineStrong}" />
             <Setter Property="FontSize" Value="11.5" />
         </Style>
     </Window.Resources>
 
-    <Border Margin="12" Background="#F2071716" BorderBrush="#6A58736C" BorderThickness="1" CornerRadius="7">
+    <Border Margin="12" Background="{DynamicResource HomeSurface}" BorderBrush="{DynamicResource HomeShellLine}" BorderThickness="1" CornerRadius="7">
         <Border.Effect>
             <DropShadowEffect Color="#000000" BlurRadius="24" ShadowDepth="4" Opacity="0.72" />
         </Border.Effect>
@@ -94,17 +108,17 @@
                 <RowDefinition Height="42" />
             </Grid.RowDefinitions>
 
-            <Border Grid.Row="0" BorderBrush="#2F514B" BorderThickness="0,0,0,1" MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+            <Border Grid.Row="0" BorderBrush="{DynamicResource HomeLine}" BorderThickness="0,0,0,1" MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
                 <Grid Margin="14,0,9,0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-                    <Ellipse Width="9" Height="9" Fill="#163C38" Stroke="#37D4C6" StrokeThickness="1.5" VerticalAlignment="Center" />
+                    <Ellipse Width="9" Height="9" Fill="{DynamicResource HomeAccentDeep}" Stroke="{DynamicResource HomeAccent}" StrokeThickness="1.5" VerticalAlignment="Center" />
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="9,0,0,0">
-                        <TextBlock Text="FIELD // LINK" Foreground="{StaticResource HomeBone}" FontFamily="Bahnschrift SemiCondensed" FontWeight="SemiBold" FontSize="11" />
-                        <TextBlock Text="  OPEN TELEMETRY CLIENT" Foreground="#86A19A" FontFamily="Bahnschrift" FontSize="10" FontWeight="Medium" VerticalAlignment="Center" />
+                        <TextBlock Text="FIELD // LINK" Foreground="{DynamicResource HomeBone}" FontFamily="Bahnschrift SemiCondensed" FontWeight="SemiBold" FontSize="11" />
+                        <TextBlock x:Name="HomeClientModeLabel" Text="  OPEN TELEMETRY CLIENT" Foreground="{DynamicResource HomeSubtle}" FontFamily="Bahnschrift" FontSize="10" FontWeight="Medium" VerticalAlignment="Center" />
                     </StackPanel>
                     <StackPanel Grid.Column="2" Orientation="Horizontal">
                         <Button Style="{StaticResource HomeChromeButton}" Content="—" Width="27" Height="23" Padding="0" Click="MinimizeButton_Click" />
@@ -122,63 +136,63 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <StackPanel>
-                            <TextBlock Text="ISLE" Foreground="#86A29A" FontFamily="Bahnschrift SemiCondensed" FontSize="14" FontWeight="SemiBold" />
-                            <TextBlock Text="LIVE MAP" Foreground="{StaticResource HomeBone}" FontFamily="Bahnschrift SemiCondensed" FontSize="42" FontWeight="Bold" Margin="-2,-7,0,0" />
-                            <TextBlock Text="Minimap và chỉ số cá nhân cho The Isle Evrima." Foreground="{StaticResource HomeMuted}" FontSize="13" FontWeight="Medium" Margin="0,2,0,0" />
+                            <TextBlock x:Name="HomeModeLabel" Text="ISLE" Foreground="{DynamicResource HomeSubtle}" FontFamily="Bahnschrift SemiCondensed" FontSize="14" FontWeight="SemiBold" />
+                            <TextBlock Text="LIVE MAP" Foreground="{DynamicResource HomeBone}" FontFamily="Bahnschrift SemiCondensed" FontSize="42" FontWeight="Bold" Margin="-2,-7,0,0" />
+                            <TextBlock Text="Minimap và chỉ số cá nhân cho The Isle Evrima." Foreground="{DynamicResource HomeMuted}" FontSize="13" FontWeight="Medium" Margin="0,2,0,0" />
                         </StackPanel>
-                        <Border Grid.Column="1" Width="68" Height="68" CornerRadius="34" BorderBrush="#3B665E" BorderThickness="1" VerticalAlignment="Top">
+                        <Border Grid.Column="1" Width="68" Height="68" CornerRadius="34" BorderBrush="{DynamicResource HomeLineStrong}" BorderThickness="1" VerticalAlignment="Top">
                             <Grid>
-                                <Ellipse Width="45" Height="45" Stroke="#385F58" StrokeThickness="1" />
-                                <Path Data="M34,12 L43,37 L34,31 L25,37 Z" Fill="#E9F4EE" Stroke="#37D4C6" StrokeThickness="1" />
-                                <Ellipse Width="5" Height="5" Fill="#E7B74E" VerticalAlignment="Center" HorizontalAlignment="Center" />
+                                <Ellipse Width="45" Height="45" Stroke="{DynamicResource HomeLine}" StrokeThickness="1" />
+                                <Path Data="M34,12 L43,37 L34,31 L25,37 Z" Fill="{DynamicResource HomeBone}" Stroke="{DynamicResource HomeAccent}" StrokeThickness="1" />
+                                <Ellipse Width="5" Height="5" Fill="{DynamicResource HomeAccentBright}" VerticalAlignment="Center" HorizontalAlignment="Center" />
                             </Grid>
                         </Border>
                     </Grid>
 
-                    <Rectangle Height="1" Fill="#35554F" Margin="0,18,0,16" />
+                    <Rectangle Height="1" Fill="{DynamicResource HomeLine}" Margin="0,18,0,16" />
 
-                    <TextBlock Text="PHÁT TRIỂN" Foreground="#A8BDB7" FontSize="11.5" FontWeight="SemiBold" Margin="0,0,0,8" />
+                    <TextBlock Text="PHÁT TRIỂN" Foreground="{DynamicResource HomeMuted}" FontSize="11.5" FontWeight="SemiBold" Margin="0,0,0,8" />
 
                     <Button Style="{StaticResource LinkButton}" Tag="https://www.facebook.com/klong.dev" Click="OpenLink_Click" Margin="0,0,0,8">
                         <Grid>
                             <Grid.ColumnDefinitions><ColumnDefinition Width="4" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-                            <Rectangle Fill="#37D4C6" RadiusX="1" RadiusY="1" />
+                            <Rectangle Fill="{DynamicResource HomeAccent}" RadiusX="1" RadiusY="1" />
                             <StackPanel Grid.Column="1" Margin="12,0,10,0">
-                                <TextBlock Text="KLONG.DEV / FACEBOOK" Foreground="{StaticResource HomeBone}" FontFamily="Bahnschrift SemiCondensed" FontSize="13" FontWeight="SemiBold" />
-                                <TextBlock Text="Thiết kế tool game · tool auto · website · shop bán hàng · bot tự động" Foreground="{StaticResource HomeMuted}" FontSize="11.5" FontWeight="Medium" TextWrapping="Wrap" Margin="0,4,0,0" />
+                                <TextBlock Text="KLONG.DEV / FACEBOOK" Foreground="{DynamicResource HomeBone}" FontFamily="Bahnschrift SemiCondensed" FontSize="13" FontWeight="SemiBold" />
+                                <TextBlock Text="Thiết kế tool game · tool auto · website · shop bán hàng · bot tự động" Foreground="{DynamicResource HomeMuted}" FontSize="11.5" FontWeight="Medium" TextWrapping="Wrap" Margin="0,4,0,0" />
                             </StackPanel>
-                            <TextBlock Grid.Column="2" Text="↗" Foreground="#37D4C6" FontSize="18" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="2" Text="↗" Foreground="{DynamicResource HomeAccent}" FontSize="18" VerticalAlignment="Center" />
                         </Grid>
                     </Button>
 
                     <Button Style="{StaticResource LinkButton}" Tag="https://www.youtube.com/@longhoangkim2246" Click="OpenLink_Click">
                         <Grid>
                             <Grid.ColumnDefinitions><ColumnDefinition Width="4" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-                            <Rectangle Fill="#E7B74E" RadiusX="1" RadiusY="1" />
+                            <Rectangle Fill="{DynamicResource HomeAccent}" RadiusX="1" RadiusY="1" />
                             <StackPanel Grid.Column="1" Margin="12,0,10,0">
-                                <TextBlock Text="LONG HOÀNG KIM / YOUTUBE" Foreground="{StaticResource HomeBone}" FontFamily="Bahnschrift SemiCondensed" FontSize="13" FontWeight="SemiBold" />
-                                <TextBlock Text="Video, dự án và các bản cập nhật mới." Foreground="{StaticResource HomeMuted}" FontSize="11.5" FontWeight="Medium" Margin="0,4,0,0" />
+                                <TextBlock Text="LONG HOÀNG KIM / YOUTUBE" Foreground="{DynamicResource HomeBone}" FontFamily="Bahnschrift SemiCondensed" FontSize="13" FontWeight="SemiBold" />
+                                <TextBlock Text="Video, dự án và các bản cập nhật mới." Foreground="{DynamicResource HomeMuted}" FontSize="11.5" FontWeight="Medium" Margin="0,4,0,0" />
                             </StackPanel>
-                            <TextBlock Grid.Column="2" Text="↗" Foreground="#E7B74E" FontSize="18" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="2" Text="↗" Foreground="{DynamicResource HomeAccent}" FontSize="18" VerticalAlignment="Center" />
                         </Grid>
                     </Button>
 
-                    <Border Background="#B7132522" BorderBrush="#4D746B" BorderThickness="1" CornerRadius="3" Padding="14,12" Margin="0,14,0,18">
+                    <Border Background="{DynamicResource HomePanelSoft}" BorderBrush="{DynamicResource HomeLineStrong}" BorderThickness="1" CornerRadius="3" Padding="14,12" Margin="0,14,0,18">
                         <Grid>
                             <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                             <StackPanel>
-                                <TextBlock Text="PROJECT PHI LỢI NHUẬN · OPEN SOURCE" Foreground="#55E0D2" FontFamily="Bahnschrift SemiCondensed" FontSize="10.5" FontWeight="SemiBold" />
-                                <TextBlock Text="Xin 1 star GitHub" Foreground="{StaticResource HomeBone}" FontFamily="Bahnschrift SemiCondensed" FontWeight="SemiBold" FontSize="19" Margin="0,3,0,0" />
-                                <TextBlock Text="* Chia sẻ thêm cho người khác để Long được nhiều người biết đến hơn. Source công khai nên bạn có thể tự kiểm tra virus và cách app vận hành." Foreground="#ABC0BA" FontSize="11.5" FontWeight="Medium" TextWrapping="Wrap" MaxWidth="330" Margin="0,6,0,0" />
+                                <TextBlock Text="PROJECT PHI LỢI NHUẬN · OPEN SOURCE" Foreground="{DynamicResource HomeAccent}" FontFamily="Bahnschrift SemiCondensed" FontSize="10.5" FontWeight="SemiBold" />
+                                <TextBlock Text="Xin 1 star GitHub" Foreground="{DynamicResource HomeBone}" FontFamily="Bahnschrift SemiCondensed" FontWeight="SemiBold" FontSize="19" Margin="0,3,0,0" />
+                                <TextBlock Text="* Chia sẻ thêm cho người khác để Long được nhiều người biết đến hơn. Source công khai nên bạn có thể tự kiểm tra virus và cách app vận hành." Foreground="{DynamicResource HomeMuted}" FontSize="11.5" FontWeight="Medium" TextWrapping="Wrap" MaxWidth="330" Margin="0,6,0,0" />
                             </StackPanel>
                             <Button Grid.Column="1" Style="{StaticResource HomeChromeButton}" Tag="https://github.com/klong-dev/IsleLiveMap" Click="OpenLink_Click"
-                                    Content="GITHUB  ★" Foreground="#E7B74E" BorderBrush="#756A3A" Padding="12,8" VerticalAlignment="Center" Margin="12,0,0,0" />
+                                    Content="GITHUB  ★" Foreground="{DynamicResource HomeAccentBright}" BorderBrush="{DynamicResource HomeLineStrong}" Padding="12,8" VerticalAlignment="Center" Margin="12,0,0,0" />
                         </Grid>
                     </Border>
 
-                    <TextBlock Text="NHÓM SINH TỒN" Foreground="#A8BDB7" FontSize="11.5" FontWeight="SemiBold" Margin="0,0,0,9" />
+                    <TextBlock Text="NHÓM SINH TỒN" Foreground="{DynamicResource HomeMuted}" FontSize="11.5" FontWeight="SemiBold" Margin="0,0,0,9" />
 
-                    <Border x:Name="TeamCard" Background="#C00A211E" BorderBrush="#4D746B" BorderThickness="1"
+                    <Border x:Name="TeamCard" Background="{DynamicResource HomePanel}" BorderBrush="{DynamicResource HomeLineStrong}" BorderThickness="1"
                             CornerRadius="3" Padding="14,12" Margin="0,0,0,18">
                         <Grid>
                             <Grid.RowDefinitions>
@@ -193,21 +207,21 @@
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-                                <Border Width="29" Height="29" CornerRadius="15" BorderBrush="#3F766D" BorderThickness="1">
+                                <Border Width="29" Height="29" CornerRadius="15" BorderBrush="{DynamicResource HomeLineStrong}" BorderThickness="1">
                                     <Grid>
-                                        <Ellipse Width="12" Height="12" Stroke="#37D4C6" StrokeThickness="1" />
-                                        <Ellipse Width="4" Height="4" Fill="#E7B74E" />
+                                        <Ellipse Width="12" Height="12" Stroke="{DynamicResource HomeAccent}" StrokeThickness="1" />
+                                        <Ellipse Width="4" Height="4" Fill="{DynamicResource HomeAccentBright}" />
                                     </Grid>
                                 </Border>
                                 <StackPanel Grid.Column="1" Margin="10,0,0,0">
-                                    <TextBlock Text="TEAM LINK / TẠM THỜI" Foreground="{StaticResource HomeBone}"
+                                    <TextBlock Text="TEAM LINK / TẠM THỜI" Foreground="{DynamicResource HomeBone}"
                                                FontFamily="Bahnschrift SemiCondensed" FontSize="13" FontWeight="SemiBold" />
                                     <TextBlock Text="Tắt app là nhóm tự hủy · Không lưu dữ liệu"
-                                               Foreground="#7F9A92" FontSize="10.5" FontWeight="Medium" />
+                                               Foreground="{DynamicResource HomeSubtle}" FontSize="10.5" FontWeight="Medium" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                                    <Ellipse x:Name="TeamStateDot" Width="6" Height="6" Fill="#607E76" Margin="0,0,6,0" />
-                                    <TextBlock x:Name="TeamStateLabel" Text="CHƯA VÀO NHÓM" Foreground="#8DA69F"
+                                    <Ellipse x:Name="TeamStateDot" Width="6" Height="6" Fill="{DynamicResource HomeSubtle}" Margin="0,0,6,0" />
+                                    <TextBlock x:Name="TeamStateLabel" Text="CHƯA VÀO NHÓM" Foreground="{DynamicResource HomeMuted}"
                                                FontFamily="Bahnschrift SemiCondensed" FontSize="9.5" FontWeight="SemiBold" />
                                 </StackPanel>
                             </Grid>
@@ -218,7 +232,7 @@
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
-                                    <Border Background="#A5071716" BorderBrush="#31514B" BorderThickness="1" CornerRadius="2" Margin="0,0,8,0">
+                                    <Border Background="{DynamicResource HomeInputSurface}" BorderBrush="{DynamicResource HomeLine}" BorderThickness="1" CornerRadius="2" Margin="0,0,8,0">
                                         <TextBox x:Name="TeamDisplayNameTextBox" Style="{StaticResource TeamInput}"
                                                  Text="Survivor" MaxLength="32" ToolTip="Tên đồng đội sẽ nhìn thấy" />
                                     </Border>
@@ -231,10 +245,10 @@
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
-                                    <Border Background="#A5071716" BorderBrush="#5D5936" BorderThickness="1" CornerRadius="2" Margin="0,0,8,0">
+                                    <Border Background="{DynamicResource HomeInputSurface}" BorderBrush="{DynamicResource HomeLineStrong}" BorderThickness="1" CornerRadius="2" Margin="0,0,8,0">
                                         <Grid>
                                             <TextBlock x:Name="InviteCodePlaceholder" Text="MÃ MỜI 6 KÝ TỰ"
-                                                       Foreground="#6F8273" FontFamily="Bahnschrift SemiCondensed"
+                                                       Foreground="{DynamicResource HomeSubtle}" FontFamily="Bahnschrift SemiCondensed"
                                                        FontSize="10.5" FontWeight="SemiBold" Margin="10,0"
                                                        VerticalAlignment="Center" IsHitTestVisible="False" />
                                             <TextBox x:Name="InviteCodeTextBox" Style="{StaticResource TeamInput}"
@@ -244,13 +258,13 @@
                                         </Grid>
                                     </Border>
                                     <Button x:Name="JoinTeamButton" Grid.Column="1" Style="{StaticResource TeamPrimaryButton}"
-                                            Content="NHẬP MÃ" BorderBrush="#786E3D" Foreground="#FFE7A0"
+                                            Content="NHẬP MÃ" BorderBrush="{DynamicResource HomeLineStrong}" Foreground="{DynamicResource HomeAccentBright}"
                                             Click="JoinTeamButton_Click" />
                                 </Grid>
                             </StackPanel>
 
                             <StackPanel x:Name="TeamActivePanel" Grid.Row="1" Margin="0,13,0,0" Visibility="Collapsed">
-                                <Border Background="#C40B1817" BorderBrush="#6D6741" BorderThickness="1" CornerRadius="2" Padding="11,8">
+                                <Border Background="{DynamicResource HomePanelSoft}" BorderBrush="{DynamicResource HomeLineStrong}" BorderThickness="1" CornerRadius="2" Padding="11,8">
                                     <Grid>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="4" />
@@ -259,14 +273,14 @@
                                             <ColumnDefinition Width="Auto" />
                                             <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
-                                        <Rectangle Fill="#E7B74E" RadiusX="1" RadiusY="1" />
+                                        <Rectangle Fill="{DynamicResource HomeAccent}" RadiusX="1" RadiusY="1" />
                                         <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center">
-                                            <TextBlock Text="MÃ MỜI" Foreground="#879D96" FontFamily="Bahnschrift SemiCondensed" FontSize="9" />
-                                            <TextBlock x:Name="ActiveInviteCodeLabel" Text="— — — — — —" Foreground="#FFE18A"
+                                            <TextBlock Text="MÃ MỜI" Foreground="{DynamicResource HomeSubtle}" FontFamily="Bahnschrift SemiCondensed" FontSize="9" />
+                                            <TextBlock x:Name="ActiveInviteCodeLabel" Text="— — — — — —" Foreground="{DynamicResource HomeAccentBright}"
                                                        FontFamily="Bahnschrift" FontSize="19" FontWeight="Bold" />
                                         </StackPanel>
                                         <TextBlock x:Name="TeamMemberCountLabel" Grid.Column="2" Text="1 / 10 NGƯỜI"
-                                                   Foreground="#91AAA3" FontFamily="Bahnschrift SemiCondensed" FontSize="10"
+                                                   Foreground="{DynamicResource HomeMuted}" FontFamily="Bahnschrift SemiCondensed" FontSize="10"
                                                    VerticalAlignment="Center" HorizontalAlignment="Right" Margin="8,0" />
                                         <Button Grid.Column="3" Style="{StaticResource HomeChromeButton}" Content="COPY"
                                                 Padding="10,6" Click="CopyInviteCodeButton_Click" />
@@ -276,18 +290,18 @@
                                     </Grid>
                                 </Border>
                                 <TextBlock Text="Gửi mã cho bạn bè. Minimap và HP / Đói / Nước sẽ tự đồng bộ khi cùng server."
-                                           Foreground="#8FA79F" FontSize="10.5" FontWeight="Medium"
+                                           Foreground="{DynamicResource HomeMuted}" FontSize="10.5" FontWeight="Medium"
                                            TextWrapping="Wrap" Margin="0,7,0,0" />
                             </StackPanel>
 
                             <TextBlock x:Name="TeamErrorLabel" Grid.Row="2" Text="Tạo nhóm mới hoặc nhập mã mời từ bạn bè."
-                                       Foreground="#839C95" FontSize="10.5" FontWeight="Medium"
+                                       Foreground="{DynamicResource HomeMuted}" FontSize="10.5" FontWeight="Medium"
                                        TextWrapping="Wrap" Margin="0,9,0,0" />
                         </Grid>
                     </Border>
 
                     <Border x:Name="MapLaunchGateBanner"
-                            Background="#B80A211E" BorderBrush="#4D746B" BorderThickness="1"
+                            Background="{DynamicResource HomePanelSoft}" BorderBrush="{DynamicResource HomeLineStrong}" BorderThickness="1"
                             CornerRadius="3" Padding="12,10" Margin="0,0,0,14">
                         <Grid>
                             <Grid.ColumnDefinitions>
@@ -305,13 +319,13 @@
                                            FontSize="11.5" FontWeight="SemiBold" />
                                 <TextBlock x:Name="MapLaunchStateDetail"
                                            Text="MỞ MAP sẽ tự mở khóa ngay khi kiểm tra hoàn tất."
-                                           Foreground="#8FA79F" FontSize="10.5" FontWeight="Medium"
+                                           Foreground="{DynamicResource HomeMuted}" FontSize="10.5" FontWeight="Medium"
                                            TextWrapping="Wrap" Margin="0,2,0,0" />
                             </StackPanel>
                         </Grid>
                     </Border>
 
-                    <TextBlock Text="KÍCH HOẠT LIVE MAP" Foreground="#A8BDB7" FontSize="11.5"
+                    <TextBlock Text="KÍCH HOẠT LIVE MAP" Foreground="{DynamicResource HomeMuted}" FontSize="11.5"
                                FontWeight="SemiBold" Margin="0,0,0,9" />
 
                     <StackPanel Margin="0,0,0,18" Loaded="SteamLoginPanel_Loaded">
@@ -326,36 +340,39 @@
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <Grid Width="31" Height="31" VerticalAlignment="Center">
-                                    <Ellipse Stroke="#4F8F84" StrokeThickness="1" />
-                                    <Ellipse Width="13" Height="13" Stroke="#37D4C6" StrokeThickness="1" />
-                                    <Ellipse Width="4" Height="4" Fill="#E7B74E" />
+                                    <Ellipse Stroke="{DynamicResource HomeLineStrong}" StrokeThickness="1" />
+                                    <Ellipse Width="13" Height="13" Stroke="{DynamicResource HomeAccent}" StrokeThickness="1" />
+                                    <Ellipse Width="4" Height="4" Fill="{DynamicResource HomeAccentBright}" />
                                 </Grid>
                                 <StackPanel Grid.Column="1" Margin="14,0,10,0" VerticalAlignment="Center">
                                     <TextBlock x:Name="SteamAccountLabel" Text="STEAM / ISLEPILOT STATS"
-                                               Foreground="#69E2D6" FontFamily="Bahnschrift SemiCondensed"
+                                               Foreground="{DynamicResource HomeAccent}" FontFamily="Bahnschrift SemiCondensed"
                                                FontSize="10" FontWeight="SemiBold" />
-                                    <TextBlock Text="MỞ LIVE MAP" Foreground="{StaticResource HomeBone}"
+                                    <TextBlock x:Name="SteamLoginTitleLabel" Text="MỞ LIVE MAP" Foreground="{DynamicResource HomeBone}"
                                                FontFamily="Bahnschrift SemiCondensed" FontSize="16"
                                                FontWeight="SemiBold" Margin="0,2,0,0" />
                                     <TextBlock x:Name="SteamLoginDetailLabel"
                                                Text="GPS trực tiếp · Dino stats đồng bộ qua IslePilot"
-                                               Foreground="#91AAA3" FontSize="10.5" FontWeight="Medium" />
+                                               Foreground="{DynamicResource HomeMuted}" FontSize="10.5" FontWeight="Medium" />
                                 </StackPanel>
                                 <TextBlock x:Name="SteamLoginActionLabel" Grid.Column="2"
-                                           Text="ĐỢI KIỂM TRA…" Foreground="#A0D2C8"
+                                           Text="ĐỢI KIỂM TRA…" Foreground="{DynamicResource HomeAccentBright}"
                                            FontFamily="Bahnschrift SemiCondensed" FontSize="12.5"
                                            FontWeight="SemiBold" VerticalAlignment="Center" Margin="10,0,0,0" />
                             </Grid>
                         </Button>
                         <TextBlock Text="GPS hoạt động trên mọi server; stats được đồng bộ qua IslePilot khi khả dụng. Npcap phải sẵn sàng trên máy."
-                                   Foreground="#78938C" FontSize="10.5" TextWrapping="Wrap" />
-                        <Button x:Name="LogoutSteamButton" Visibility="Collapsed" />
+                                   Foreground="{DynamicResource HomeSubtle}" FontSize="10.5" TextWrapping="Wrap" />
+                        <Button x:Name="LogoutSteamButton" Style="{StaticResource HomeChromeButton}"
+                                Content="ĐĂNG XUẤT STEAM" Padding="10,5" Margin="0,8,0,0"
+                                HorizontalAlignment="Right" Visibility="Collapsed"
+                                Click="LogoutSteamButton_Click" />
                     </StackPanel>
 
-                    <Rectangle Height="1" Fill="#2F514B" Margin="0,0,0,14" />
+                    <Rectangle Height="1" Fill="{DynamicResource HomeLine}" Margin="0,0,0,14" />
 
                     <TextBlock x:Name="ProSectionHeading" Text="KÍCH HOẠT PRO"
-                               Foreground="#E8C86E" FontSize="11.5"
+                               Foreground="{DynamicResource HomeAccentBright}" FontSize="11.5"
                                FontWeight="SemiBold" Margin="0,0,0,9" />
 
                     <StackPanel Loaded="ProAccessPanel_Loaded" Margin="0,0,0,4">
@@ -371,22 +388,22 @@
                                 <StackPanel Grid.Column="1" Margin="13,0,10,0" VerticalAlignment="Center">
                                     <StackPanel Orientation="Horizontal">
                                         <TextBlock x:Name="ProTierLabel" Text="FREE / CHƯA KIỂM TRA"
-                                                   Foreground="#B4B89F" FontFamily="Bahnschrift SemiCondensed"
+                                                   Foreground="{DynamicResource HomeAccentBright}" FontFamily="Bahnschrift SemiCondensed"
                                                    FontSize="10" FontWeight="SemiBold" />
                                         <TextBlock x:Name="ProAccountLabel" Text="  ·  CHƯA ĐĂNG NHẬP STEAM"
-                                                   Foreground="#748B83" FontFamily="Bahnschrift SemiCondensed"
+                                                   Foreground="{DynamicResource HomeSubtle}" FontFamily="Bahnschrift SemiCondensed"
                                                    FontSize="10" FontWeight="SemiBold" />
                                     </StackPanel>
-                                    <TextBlock Text="PLAYER + AI TRACKING" Foreground="{StaticResource HomeBone}"
+                                    <TextBlock Text="PLAYER + AI TRACKING" Foreground="{DynamicResource HomeBone}"
                                                FontFamily="Bahnschrift SemiCondensed" FontSize="15"
                                                FontWeight="SemiBold" Margin="0,2,0,0" />
                                     <TextBlock x:Name="ProAccessDetailLabel"
                                                Text="Đăng nhập Steam để kiểm tra quyền theo tài khoản"
-                                               Foreground="#91A09A" FontSize="10.5" FontWeight="Medium"
+                                               Foreground="{DynamicResource HomeMuted}" FontSize="10.5" FontWeight="Medium"
                                                TextTrimming="CharacterEllipsis" />
                                 </StackPanel>
                                 <TextBlock x:Name="ProAccessActionLabel" Grid.Column="2"
-                                           Text="ĐĂNG NHẬP  →" Foreground="#FFE18A"
+                                           Text="ĐĂNG NHẬP  →" Foreground="{DynamicResource HomeAccentBright}"
                                            FontFamily="Bahnschrift SemiCondensed" FontSize="12"
                                            FontWeight="SemiBold" VerticalAlignment="Center" Margin="8,0,0,0" />
                             </Grid>
@@ -397,11 +414,12 @@
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <TextBlock Text="Nâng cấp tùy chọn: phân loại player, AI, loài và cân nặng. Free luôn hoạt động độc lập."
-                                       Foreground="#78938C" FontSize="10.5" TextWrapping="Wrap"
+                            <TextBlock x:Name="ProAccessFootnoteLabel"
+                                       Text="Nâng cấp tùy chọn: phân loại player, AI, loài và cân nặng. Free luôn hoạt động độc lập."
+                                       Foreground="{DynamicResource HomeSubtle}" FontSize="10.5" TextWrapping="Wrap"
                                        VerticalAlignment="Center" />
                             <Button x:Name="LogoutProButton" Grid.Column="1"
-                                    Style="{StaticResource HomeChromeButton}" Content="XÓA PHIÊN PRO"
+                                    Style="{StaticResource HomeChromeButton}" Content="ĐĂNG XUẤT PRO"
                                     Padding="10,5" Margin="10,0,0,0" Visibility="Collapsed"
                                     Click="LogoutProButton_Click" />
                         </Grid>
@@ -409,16 +427,16 @@
 
                     <TextBlock x:Name="SourceStatusLabel"
                                Text="Free đã sẵn sàng cho mọi server. Pro chỉ được ghép thêm sau khi xác minh quyền."
-                               Foreground="#9CB2AC" FontSize="11.5" FontWeight="Medium"
+                               Foreground="{DynamicResource HomeMuted}" FontSize="11.5" FontWeight="Medium"
                                TextWrapping="Wrap" Margin="0,12,0,0" />
                 </StackPanel>
             </ScrollViewer>
 
-            <Border Grid.Row="2" BorderBrush="#2F514B" BorderThickness="0,1,0,0">
+            <Border Grid.Row="2" BorderBrush="{DynamicResource HomeLine}" BorderThickness="0,1,0,0">
                 <Grid Margin="14,0">
                     <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-                    <Ellipse Width="6" Height="6" Fill="#37D4C6" VerticalAlignment="Center" />
-                    <TextBlock x:Name="UpdateStatusLabel" Grid.Column="1" Text="ĐANG KIỂM TRA CẬP NHẬT" Foreground="#87A39B" FontFamily="Bahnschrift SemiCondensed" FontSize="10" FontWeight="SemiBold" VerticalAlignment="Center" Margin="7,0,0,0" />
+                    <Ellipse Width="6" Height="6" Fill="{DynamicResource HomeAccent}" VerticalAlignment="Center" />
+                    <TextBlock x:Name="UpdateStatusLabel" Grid.Column="1" Text="ĐANG KIỂM TRA CẬP NHẬT" Foreground="{DynamicResource HomeSubtle}" FontFamily="Bahnschrift SemiCondensed" FontSize="10" FontWeight="SemiBold" VerticalAlignment="Center" Margin="7,0,0,0" />
                     <Button x:Name="ApplyUpdateButton" Grid.Column="2" Style="{StaticResource HomeChromeButton}" Content="CẬP NHẬT &amp; KHỞI ĐỘNG LẠI" Padding="9,4" Visibility="Collapsed" Click="ApplyUpdateButton_Click" />
                 </Grid>
             </Border>

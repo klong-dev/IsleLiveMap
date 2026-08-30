@@ -7,9 +7,12 @@ public sealed record ProEntitlement(
     string Status,
     DateTimeOffset? ExpiresAt)
 {
-    public bool IsPro =>
+    public bool IsPro => IsProAt(DateTimeOffset.UtcNow);
+
+    public bool IsProAt(DateTimeOffset now) =>
         string.Equals(Tier, "pro", StringComparison.Ordinal) &&
-        string.Equals(Status, "active", StringComparison.Ordinal);
+        string.Equals(Status, "active", StringComparison.Ordinal) &&
+        (ExpiresAt is null || ExpiresAt > now);
 }
 
 public sealed record ProTokenResponse(
