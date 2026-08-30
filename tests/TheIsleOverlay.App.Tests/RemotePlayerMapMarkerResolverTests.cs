@@ -74,12 +74,26 @@ public sealed class RemotePlayerMapMarkerResolverTests
     }
 
     [Fact]
-    public void Resolve_UsesNeutralCategoryWhenPlayerSpeciesCannotBeColoredSafely()
+    public void Resolve_UsesKnownDietWhenLocalSpeciesIsUnavailable()
     {
         var map = new MapTelemetry
         {
             Markers =
             [
+                Entity(
+                    "pro-entity:player:deino",
+                    "Deino 2.3T",
+                    RemoteEntityKind.Player,
+                    "deinosuchus",
+                    CreatureDiet.Carnivore,
+                    point: new MapPoint(0.1, 0.2)),
+                Entity(
+                    "pro-entity:player:trice",
+                    "Trice 1.2T",
+                    RemoteEntityKind.Player,
+                    "triceratops",
+                    CreatureDiet.Herbivore,
+                    point: new MapPoint(0.15, 0.25)),
                 Entity(
                     "pro-entity:player:galli",
                     "Galli 300K",
@@ -99,13 +113,21 @@ public sealed class RemotePlayerMapMarkerResolverTests
 
         var result = RemotePlayerMapMarkerResolver.Resolve(map, localPlayer: null);
 
-        Assert.Equal(2, result.Count);
-        Assert.All(
+        Assert.Collection(
             result,
+            marker => Assert.Equal(
+                RemoteEntityMapCategory.OtherCarnivore,
+                marker.Category),
+            marker => Assert.Equal(
+                RemoteEntityMapCategory.OtherHerbivore,
+                marker.Category),
+            marker => Assert.Equal(
+                RemoteEntityMapCategory.UnclassifiedPlayer,
+                marker.Category),
             marker => Assert.Equal(
                 RemoteEntityMapCategory.UnclassifiedPlayer,
                 marker.Category));
-        Assert.Equal("Player ?", result[1].Label);
+        Assert.Equal("Player ?", result[3].Label);
     }
 
     [Fact]

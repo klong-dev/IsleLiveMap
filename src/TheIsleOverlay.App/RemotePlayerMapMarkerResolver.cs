@@ -81,19 +81,14 @@ internal static class RemotePlayerMapMarkerResolver
             return false;
         }
 
-        if (CreatureSpeciesIdentity.Normalize(localPlayer?.Class) is not { Length: > 0 })
-        {
-            category = RemoteEntityMapCategory.UnclassifiedPlayer;
-            return true;
-        }
-
         if (string.IsNullOrWhiteSpace(marker.CreatureSpeciesId))
         {
             category = RemoteEntityMapCategory.UnclassifiedPlayer;
             return true;
         }
 
-        if (CreatureSpeciesIdentity.AreSame(
+        if (CreatureSpeciesIdentity.Normalize(localPlayer?.Class) is { Length: > 0 }
+            && CreatureSpeciesIdentity.AreSame(
                 marker.CreatureSpeciesId,
                 localPlayer?.Class))
         {
