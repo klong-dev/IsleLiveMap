@@ -32,7 +32,10 @@ public partial class HomeWindow
 
     private async void SteamLoginButton_Click(object sender, RoutedEventArgs e)
     {
-        if (!EnsureMapLaunchAvailable() || _islePilotConnecting || _connecting)
+        if (!EnsureMapLaunchAvailable()
+            || _islePilotConnecting
+            || _connecting
+            || _proAccessLoading)
         {
             return;
         }

@@ -329,13 +329,17 @@ public partial class HomeWindow : Window
     {
         var enabled = MapLaunchGatePolicy.AllowsMap(_mapLaunchGateState)
                       && !_connecting;
-        SteamLoginButton.IsEnabled = enabled && !_islePilotConnecting;
+        SteamLoginButton.IsEnabled = enabled
+                                     && !_islePilotConnecting
+                                     && !_proAccessLoading;
         LogoutSteamButton.IsEnabled = !_islePilotConnecting && _islePilotCredentials is not null;
         ProAccessButton.IsEnabled = !_proAccessLoading && !_connecting && !_islePilotConnecting;
         LogoutProButton.IsEnabled = !_proAccessLoading;
 
         SteamLoginActionLabel.Text = _islePilotConnecting
             ? "ĐANG KẾT NỐI…"
+            : _proAccessLoading
+                ? "ĐANG NẠP PRO…"
             : _mapLaunchGateState switch
         {
             MapLaunchGateState.Checking => "ĐỢI KIỂM TRA…",
