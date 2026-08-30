@@ -35,6 +35,7 @@ public partial class HomeWindow
         if (!EnsureMapLaunchAvailable()
             || _islePilotConnecting
             || _connecting
+            || !_proAccessInitialized
             || _proAccessLoading)
         {
             return;

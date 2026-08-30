@@ -331,6 +331,7 @@ public partial class HomeWindow : Window
                       && !_connecting;
         SteamLoginButton.IsEnabled = enabled
                                      && !_islePilotConnecting
+                                     && _proAccessInitialized
                                      && !_proAccessLoading;
         LogoutSteamButton.IsEnabled = !_islePilotConnecting && _islePilotCredentials is not null;
         ProAccessButton.IsEnabled = !_proAccessLoading && !_connecting && !_islePilotConnecting;
@@ -338,7 +339,7 @@ public partial class HomeWindow : Window
 
         SteamLoginActionLabel.Text = _islePilotConnecting
             ? "ĐANG KẾT NỐI…"
-            : _proAccessLoading
+            : !_proAccessInitialized || _proAccessLoading
                 ? "ĐANG NẠP PRO…"
             : _mapLaunchGateState switch
         {
