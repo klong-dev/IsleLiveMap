@@ -18,7 +18,18 @@ public sealed record RemotePlayerTelemetryFrame(
     // Capture time can trail wall clock while the stateful Iris decoder
     // drains a burst. Receipt time proves IPC liveness without pretending the
     // underlying GPS or entity samples were captured more recently.
-    DateTimeOffset? ReceivedAt = null);
+    DateTimeOffset? ReceivedAt = null,
+    RemotePlayerSyncState? PlayerSync = null);
+
+public sealed record RemotePlayerSyncState(
+    bool IsSynchronizing,
+    int VerifiedPlayers,
+    int ProvisionalPlayers,
+    int CandidateActors,
+    int SpeciesEvidenceActors,
+    int LocatedActors,
+    long QueueDroppedPackets,
+    int QueueDepth);
 
 public enum RemoteEntityKind
 {
@@ -45,4 +56,5 @@ public sealed record VerifiedRemoteEntityTelemetry(
     WorldLocation Location,
     double DistanceFromLocal,
     int ConfirmationHits,
-    DateTimeOffset ObservedAt);
+    DateTimeOffset ObservedAt,
+    bool IsProvisional = false);

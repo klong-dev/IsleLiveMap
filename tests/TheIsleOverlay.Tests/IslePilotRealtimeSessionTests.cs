@@ -155,6 +155,37 @@ public sealed class IslePilotRealtimeSessionTests
         Assert.Equal(1, ownedResource.DisposeCalls);
     }
 
+    [Fact]
+    public async Task Bootstrap_MergesOptionalTenantHeatmapIntoMapSnapshot()
+    {
+        var api = new FakeApiClient
+        {
+            Heatmap = new IslePilotOverlayHeatmapDto
+            {
+                Ok = true,
+                Radius = 30,
+                Cells = [new IslePilotHeatCellDto { U = 0.2, V = 0.8, Intensity = 0.7 }]
+            }
+        };
+        var socket = new FakeWebSocket(
+        [
+            new IslePilotOverlayLiveDataDto { HasDino = true }
+        ]);
+        await using var session = CreateSession(api, () => socket);
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+        await using var snapshots = session.WatchAsync(timeout.Token).GetAsyncEnumerator();
+
+        var snapshot = await ReadUntilAsync(
+            snapshots,
+            value => value.SessionState == TelemetrySessionState.Live,
+            timeout.Token);
+
+        Assert.Equal("IslePilot Server", api.HeatmapServerName);
+        Assert.True(snapshot.Map?.PlayerHeatmapEnabled);
+        Assert.Equal(0.03, snapshot.Map?.PlayerHeatmapRadius);
+        Assert.Single(snapshot.Map?.PlayerHeatmapCells ?? []);
+    }
+
     private static IslePilotRealtimeSession CreateSession(
         IIslePilotOverlayApiClient api,
         Func<IIslePilotOverlayWebSocket> socketFactory) => new(
@@ -185,12 +216,16 @@ public sealed class IslePilotRealtimeSessionTests
         throw new InvalidOperationException("The telemetry session ended before the expected snapshot.");
     }
 
-    private sealed class FakeApiClient : IIslePilotOverlayApiClient
+    private sealed class FakeApiClient :
+        IIslePilotOverlayApiClient,
+        IIslePilotOverlayHeatmapClient
     {
         public Exception? Failure { get; init; }
         public bool Online { get; init; }
         public int MeCalls { get; private set; }
         public int MapCalls { get; private set; }
+        public IslePilotOverlayHeatmapDto? Heatmap { get; init; }
+        public string? HeatmapServerName { get; private set; }
 
         public Task<IslePilotOverlayMeDto> GetMeAsync(CancellationToken cancellationToken = default)
         {
@@ -229,6 +264,14 @@ public sealed class IslePilotRealtimeSessionTests
                     B = new IslePilotMapCalibrationPointDto { WorldX = 100, WorldY = 100, U = 1, V = 1 }
                 }
             });
+        }
+
+        public Task<IslePilotOverlayHeatmapDto?> GetHeatmapAsync(
+            string? serverName,
+            CancellationToken cancellationToken = default)
+        {
+            HeatmapServerName = serverName;
+            return Task.FromResult(Heatmap);
         }
     }
 

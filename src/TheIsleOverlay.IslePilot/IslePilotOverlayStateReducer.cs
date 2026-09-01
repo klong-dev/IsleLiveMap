@@ -178,11 +178,56 @@ public sealed class IslePilotOverlayStateReducer
             return null;
         }
 
+        var heatCells = FirstPopulated(
+            _map.Heat,
+            _map.HeatmapCells,
+            _map.PlayerHeatmap);
+        var normalizedHeatCells = NormalizeHeatCells(heatCells);
         return new MapTelemetry
         {
+            PlayerHeatmapEnabled = (_map.HeatmapEnabled == true || normalizedHeatCells.Length > 0)
+                                   && normalizedHeatCells.Length > 0,
+            PlayerHeatmapCells = normalizedHeatCells,
+            PlayerHeatmapRadius = NormalizeHeatRadius(
+                _map.HeatRadius ?? _map.HeatmapRadius),
             Markers = (_map.Markers ?? []).Select(ToMarker).ToArray(),
             PointsOfInterest = (_map.Pois ?? []).Select(ToPointOfInterest).ToArray()
         };
+    }
+
+    private static IReadOnlyList<IslePilotHeatCellDto> FirstPopulated(
+        params IReadOnlyList<IslePilotHeatCellDto>?[] sources) =>
+        sources.FirstOrDefault(source => source is { Count: > 0 }) ?? [];
+
+    private static MapHeatCellTelemetry[] NormalizeHeatCells(
+        IReadOnlyList<IslePilotHeatCellDto> source) => source
+        .Where(cell => cell.U is { } u
+                       && cell.V is { } v
+                       && cell.Intensity is { } intensity
+                       && double.IsFinite(u)
+                       && double.IsFinite(v)
+                       && double.IsFinite(intensity)
+                       && u is >= 0d and <= 1d
+                       && v is >= 0d and <= 1d)
+        .Take(2048)
+        .Select(cell => new MapHeatCellTelemetry
+        {
+            Location = new MapPoint(cell.U!.Value, cell.V!.Value),
+            Intensity = Math.Clamp(cell.Intensity!.Value, 0d, 1d)
+        })
+        .ToArray();
+
+    private static double? NormalizeHeatRadius(double? radius)
+    {
+        if (radius is not { } value || !double.IsFinite(value) || value <= 0d)
+        {
+            return null;
+        }
+
+        // IslePilot's web canvas uses a 0..1000 viewBox. Accept normalized
+        // values too so an overlay API can avoid leaking its rendering scale.
+        var normalized = value > 1d ? value / 1000d : value;
+        return normalized is >= 0.001d and <= 0.25d ? normalized : null;
     }
 
     private MapMarkerTelemetry ToMarker(IslePilotOverlayMapMarkerDto marker)

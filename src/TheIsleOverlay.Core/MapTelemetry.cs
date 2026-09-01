@@ -4,6 +4,18 @@ public sealed record MapTelemetry
 {
     public IReadOnlyList<MapMarkerTelemetry> Markers { get; init; } = [];
     public IReadOnlyList<MapPointOfInterestTelemetry> PointsOfInterest { get; init; } = [];
+    // Provider-side opt-in. A heatmap is rendered only from explicit cells
+    // returned by IslePilot; player/entity markers are never repurposed as heat.
+    public bool PlayerHeatmapEnabled { get; init; }
+    public IReadOnlyList<MapHeatCellTelemetry> PlayerHeatmapCells { get; init; } = [];
+    // Radius in normalized map coordinates (the official web map uses 30/1000).
+    public double? PlayerHeatmapRadius { get; init; }
+}
+
+public sealed record MapHeatCellTelemetry
+{
+    public MapPoint Location { get; init; }
+    public double Intensity { get; init; }
 }
 
 public sealed record MapMarkerTelemetry
@@ -20,6 +32,7 @@ public sealed record MapMarkerTelemetry
     public string? CreatureSpeciesShortName { get; init; }
     public CreatureDiet? ProCreatureDiet { get; init; }
     public double? CreatureMassKg { get; init; }
+    public bool ProEntityIsProvisional { get; init; }
 }
 
 public sealed record MapPointOfInterestTelemetry
@@ -28,4 +41,10 @@ public sealed record MapPointOfInterestTelemetry
     public string? Name { get; init; }
     public string? CategoryId { get; init; }
     public IReadOnlyList<MapPoint> Points { get; init; } = [];
+}
+
+public enum MapZoneKind
+{
+    Migration = 1,
+    Patrol = 2
 }

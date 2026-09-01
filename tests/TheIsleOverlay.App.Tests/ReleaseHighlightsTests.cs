@@ -6,7 +6,7 @@ namespace TheIsleOverlay.App.Tests;
 public sealed class ReleaseHighlightsTests
 {
     [Fact]
-    public void Home_ShowsProAnnouncementOnlyWithoutCurrentProAccess()
+    public void Home_ShowsReleaseWizardUnlessTheCurrentVersionWasHidden()
     {
         var source = File.ReadAllText(Path.Combine(
             AppContext.BaseDirectory,
@@ -14,23 +14,21 @@ public sealed class ReleaseHighlightsTests
             "HomeWindow.xaml.cs"));
 
         Assert.Contains(
-            "new ReleaseHighlightsWindow(currentVersion)",
+            "highlightsStore.ShouldShow(ReleaseHighlightsWindow.ReleaseVersion)",
             source,
             StringComparison.Ordinal);
         Assert.Contains(
-            "HomeProPresentationPolicy.Evaluate(",
+            "proPresentation.HasCurrentProAccess",
             source,
             StringComparison.Ordinal);
         Assert.Contains(
-            ").HasCurrentProAccess",
+            "new ReleaseHighlightsWindow(",
             source,
             StringComparison.Ordinal);
-        Assert.DoesNotContain("ShouldShow(currentVersion)", source, StringComparison.Ordinal);
-        Assert.DoesNotContain("MarkShown(currentVersion)", source, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void Modal_SummarizesVersion142PlayerTrackingPro()
+    public void Modal_IsAFourStepFreeAndProBriefingWithFinalOptOut()
     {
         var document = XDocument.Load(Path.Combine(
             AppContext.BaseDirectory,
@@ -53,23 +51,35 @@ public sealed class ReleaseHighlightsTests
                 (string?)element.Attribute("Content")
             }));
 
-        Assert.Equal("1.4.2", ReleaseHighlightsWindow.ReleaseVersion);
-        Assert.Contains("ISLE LIVE MAP PRO", allCopy, StringComparison.Ordinal);
-        Assert.Contains("PLAYER ĐÃ XÁC MINH", allCopy, StringComparison.Ordinal);
-        Assert.Contains("AI TÁCH BIỆT", allCopy, StringComparison.Ordinal);
-        Assert.Contains("LOÀI + CÂN NẶNG", allCopy, StringComparison.Ordinal);
-        Assert.Contains("MỌI SERVER · MỘT LIVE MAP", allCopy, StringComparison.Ordinal);
+        Assert.Equal("1.4.3", ReleaseHighlightsWindow.ReleaseVersion);
+        Assert.Equal(4, ReleaseHighlightsWindow.PageCount);
+        Assert.Contains("FREE UPDATE", allCopy, StringComparison.Ordinal);
+        Assert.Contains("ALT + KÉO GIỮ CHUỘT TRÁI", allCopy, StringComparison.Ordinal);
+        Assert.Contains("ALT + CHUỘT PHẢI", allCopy, StringComparison.Ordinal);
+        Assert.Contains("CTRL + SHIFT + O", allCopy, StringComparison.Ordinal);
+        Assert.Contains("PRO · ALT + M", allCopy, StringComparison.Ordinal);
+        Assert.Contains("CHIA SẺ CHO NHÓM", allCopy, StringComparison.Ordinal);
+        Assert.Contains("PRO · MAP ZONES", allCopy, StringComparison.Ordinal);
+        Assert.Contains("PLAYER ĐƯỢC DỰNG NHANH VÀ ĐỦ HƠN", allCopy, StringComparison.Ordinal);
         Assert.Equal(
-            "KÍCH HOẠT PRO NGAY  →",
-            (string?)Control("EnterToolButton").Attribute("Content"));
+            "HOÀN TẤT",
+            (string?)Control("FinishButton").Attribute("Content"));
+        Assert.NotNull(Control("DoNotShowAgainCheckBox"));
         Assert.Equal("https://isle.klong.dev/", ReleaseHighlightsWindow.ProLandingPageUri.AbsoluteUri);
 
-        var preview = Assert.Single(
+        var setPointPreview = Assert.Single(
             document.Descendants(),
             element => string.Equals(
                 (string?)element.Attribute("Source"),
-                ReleaseHighlightsWindow.ProPreviewResourcePath,
+                ReleaseHighlightsWindow.SetPointPreviewResourcePath,
                 StringComparison.Ordinal));
-        Assert.Equal("Image", preview.Name.LocalName);
+        Assert.Equal("Image", setPointPreview.Name.LocalName);
+        var zonePreview = Assert.Single(
+            document.Descendants(),
+            element => string.Equals(
+                (string?)element.Attribute("Source"),
+                ReleaseHighlightsWindow.MapZonePreviewResourcePath,
+                StringComparison.Ordinal));
+        Assert.Equal("Image", zonePreview.Name.LocalName);
     }
 }

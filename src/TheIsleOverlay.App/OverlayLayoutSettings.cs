@@ -5,14 +5,26 @@ namespace TheIsleOverlay.App;
 
 public sealed record OverlayLayoutSettings
 {
-    public int Version { get; init; } = 1;
+    public int Version { get; init; } = 2;
     public double Scale { get; init; } = OverlayLayoutRules.DefaultScale;
     public double? Left { get; init; }
     public double? Top { get; init; }
+    public Dictionary<string, OverlayWidgetPosition> Widgets { get; init; } = new(StringComparer.OrdinalIgnoreCase);
+}
+
+public sealed record OverlayWidgetPosition
+{
+    public double Left { get; init; }
+    public double Top { get; init; }
 }
 
 public static class OverlayLayoutRules
 {
+    public const string MapWidget = "map";
+    public const string StatsWidget = "stats";
+    public const string TeamWidget = "team";
+    public const string PrimeWidget = "prime";
+    public const string ControlsWidget = "controls";
     public const double BaseWidth = 318d;
     public const double DefaultScale = 1d;
     public const double MinimumScale = 0.65d;
@@ -22,12 +34,23 @@ public static class OverlayLayoutRules
     public static OverlayLayoutSettings Normalize(OverlayLayoutSettings? settings)
     {
         settings ??= new OverlayLayoutSettings();
+        var widgets = (settings.Widgets ?? new Dictionary<string, OverlayWidgetPosition>(StringComparer.OrdinalIgnoreCase))
+            .Where(pair => IsKnownWidget(pair.Key) && pair.Value is not null)
+            .ToDictionary(
+                pair => pair.Key.ToLowerInvariant(),
+                pair => new OverlayWidgetPosition
+                {
+                    Left = FiniteOrZero(pair.Value.Left),
+                    Top = FiniteOrZero(pair.Value.Top)
+                },
+                StringComparer.OrdinalIgnoreCase);
         return settings with
         {
-            Version = 1,
+            Version = 2,
             Scale = NormalizeScale(settings.Scale),
             Left = FiniteOrNull(settings.Left),
-            Top = FiniteOrNull(settings.Top)
+            Top = FiniteOrNull(settings.Top),
+            Widgets = widgets
         };
     }
 
@@ -51,6 +74,11 @@ public static class OverlayLayoutRules
 
     private static double? FiniteOrNull(double? value) =>
         value is { } number && double.IsFinite(number) ? number : null;
+
+    private static double FiniteOrZero(double value) => double.IsFinite(value) ? value : 0d;
+
+    private static bool IsKnownWidget(string value) => value.ToLowerInvariant() is
+        MapWidget or StatsWidget or TeamWidget or PrimeWidget or ControlsWidget;
 }
 
 public static class MapZoomRules
@@ -65,6 +93,70 @@ public static class MapZoomRules
 
     public static double ZoomOut(double current) =>
         Math.Max(MinimumZoom, current - WheelStep);
+}
+
+public enum MapFocusMode
+{
+    FollowPlayer,
+    FreeLook
+}
+
+public static class MapPanRules
+{
+    public static TheIsleOverlay.Core.MapPoint ApplyDragToFocus(
+        TheIsleOverlay.Core.MapPoint startingFocus,
+        double horizontalDelta,
+        double verticalDelta,
+        double imageWidth,
+        double imageHeight)
+    {
+        if (!IsPositiveFinite(imageWidth) || !IsPositiveFinite(imageHeight))
+        {
+            return Normalize(startingFocus);
+        }
+
+        var start = Normalize(startingFocus);
+        return new TheIsleOverlay.Core.MapPoint(
+            start.Left - NormalizeDelta(horizontalDelta) / imageWidth,
+            start.Top - NormalizeDelta(verticalDelta) / imageHeight);
+    }
+
+    public static TheIsleOverlay.Core.MapPoint ClampFocus(
+        TheIsleOverlay.Core.MapPoint focus,
+        double viewportWidth,
+        double viewportHeight,
+        double imageWidth,
+        double imageHeight)
+    {
+        var normalized = Normalize(focus);
+        var horizontalLimit = CenterLimit(viewportWidth, imageWidth);
+        var verticalLimit = CenterLimit(viewportHeight, imageHeight);
+        return new TheIsleOverlay.Core.MapPoint(
+            Math.Clamp(normalized.Left, horizontalLimit, 1d - horizontalLimit),
+            Math.Clamp(normalized.Top, verticalLimit, 1d - verticalLimit));
+    }
+
+    private static double CenterLimit(double viewportSize, double imageSize)
+    {
+        if (!IsPositiveFinite(viewportSize) || !IsPositiveFinite(imageSize) || imageSize <= viewportSize)
+        {
+            return 0.5d;
+        }
+
+        return Math.Clamp(viewportSize / (2d * imageSize), 0d, 0.5d);
+    }
+
+    private static TheIsleOverlay.Core.MapPoint Normalize(TheIsleOverlay.Core.MapPoint value) =>
+        new(
+            Math.Clamp(NormalizeComponent(value.Left, 0.5d), 0d, 1d),
+            Math.Clamp(NormalizeComponent(value.Top, 0.5d), 0d, 1d));
+
+    private static double NormalizeComponent(double value, double fallback = 0d) =>
+        double.IsFinite(value) ? value : fallback;
+
+    private static double NormalizeDelta(double value) => double.IsFinite(value) ? value : 0d;
+
+    private static bool IsPositiveFinite(double value) => double.IsFinite(value) && value > 0d;
 }
 
 public sealed class OverlayLayoutSettingsStore

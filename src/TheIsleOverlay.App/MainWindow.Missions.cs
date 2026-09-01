@@ -20,9 +20,7 @@ public partial class MainWindow
             .ToArray() ?? [];
 
         _hasMissions = quests.Length > 0;
-        MissionPanel.Visibility = _hasMissions && _missionsVisible
-            ? Visibility.Visible
-            : Visibility.Collapsed;
+        RefreshOptionalWidgetVisibility();
         MissionList.ItemsSource = quests
             .Select(quest => new MissionRowViewModel
             {
@@ -46,7 +44,7 @@ public partial class MainWindow
     private void ClearPrimeMissions()
     {
         _hasMissions = false;
-        MissionPanel.Visibility = Visibility.Collapsed;
+        RefreshOptionalWidgetVisibility();
         MissionList.ItemsSource = null;
         MissionProgressLabel.Text = "0 / 0";
         _primeQuestCompletionTracker.Reset();
@@ -55,9 +53,7 @@ public partial class MainWindow
     private void ToggleMissions()
     {
         _missionsVisible = !_missionsVisible;
-        MissionPanel.Visibility = _hasMissions && _missionsVisible
-            ? Visibility.Visible
-            : Visibility.Collapsed;
+        RefreshOptionalWidgetVisibility();
         RefreshWindowSizeToContent();
         KeepOverlayVisible();
         PositionMap();
@@ -81,6 +77,7 @@ public partial class MainWindow
                 FillBehavior = FillBehavior.HoldEnd
             },
             HandoffBehavior.SnapshotAndReplace);
+        PositionMap();
     }
 
     private void EnqueueMissionToast(string missionName)

@@ -21,6 +21,8 @@ public sealed class IslePilotRealtimeSession : ITelemetrySession
     private readonly object _stateGate = new();
 
     private Task? _runTask;
+    private string? _activeServerName;
+    private bool? _activeServerSupported;
     private int _watchStarted;
     private int _disposed;
 
@@ -213,7 +215,7 @@ public sealed class IslePilotRealtimeSession : ITelemetrySession
         try
         {
             var me = await _apiClient.GetMeAsync(cancellationToken);
-            UpdateState(reducer => reducer.ApplyMe(me, _utcNow()));
+            ApplyMe(me);
         }
         catch (TelemetryAuthenticationException)
         {
@@ -225,7 +227,7 @@ public sealed class IslePilotRealtimeSession : ITelemetrySession
 
         try
         {
-            var map = await _apiClient.GetMapAsync(cancellationToken);
+            var map = await GetMapWithHeatmapAsync(cancellationToken);
             UpdateState(reducer => reducer.ApplyMap(map, _utcNow()));
         }
         catch (TelemetryAuthenticationException)
@@ -245,7 +247,7 @@ public sealed class IslePilotRealtimeSession : ITelemetrySession
             try
             {
                 var me = await _apiClient.GetMeAsync(cancellationToken);
-                UpdateState(reducer => reducer.ApplyMe(me, _utcNow()));
+                ApplyMe(me);
             }
             catch (TelemetryAuthenticationException)
             {
@@ -264,7 +266,7 @@ public sealed class IslePilotRealtimeSession : ITelemetrySession
             await Task.Delay(_options.MapRefreshInterval, cancellationToken);
             try
             {
-                var map = await _apiClient.GetMapAsync(cancellationToken);
+                var map = await GetMapWithHeatmapAsync(cancellationToken);
                 UpdateState(reducer => reducer.ApplyMap(map, _utcNow()));
             }
             catch (TelemetryAuthenticationException)
@@ -351,6 +353,71 @@ public sealed class IslePilotRealtimeSession : ITelemetrySession
             _snapshots.Writer.TryWrite(_reducer.BuildSnapshot(_utcNow()));
         }
     }
+
+    private void ApplyMe(IslePilotOverlayMeDto me)
+    {
+        UpdateState(reducer =>
+        {
+            _activeServerName = me.Server;
+            _activeServerSupported = me.HasData;
+            reducer.ApplyMe(me, _utcNow());
+        });
+    }
+
+    private async Task<IslePilotOverlayMapDto> GetMapWithHeatmapAsync(
+        CancellationToken cancellationToken)
+    {
+        var map = await _apiClient.GetMapAsync(cancellationToken);
+        if (HasExplicitHeatmap(map)
+            || _apiClient is not IIslePilotOverlayHeatmapClient heatmapClient)
+        {
+            return map;
+        }
+
+        (string? ServerName, bool? Supported) context;
+        lock (_stateGate)
+        {
+            context = (_activeServerName, _activeServerSupported);
+        }
+
+        if (context.Supported == false || string.IsNullOrWhiteSpace(context.ServerName))
+        {
+            return map;
+        }
+
+        try
+        {
+            var heatmap = await heatmapClient.GetHeatmapAsync(
+                context.ServerName,
+                cancellationToken);
+            if (heatmap?.Ok != true)
+            {
+                return map;
+            }
+
+            return map with
+            {
+                HeatmapEnabled = true,
+                Heat = heatmap.Cells,
+                HeatRadius = heatmap.Radius
+            };
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception) when (IsRecoverableRestFailure(exception, cancellationToken))
+        {
+            // Heatmap is optional. Never discard a valid map/stats update when
+            // a tenant endpoint is unavailable or changes its response shape.
+            return map;
+        }
+    }
+
+    private static bool HasExplicitHeatmap(IslePilotOverlayMapDto map) =>
+        map.Heat is { Count: > 0 }
+        || map.HeatmapCells is { Count: > 0 }
+        || map.PlayerHeatmap is { Count: > 0 };
 
     private void PublishSnapshot()
     {

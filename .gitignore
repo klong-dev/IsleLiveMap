@@ -12,3 +12,5 @@ output/playwright/messenger-training/
 *.WebView2/
 src/TheIsleOverlay.App/Assets/*.png
 !src/TheIsleOverlay.App/Assets/ProMapPreview.png
+!src/TheIsleOverlay.App/Assets/SetPointTip.png
+!src/TheIsleOverlay.App/Assets/MapZoneTip.png

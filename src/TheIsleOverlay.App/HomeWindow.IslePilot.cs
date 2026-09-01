@@ -1,5 +1,6 @@
 using System.Net.Http;
 using System.Windows;
+using System.Windows.Interop;
 using TheIsleOverlay.Core;
 using TheIsleOverlay.IslePilot;
 using TheIsleOverlay.LocalTelemetry;
@@ -89,6 +90,27 @@ public partial class HomeWindow
                 ApplySteamLoginState(credentials);
             }
 
+            if (string.IsNullOrWhiteSpace(credentials.PlayerCookie))
+            {
+                var enriched = await AttachSavedIslePilotCookieAsync(credentials);
+                if (!Equals(enriched, credentials))
+                {
+                    credentials = enriched;
+                    await _islePilotCredentialStore.SaveAsync(credentials, _shutdown.Token);
+                    _islePilotCredentials = credentials;
+                }
+            }
+
+            var proPresentation = HomeProPresentationPolicy.Evaluate(
+                _proAccess,
+                DateTimeOffset.UtcNow);
+            if (proPresentation.HasCurrentProAccess
+                && _proAccess.AgentReady
+                && _proAccess.SteamId64 is { Length: 17 } proSteamId64)
+            {
+                _ = await EnsureIslePilotVoiceCredentialsAsync(proSteamId64);
+            }
+
             SourceStatusLabel.Text = "ĐANG KHỞI TẠO ISLEPILOT REALTIME…";
             await OpenIslePilotOverlayAsync(credentials);
         }
@@ -114,6 +136,7 @@ public partial class HomeWindow
         }
 
         _islePilotCredentialStore.Clear();
+        _islePilotVoiceCredentialStore.Clear();
         _islePilotCredentials = null;
         ApplySteamLoginState(null);
         SourceStatusLabel.Text = "Đã đăng xuất IslePilot và xóa token đã lưu.";
@@ -134,7 +157,8 @@ public partial class HomeWindow
         var session = new AuthenticationInvalidatingTelemetrySession(
             IslePilotRealtimeSession.Create(new IslePilotOverlayOptions
             {
-                OverlayToken = credentials.OverlayToken
+                OverlayToken = credentials.OverlayToken,
+                PlayerCookie = credentials.PlayerCookie
             }),
             _islePilotCredentialStore.Clear);
 
@@ -146,7 +170,8 @@ public partial class HomeWindow
                     App.CurrentApp.TakeLocalTelemetrySource(),
                     "ISLEPILOT",
                     CreateProPlayerSource()),
-                "ISLEPILOT");
+                "ISLEPILOT",
+                ProFeatureAccessGrant.FromSnapshot(_proAccess, DateTimeOffset.UtcNow));
             Application.Current.MainWindow = overlay;
             overlay.Show();
             Close();
@@ -155,6 +180,29 @@ public partial class HomeWindow
         {
             await session.DisposeAsync();
             throw;
+        }
+    }
+
+    private async Task<IslePilotOverlayAuthResult> AttachSavedIslePilotCookieAsync(
+        IslePilotOverlayAuthResult credentials)
+    {
+        try
+        {
+            var handle = new WindowInteropHelper(this).Handle;
+            var playerCookie = await IslePilotPlayerCookieReader.ReadFromProfileAsync(
+                handle,
+                _shutdown.Token);
+            return string.IsNullOrWhiteSpace(playerCookie)
+                ? credentials
+                : credentials with { PlayerCookie = playerCookie };
+        }
+        catch (OperationCanceledException) when (_shutdown.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch
+        {
+            return credentials;
         }
     }
 

@@ -66,7 +66,8 @@ public partial class HomeWindow : Window
                 new LocalPositionTelemetrySession(
                     localSource: App.CurrentApp.TakeLocalTelemetrySource(),
                     remotePlayerSource: CreateProPlayerSource()),
-                "DIRECT");
+                "DIRECT",
+                ProFeatureAccessGrant.FromSnapshot(_proAccess, DateTimeOffset.UtcNow));
             Application.Current.MainWindow = overlay;
             overlay.Show();
             Close();
@@ -97,12 +98,17 @@ public partial class HomeWindow : Window
         }
 
         var access = await EnsureProAccessInitializedAsync();
-        if (!HomeProPresentationPolicy.Evaluate(
-                access,
-                DateTimeOffset.UtcNow).HasCurrentProAccess)
+        var proPresentation = HomeProPresentationPolicy.Evaluate(
+            access,
+            DateTimeOffset.UtcNow);
+        var highlightsStore = new ReleaseHighlightsPreferenceStore();
+        if (highlightsStore.ShouldShow(ReleaseHighlightsWindow.ReleaseVersion))
         {
             var currentVersion = CurrentVersion();
-            var highlightsWindow = new ReleaseHighlightsWindow(currentVersion)
+            var highlightsWindow = new ReleaseHighlightsWindow(
+                currentVersion,
+                proPresentation.HasCurrentProAccess,
+                highlightsStore)
             {
                 Owner = this
             };
@@ -222,7 +228,8 @@ public partial class HomeWindow : Window
                 source,
                 loginWindow.CookieValue,
                 CreateProPlayerSource(),
-                App.CurrentApp.TakeLocalTelemetrySource());
+                App.CurrentApp.TakeLocalTelemetrySource(),
+                ProFeatureAccessGrant.FromSnapshot(_proAccess, DateTimeOffset.UtcNow));
             Application.Current.MainWindow = overlay;
             overlay.Show();
             Close();

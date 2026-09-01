@@ -75,9 +75,10 @@ public partial class MainWindow
 
     private void RenderTeamState(TeamRelayState state)
     {
+        UpdateTeamMapPings(HasCurrentProFeatures ? state : new TeamRelayState());
         if (!state.HasActiveSession || state.Session is not { } session)
         {
-            TeamPanel.Visibility = Visibility.Collapsed;
+            RefreshOptionalWidgetVisibility();
             TeamMembersList.ItemsSource = null;
             ClearTeamMarkers();
             return;
@@ -107,6 +108,7 @@ public partial class MainWindow
             .ToArray();
 
         SyncTeamMarkers(peers);
+        KeepWidgetsVisible();
         PositionMap();
     }
 

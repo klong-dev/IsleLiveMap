@@ -12,9 +12,28 @@ public static class GatewayMapProjection
 
     public static MapPoint Project(WorldLocation location)
     {
+        var point = ProjectUnclamped(location);
+        return new MapPoint(
+            Math.Clamp(point.Left, 0d, 1d),
+            Math.Clamp(point.Top, 0d, 1d));
+    }
+
+    public static MapPoint ProjectUnclamped(WorldLocation location)
+    {
         var left = (location.X / WorldScale + XOffset) / MapWidth;
         var top = (location.Y / WorldScale + YOffset) / MapHeight;
-        return new MapPoint(Math.Clamp(left, 0d, 1d), Math.Clamp(top, 0d, 1d));
+        return new MapPoint(left, top);
+    }
+
+    public static WorldLocation Unproject(MapPoint point)
+    {
+        var left = double.IsFinite(point.Left) ? Math.Clamp(point.Left, 0d, 1d) : 0.5d;
+        var top = double.IsFinite(point.Top) ? Math.Clamp(point.Top, 0d, 1d) : 0.5d;
+        return new WorldLocation
+        {
+            X = (left * MapWidth - XOffset) * WorldScale,
+            Y = (top * MapHeight - YOffset) * WorldScale
+        };
     }
 
     public static MapPoint? ResolveForBundledTexture(

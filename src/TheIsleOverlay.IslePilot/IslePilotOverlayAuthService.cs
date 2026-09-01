@@ -106,7 +106,8 @@ public static class IslePilotOverlayAuthService
 
 public sealed record IslePilotOverlayAuthResult(
     string SteamId,
-    string OverlayToken);
+    string OverlayToken,
+    string? PlayerCookie = null);
 
 public enum IslePilotOverlayAuthValidationState
 {

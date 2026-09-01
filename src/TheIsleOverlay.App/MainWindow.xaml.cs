@@ -23,13 +23,16 @@ public partial class MainWindow : Window
     private const int EditHotkeyId = 0x714;
     private const int ToggleMissionsNHotkeyId = 0x715;
     private const int ToggleHudHotkeyId = 0x716;
+    private const int MapNotesHotkeyId = 0x717;
     private const int WmHotkey = 0x0312;
+    private const int WmInput = 0x00FF;
     private const uint ModAlt = 0x0001;
     private const uint ModControl = 0x0002;
     private const uint ModShift = 0x0004;
     private const uint KeyO = 0x4F;
     private const uint KeyN = 0x4E;
     private const uint KeyP = 0x50;
+    private const uint KeyM = 0x4D;
     private const int GwlExStyle = -20;
     private const int WsExTransparent = 0x00000020;
     private const int WsExNoActivate = 0x08000000;
@@ -45,6 +48,7 @@ public partial class MainWindow : Window
     private readonly ITelemetrySession? _providedSession;
     private readonly IRemotePlayerTelemetrySource? _remotePlayerSource;
     private readonly ILocalMovementSource? _providedLocalSource;
+    private ProFeatureAccessGrant _proFeatureAccess;
     private readonly OverlayLayoutSettingsStore _layoutSettingsStore = new();
     private readonly object _renderSnapshotGate = new();
     private ITelemetrySession? _telemetrySession;
@@ -58,6 +62,12 @@ public partial class MainWindow : Window
     private GlobalMouseShortcutHook? _mouseShortcuts;
     private HwndSource? _windowSource;
     private double _mapZoom = MapZoomRules.DefaultZoom;
+    private double _mapPanStartImageWidth;
+    private double _mapPanStartImageHeight;
+    private double _mapPanStartDpiScaleX = 1d;
+    private double _mapPanStartDpiScaleY = 1d;
+    private double _mapPanRawDeltaX;
+    private double _mapPanRawDeltaY;
     private double _headingDegrees;
     private double _overlayScale = OverlayLayoutRules.DefaultScale;
     private double _resizeStartingScale;
@@ -68,16 +78,28 @@ public partial class MainWindow : Window
     private bool _editHotkeyRegistered;
     private bool _toggleMissionsNHotkeyRegistered;
     private bool _toggleHudHotkeyRegistered;
+    private bool _mapNotesHotkeyRegistered;
     private bool _hudVisible = true;
     private bool _remotePlayerSourceOwnedBySession;
     private bool _renderSnapshotScheduled;
+    private bool _mapPanActive;
+    private bool _rawMapPanReceived;
+    private DispatcherTimer? _proFeatureExpiryTimer;
+    private MapFocusMode _mapFocusMode = MapFocusMode.FollowPlayer;
+    private MapPoint? _freeMapFocus;
+    private MapPoint _mapPanStartFocus = new(0.5d, 0.5d);
+    private GlobalMousePoint _mapPanStartScreenPoint;
+    private volatile MapScreenBounds? _mapScreenBounds;
+    private FrameworkElement? _draggedWidget;
+    private Point _widgetDragStart;
+    private Point _widgetOrigin;
 
-    public MainWindow() : this(null, null, null, null, null, null)
+    public MainWindow() : this(null, null, null, null, null, null, ProFeatureAccessGrant.Free)
     {
     }
 
     public MainWindow(TelemetrySourceDefinition? source, string? cookieValue)
-        : this(source, cookieValue, null, null, null, null)
+        : this(source, cookieValue, null, null, null, null, ProFeatureAccessGrant.Free)
     {
     }
 
@@ -85,7 +107,7 @@ public partial class MainWindow : Window
         TelemetrySourceDefinition? source,
         string? cookieValue,
         IRemotePlayerTelemetrySource? remotePlayerSource)
-        : this(source, cookieValue, null, null, remotePlayerSource, null)
+        : this(source, cookieValue, null, null, remotePlayerSource, null, ProFeatureAccessGrant.Free)
     {
     }
 
@@ -94,7 +116,7 @@ public partial class MainWindow : Window
         string? cookieValue,
         IRemotePlayerTelemetrySource? remotePlayerSource,
         ILocalMovementSource localSource)
-        : this(source, cookieValue, null, null, remotePlayerSource, localSource)
+        : this(source, cookieValue, null, null, remotePlayerSource, localSource, ProFeatureAccessGrant.Free)
     {
     }
 
@@ -105,7 +127,8 @@ public partial class MainWindow : Window
             telemetrySession ?? throw new ArgumentNullException(nameof(telemetrySession)),
             displayName,
             null,
-            null)
+            null,
+            ProFeatureAccessGrant.Free)
     {
     }
 
@@ -119,7 +142,33 @@ public partial class MainWindow : Window
             telemetrySession ?? throw new ArgumentNullException(nameof(telemetrySession)),
             displayName,
             remotePlayerSource,
-            null)
+            null,
+            ProFeatureAccessGrant.Free)
+    {
+    }
+
+    internal MainWindow(
+        ITelemetrySession telemetrySession,
+        string displayName,
+        ProFeatureAccessGrant proFeatureAccess)
+        : this(
+            null,
+            null,
+            telemetrySession ?? throw new ArgumentNullException(nameof(telemetrySession)),
+            displayName,
+            null,
+            null,
+            proFeatureAccess)
+    {
+    }
+
+    internal MainWindow(
+        TelemetrySourceDefinition? source,
+        string? cookieValue,
+        IRemotePlayerTelemetrySource? remotePlayerSource,
+        ILocalMovementSource localSource,
+        ProFeatureAccessGrant proFeatureAccess)
+        : this(source, cookieValue, null, null, remotePlayerSource, localSource, proFeatureAccess)
     {
     }
 
@@ -129,19 +178,22 @@ public partial class MainWindow : Window
         ITelemetrySession? telemetrySession,
         string? displayName,
         IRemotePlayerTelemetrySource? remotePlayerSource,
-        ILocalMovementSource? localSource)
+        ILocalMovementSource? localSource,
+        ProFeatureAccessGrant proFeatureAccess)
     {
         _requestedSource = source;
         _providedCookie = cookieValue;
         _providedSession = telemetrySession;
         _remotePlayerSource = remotePlayerSource;
         _providedLocalSource = localSource;
+        _proFeatureAccess = proFeatureAccess;
         if (!string.IsNullOrWhiteSpace(displayName))
         {
             _configuredSource = displayName;
         }
 
         InitializeComponent();
+        InitializeMapNotes();
         _layoutSettings = _layoutSettingsStore.Load();
         ApplyOverlayScale(_layoutSettings.Scale, persist: false);
     }
@@ -155,16 +207,20 @@ public partial class MainWindow : Window
         var handle = new WindowInteropHelper(this).Handle;
         _windowSource = HwndSource.FromHwnd(handle);
         _windowSource?.AddHook(WindowMessageHook);
+        RawMouseInput.TryRegister(handle);
         _editHotkeyRegistered = RegisterHotKey(handle, EditHotkeyId, ModControl | ModShift, KeyO);
         _toggleMissionsNHotkeyRegistered = RegisterHotKey(handle, ToggleMissionsNHotkeyId, ModAlt, KeyN);
         _toggleHudHotkeyRegistered = RegisterHotKey(handle, ToggleHudHotkeyId, ModAlt, KeyP);
+        _mapNotesHotkeyRegistered = HasCurrentProFeatures
+            && RegisterHotKey(handle, MapNotesHotkeyId, ModAlt, KeyM);
+        StartProFeatureExpiryWatch();
+        ConfigureWorkspaceBounds();
+        RestoreWidgetLayout();
         InstallMouseShortcuts();
         if (_editHotkeyRegistered)
         {
             SetClickThrough(true);
         }
-
-        RestoreOverlayPosition();
 
         if (!TryConfigureTelemetrySession())
         {
@@ -186,6 +242,47 @@ public partial class MainWindow : Window
 
         LoadMap();
         _telemetryWatchTask = WatchTelemetryAsync();
+    }
+
+    private bool HasCurrentProFeatures => _proFeatureAccess.IsActiveAt(DateTimeOffset.UtcNow);
+
+    private void StartProFeatureExpiryWatch()
+    {
+        _proFeatureExpiryTimer?.Stop();
+        _proFeatureExpiryTimer = null;
+        if (!HasCurrentProFeatures || _proFeatureAccess.ExpiresAt is not { } expiresAt)
+        {
+            return;
+        }
+
+        var remaining = expiresAt - DateTimeOffset.UtcNow;
+        _proFeatureExpiryTimer = new DispatcherTimer(
+            remaining <= TimeSpan.FromSeconds(30)
+                ? TimeSpan.FromMilliseconds(Math.Max(250d, remaining.TotalMilliseconds + 100d))
+                : TimeSpan.FromSeconds(30),
+            DispatcherPriority.Normal,
+            ProFeatureExpiryTimer_Tick,
+            Dispatcher);
+        _proFeatureExpiryTimer.Start();
+    }
+
+    private void ProFeatureExpiryTimer_Tick(object? sender, EventArgs e)
+    {
+        if (HasCurrentProFeatures)
+        {
+            return;
+        }
+
+        _proFeatureExpiryTimer?.Stop();
+        _proFeatureExpiryTimer = null;
+        _proFeatureAccess = ProFeatureAccessGrant.Free;
+        if (_mapNotesHotkeyRegistered)
+        {
+            UnregisterHotKey(new WindowInteropHelper(this).Handle, MapNotesHotkeyId);
+            _mapNotesHotkeyRegistered = false;
+        }
+
+        DisableProMapFeatures();
     }
 
     private bool TryConfigureTelemetrySession()
@@ -246,9 +343,14 @@ public partial class MainWindow : Window
     private void InstallMouseShortcuts()
     {
         _mouseShortcuts = new GlobalMouseShortcutHook(Dispatcher);
+        _mouseShortcuts.CanStartMapPan = CanStartMapPan;
         _mouseShortcuts.ZoomInRequested += ZoomInMap;
         _mouseShortcuts.ZoomOutRequested += ZoomOutMap;
         _mouseShortcuts.ToggleMapRequested += ToggleMap;
+        _mouseShortcuts.MapPanStarted += StartMapPan;
+        _mouseShortcuts.MapPanMoved += MoveMapPan;
+        _mouseShortcuts.MapPanEnded += EndMapPan;
+        _mouseShortcuts.FollowMapRequested += FollowPlayerMap;
         _mouseShortcuts.Install();
     }
 
@@ -266,6 +368,7 @@ public partial class MainWindow : Window
             image.EndInit();
             image.Freeze();
             MapImage.Source = image;
+            InitializeMapLayers();
             MapStateLabel.Visibility = Visibility.Collapsed;
             PositionMap();
         }
@@ -420,6 +523,8 @@ public partial class MainWindow : Window
             UpdateHeading(player);
             _location = player.Location;
             _mapLocation = player.MapLocation;
+            UpdateMapNotesPlayer();
+            SyncPlayerHeatmap(snapshot.Map, snapshot.Player);
             SyncRemotePlayerMarkers(snapshot);
             if (_location is not null)
             {
@@ -549,6 +654,7 @@ public partial class MainWindow : Window
         _previousLocation = null;
         _hasMovementHeading = false;
         ClearRemotePlayerMarkers();
+        ClearPlayerHeatmap();
         PlayerMarker.Visibility = Visibility.Collapsed;
         HeadingModeLabel.Text = "COURSE · WAITING";
         ClearVitals();
@@ -567,6 +673,7 @@ public partial class MainWindow : Window
         _previousLocation = null;
         _hasMovementHeading = false;
         ClearRemotePlayerMarkers();
+        ClearPlayerHeatmap();
         PlayerMarker.Visibility = Visibility.Collapsed;
         HeadingModeLabel.Text = "COURSE · WAITING";
         ClearVitals();
@@ -594,6 +701,7 @@ public partial class MainWindow : Window
     private void SetTelemetryOpacity(double opacity)
     {
         PlayerMarker.Opacity = opacity;
+        MapHeatmapLayer.Opacity = opacity;
         RemotePlayerMarkerLayer.Opacity = opacity;
         HealthBar.Opacity = StaminaBar.Opacity = HungerBar.Opacity = WaterBar.Opacity = opacity;
         HealthValue.Opacity = StaminaValue.Opacity = HungerValue.Opacity = WaterValue.Opacity = opacity;
@@ -606,6 +714,7 @@ public partial class MainWindow : Window
         var viewportHeight = MapViewport.ActualHeight;
         if (viewportWidth <= 0 || viewportHeight <= 0)
         {
+            _mapScreenBounds = null;
             return;
         }
 
@@ -614,6 +723,7 @@ public partial class MainWindow : Window
 
         if (MapImage.Source is not BitmapSource source || source.PixelWidth <= 0 || source.PixelHeight <= 0)
         {
+            _mapScreenBounds = null;
             return;
         }
 
@@ -624,19 +734,34 @@ public partial class MainWindow : Window
         MapImage.Height = imageHeight;
 
         var playerPoint = ResolvePlayerMapPoint();
-        var point = playerPoint ?? new MapPoint(0.5d, 0.5d);
-        var desiredLeft = viewportWidth / 2d - point.Left * imageWidth;
-        var desiredTop = viewportHeight / 2d - point.Top * imageHeight;
+        var anchorPoint = playerPoint ?? new MapPoint(0.5d, 0.5d);
+        var focusPoint = _mapFocusMode == MapFocusMode.FollowPlayer
+            ? MapPanRules.ClampFocus(anchorPoint, viewportWidth, viewportHeight, imageWidth, imageHeight)
+            : MapPanRules.ClampFocus(
+                _freeMapFocus ?? anchorPoint,
+                viewportWidth,
+                viewportHeight,
+                imageWidth,
+                imageHeight);
+        if (_mapFocusMode == MapFocusMode.FreeLook)
+        {
+            _freeMapFocus = focusPoint;
+        }
+        var desiredLeft = viewportWidth / 2d - focusPoint.Left * imageWidth;
+        var desiredTop = viewportHeight / 2d - focusPoint.Top * imageHeight;
         var left = ClampImageOffset(desiredLeft, viewportWidth, imageWidth);
         var top = ClampImageOffset(desiredTop, viewportHeight, imageHeight);
         Canvas.SetLeft(MapImage, left);
         Canvas.SetTop(MapImage, top);
 
-        Canvas.SetLeft(PlayerMarker, left + point.Left * imageWidth - PlayerMarker.Width / 2d);
-        Canvas.SetTop(PlayerMarker, top + point.Top * imageHeight - PlayerMarker.Height / 2d);
+        Canvas.SetLeft(PlayerMarker, left + anchorPoint.Left * imageWidth - PlayerMarker.Width / 2d);
+        Canvas.SetTop(PlayerMarker, top + anchorPoint.Top * imageHeight - PlayerMarker.Height / 2d);
+        PositionMapLayers(left, top, imageWidth, imageHeight);
         PositionRemotePlayerMarkers(left, top, imageWidth, imageHeight);
         PositionTeamMarkers(left, top, imageWidth, imageHeight);
-        PositionRoute(playerPoint, left, top, imageWidth, imageHeight);
+        PositionMapNotes(playerPoint, left, top, imageWidth, imageHeight);
+        UpdateMapFocusIndicator();
+        UpdateMapScreenBounds();
     }
 
     private MapPoint? ResolvePlayerMapPoint()
@@ -644,6 +769,160 @@ public partial class MainWindow : Window
 
     private static double ClampImageOffset(double desired, double viewportSize, double imageSize) =>
         imageSize <= viewportSize ? (viewportSize - imageSize) / 2d : Math.Clamp(desired, viewportSize - imageSize, 0d);
+
+    private bool CanStartMapPan(GlobalMousePoint point)
+    {
+        var bounds = _mapScreenBounds;
+        return bounds?.Contains(point) == true;
+    }
+
+    private void StartMapPan(GlobalMousePoint point)
+    {
+        if (!CanStartMapPan(point)
+            || !double.IsFinite(MapImage.Width)
+            || !double.IsFinite(MapImage.Height)
+            || MapImage.Width <= 0d
+            || MapImage.Height <= 0d)
+        {
+            return;
+        }
+
+        var dpi = VisualTreeHelper.GetDpi(MapViewport);
+        _mapPanStartDpiScaleX = Math.Max(0.01d, dpi.DpiScaleX);
+        _mapPanStartDpiScaleY = Math.Max(0.01d, dpi.DpiScaleY);
+        _mapPanStartImageWidth = MapImage.Width;
+        _mapPanStartImageHeight = MapImage.Height;
+        var anchorPoint = ResolvePlayerMapPoint() ?? new MapPoint(0.5d, 0.5d);
+        _mapPanStartFocus = _mapFocusMode == MapFocusMode.FreeLook && _freeMapFocus is { } freeFocus
+            ? MapPanRules.ClampFocus(
+                freeFocus,
+                MapViewport.ActualWidth,
+                MapViewport.ActualHeight,
+                MapImage.Width,
+                MapImage.Height)
+            : MapPanRules.ClampFocus(
+                anchorPoint,
+                MapViewport.ActualWidth,
+                MapViewport.ActualHeight,
+                MapImage.Width,
+                MapImage.Height);
+        _mapPanRawDeltaX = 0d;
+        _mapPanRawDeltaY = 0d;
+        _rawMapPanReceived = false;
+        _freeMapFocus = _mapPanStartFocus;
+        _mapFocusMode = MapFocusMode.FreeLook;
+        _mapPanStartScreenPoint = point;
+        _mapPanActive = true;
+        MapPanel.Cursor = Cursors.Hand;
+        UpdateMapFocusIndicator();
+    }
+
+    private void MoveMapPan(GlobalMousePoint point)
+    {
+        if (!_mapPanActive || _rawMapPanReceived)
+        {
+            return;
+        }
+
+        var horizontalDelta = (point.X - _mapPanStartScreenPoint.X) / _mapPanStartDpiScaleX;
+        var verticalDelta = (point.Y - _mapPanStartScreenPoint.Y) / _mapPanStartDpiScaleY;
+        ApplyMapPanDelta(horizontalDelta, verticalDelta);
+    }
+
+    private void MoveMapPan(RawMouseDelta delta)
+    {
+        if (!_mapPanActive)
+        {
+            return;
+        }
+
+        _rawMapPanReceived = true;
+        _mapPanRawDeltaX += delta.X / _mapPanStartDpiScaleX;
+        _mapPanRawDeltaY += delta.Y / _mapPanStartDpiScaleY;
+        ApplyMapPanDelta(_mapPanRawDeltaX, _mapPanRawDeltaY);
+    }
+
+    private void ApplyMapPanDelta(double horizontalDelta, double verticalDelta)
+    {
+        var requestedFocus = MapPanRules.ApplyDragToFocus(
+            _mapPanStartFocus,
+            horizontalDelta,
+            verticalDelta,
+            _mapPanStartImageWidth,
+            _mapPanStartImageHeight);
+        _freeMapFocus = MapPanRules.ClampFocus(
+            requestedFocus,
+            MapViewport.ActualWidth,
+            MapViewport.ActualHeight,
+            MapImage.Width,
+            MapImage.Height);
+        PositionMap();
+    }
+
+    private void EndMapPan(GlobalMousePoint point)
+    {
+        if (!_rawMapPanReceived)
+        {
+            MoveMapPan(point);
+        }
+        _mapPanActive = false;
+        MapPanel.Cursor = _clickThrough ? Cursors.Arrow : Cursors.SizeAll;
+    }
+
+    private void FollowPlayerMap()
+    {
+        _mapPanActive = false;
+        _mapFocusMode = MapFocusMode.FollowPlayer;
+        _freeMapFocus = null;
+        UpdateMapFocusIndicator();
+        PositionMap();
+    }
+
+    private void UpdateMapFocusIndicator()
+    {
+        if (MapFocusModeButton is null)
+        {
+            return;
+        }
+
+        var freeLook = _mapFocusMode == MapFocusMode.FreeLook;
+        MapFocusModeButton.Content = freeLook ? "FREE · ALT+RMB" : "FOLLOW · GPS";
+        MapFocusModeButton.Foreground = freeLook ? BrushFrom("#F4CB69") : BrushFrom("#72E4D8");
+        MapFocusModeButton.BorderBrush = freeLook ? BrushFrom("#A8E7B74E") : BrushFrom("#8A37D4C6");
+        MapFocusModeButton.ToolTip = freeLook
+            ? "GPS vẫn cập nhật nhưng map đang đứng yên. ALT + chuột phải để bám GPS lại."
+            : "Map tự bám theo GPS. ALT + kéo chuột trái để quan sát tự do.";
+    }
+
+    private void UpdateMapScreenBounds()
+    {
+        if (!IsLoaded
+            || !_hudVisible
+            || WindowState == WindowState.Minimized
+            || MapPanel.Visibility != Visibility.Visible
+            || MapImage.Source is null)
+        {
+            _mapScreenBounds = null;
+            return;
+        }
+
+        try
+        {
+            var topLeft = MapViewport.PointToScreen(new Point(0d, 0d));
+            var bottomRight = MapViewport.PointToScreen(
+                new Point(MapViewport.ActualWidth, MapViewport.ActualHeight));
+            var bounds = new MapScreenBounds(
+                Math.Min(topLeft.X, bottomRight.X),
+                Math.Min(topLeft.Y, bottomRight.Y),
+                Math.Max(topLeft.X, bottomRight.X),
+                Math.Max(topLeft.Y, bottomRight.Y));
+            _mapScreenBounds = bounds.Width > 1d && bounds.Height > 1d ? bounds : null;
+        }
+        catch (InvalidOperationException)
+        {
+            _mapScreenBounds = null;
+        }
+    }
 
     private void SetConnectionState(string text, Brush brush)
     {
@@ -676,6 +955,16 @@ public partial class MainWindow : Window
         return brush;
     }
 
+    private static T? FindAncestor<T>(DependencyObject? source) where T : DependencyObject
+    {
+        while (source is not null)
+        {
+            if (source is T match) return match;
+            source = VisualTreeHelper.GetParent(source);
+        }
+        return null;
+    }
+
     private void MapViewport_SizeChanged(object sender, SizeChangedEventArgs e) => PositionMap();
 
     private void ZoomInMap()
@@ -699,19 +988,76 @@ public partial class MainWindow : Window
         {
             Dispatcher.BeginInvoke(PositionMap, DispatcherPriority.Loaded);
         }
+        else
+        {
+            _mapScreenBounds = null;
+        }
     }
 
     private void ZoomInButton_Click(object sender, RoutedEventArgs e) => ZoomInMap();
 
     private void ZoomOutButton_Click(object sender, RoutedEventArgs e) => ZoomOutMap();
 
-    private void DragRegion_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    private void MapFocusModeButton_Click(object sender, RoutedEventArgs e) => FollowPlayerMap();
+
+    private FrameworkElement[] WidgetPanels =>
+        [MapPanel, StatsPanel, TeamPanel, MissionPanel, LayoutControls];
+
+    private void WidgetPanel_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
-        if (e.ButtonState == MouseButtonState.Pressed && e.OriginalSource is not System.Windows.Controls.Button)
+        if (_clickThrough
+            || e.ButtonState != MouseButtonState.Pressed
+            || sender is not FrameworkElement widget
+            || (ReferenceEquals(widget, MapPanel) && (Keyboard.Modifiers & ModifierKeys.Alt) != 0)
+            || FindAncestor<ButtonBase>(e.OriginalSource as DependencyObject) is not null
+            || FindAncestor<Thumb>(e.OriginalSource as DependencyObject) is not null)
         {
-            DragMove();
-            SaveOverlayLayout();
+            return;
         }
+
+        _draggedWidget = widget;
+        _widgetDragStart = e.GetPosition(WidgetCanvas);
+        _widgetOrigin = new Point(
+            FiniteCanvasCoordinate(Canvas.GetLeft(widget)),
+            FiniteCanvasCoordinate(Canvas.GetTop(widget)));
+        Panel.SetZIndex(widget, 80);
+        widget.CaptureMouse();
+        e.Handled = true;
+    }
+
+    private void WidgetPanel_MouseMove(object sender, MouseEventArgs e)
+    {
+        if (_draggedWidget is null || e.LeftButton != MouseButtonState.Pressed)
+        {
+            return;
+        }
+
+        var current = e.GetPosition(WidgetCanvas);
+        MoveWidget(
+            _draggedWidget,
+            _widgetOrigin.X + current.X - _widgetDragStart.X,
+            _widgetOrigin.Y + current.Y - _widgetDragStart.Y,
+            snap: true);
+        e.Handled = true;
+    }
+
+    private void WidgetPanel_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        if (_draggedWidget is null)
+        {
+            return;
+        }
+
+        var movedMap = ReferenceEquals(_draggedWidget, MapPanel);
+        _draggedWidget.ReleaseMouseCapture();
+        Panel.SetZIndex(_draggedWidget, 0);
+        _draggedWidget = null;
+        SaveOverlayLayout();
+        if (movedMap)
+        {
+            PositionMap();
+        }
+        e.Handled = true;
     }
 
     private void ScaleDownButton_Click(object sender, RoutedEventArgs e) =>
@@ -769,8 +1115,11 @@ public partial class MainWindow : Window
     private void ApplyOverlayScale(double scale, bool persist)
     {
         _overlayScale = OverlayLayoutRules.NormalizeScale(scale);
-        OverlayScaleTransform.ScaleX = _overlayScale;
-        OverlayScaleTransform.ScaleY = _overlayScale;
+        foreach (var widget in WidgetPanels)
+        {
+            widget.LayoutTransform = new ScaleTransform(_overlayScale, _overlayScale);
+        }
+        MissionToast.LayoutTransform = new ScaleTransform(_overlayScale, _overlayScale);
         OverlayScaleLabel.Text = OverlayLayoutRules.FormatScale(_overlayScale);
         ScaleDownButton.IsEnabled = _overlayScale > OverlayLayoutRules.MinimumScale;
         ScaleResetButton.IsEnabled = Math.Abs(_overlayScale - OverlayLayoutRules.DefaultScale) > 0.001d;
@@ -781,7 +1130,7 @@ public partial class MainWindow : Window
         if (IsLoaded)
         {
             UpdateLayout();
-            KeepOverlayVisible();
+            KeepWidgetsVisible();
             PositionMap();
         }
 
@@ -791,78 +1140,149 @@ public partial class MainWindow : Window
         }
     }
 
-    private void RestoreOverlayPosition()
+    private void ConfigureWorkspaceBounds()
     {
-        UpdateLayout();
-        var primaryWorkArea = SystemParameters.WorkArea;
-        Left = _layoutSettings.Left
-            ?? Math.Max(primaryWorkArea.Left, primaryWorkArea.Right - ActualWidth - 24d);
-        Top = _layoutSettings.Top ?? primaryWorkArea.Top + 70d;
-        KeepOverlayVisible();
+        var workArea = SystemParameters.WorkArea;
+        Left = workArea.Left;
+        Top = workArea.Top;
+        Width = workArea.Width;
+        Height = workArea.Height;
+        WidgetCanvas.Width = workArea.Width;
+        WidgetCanvas.Height = workArea.Height;
     }
 
-    private void KeepOverlayVisible()
+    private void RestoreWidgetLayout()
     {
-        const double minimumVisible = 80d;
-        var virtualLeft = SystemParameters.VirtualScreenLeft;
-        var virtualTop = SystemParameters.VirtualScreenTop;
-        var virtualWidth = SystemParameters.VirtualScreenWidth;
-        var virtualHeight = SystemParameters.VirtualScreenHeight;
-        if (virtualWidth <= 0d || virtualHeight <= 0d)
+        var workArea = SystemParameters.WorkArea;
+        var baseLeft = _layoutSettings.Left is { } legacyLeft
+            ? legacyLeft - workArea.Left
+            : Math.Max(12d, WidgetCanvas.Width - 304d * _overlayScale - 24d);
+        var baseTop = _layoutSettings.Top is { } legacyTop
+            ? legacyTop - workArea.Top
+            : 70d;
+        var controlsLeft = Math.Max(12d, baseLeft - 316d * _overlayScale);
+        var defaults = new Dictionary<string, OverlayWidgetPosition>(StringComparer.OrdinalIgnoreCase)
         {
-            return;
-        }
+            [OverlayLayoutRules.MapWidget] = new() { Left = baseLeft, Top = baseTop },
+            [OverlayLayoutRules.StatsWidget] = new() { Left = baseLeft, Top = baseTop + 312d * _overlayScale },
+            [OverlayLayoutRules.TeamWidget] = new() { Left = baseLeft, Top = baseTop + 490d * _overlayScale },
+            [OverlayLayoutRules.PrimeWidget] = new() { Left = baseLeft, Top = baseTop + 610d * _overlayScale },
+            [OverlayLayoutRules.ControlsWidget] = new() { Left = controlsLeft, Top = baseTop }
+        };
 
-        var width = Math.Max(1d, ActualWidth);
-        var height = Math.Max(1d, ActualHeight);
-        Left = KeepCoordinateVisible(
-            Left,
-            width,
-            virtualLeft,
-            virtualWidth,
-            minimumVisible);
-        Top = KeepCoordinateVisible(
-            Top,
-            height,
-            virtualTop,
-            virtualHeight,
-            minimumVisible);
+        RestoreWidget(MapPanel, OverlayLayoutRules.MapWidget, defaults);
+        RestoreWidget(StatsPanel, OverlayLayoutRules.StatsWidget, defaults);
+        RestoreWidget(TeamPanel, OverlayLayoutRules.TeamWidget, defaults);
+        RestoreWidget(MissionPanel, OverlayLayoutRules.PrimeWidget, defaults);
+        RestoreWidget(LayoutControls, OverlayLayoutRules.ControlsWidget, defaults);
+        KeepWidgetsVisible();
     }
 
-    private static double KeepCoordinateVisible(
-        double coordinate,
-        double windowSize,
-        double virtualStart,
-        double virtualSize,
-        double minimumVisible)
+    private void RestoreWidget(
+        FrameworkElement widget,
+        string id,
+        IReadOnlyDictionary<string, OverlayWidgetPosition> defaults)
     {
-        if (!double.IsFinite(coordinate))
-        {
-            return virtualStart;
-        }
-
-        if (windowSize <= virtualSize)
-        {
-            return Math.Clamp(coordinate, virtualStart, virtualStart + virtualSize - windowSize);
-        }
-
-        var visible = Math.Min(minimumVisible, virtualSize);
-        return Math.Clamp(
-            coordinate,
-            virtualStart - windowSize + visible,
-            virtualStart + virtualSize - visible);
+        var position = _layoutSettings.Widgets.TryGetValue(id, out var saved)
+            ? saved
+            : defaults[id];
+        MoveWidget(widget, position.Left, position.Top, snap: false);
     }
+
+    private void MoveWidget(FrameworkElement widget, double left, double top, bool snap)
+    {
+        const double edgeMargin = 10d;
+        const double snapDistance = 10d;
+        var width = ScaledWidth(widget);
+        var height = ScaledHeight(widget);
+        var maxLeft = Math.Max(edgeMargin, WidgetCanvas.Width - width - edgeMargin);
+        var maxTop = Math.Max(edgeMargin, WidgetCanvas.Height - height - edgeMargin);
+        left = Math.Clamp(double.IsFinite(left) ? left : edgeMargin, edgeMargin, maxLeft);
+        top = Math.Clamp(double.IsFinite(top) ? top : edgeMargin, edgeMargin, maxTop);
+
+        if (snap)
+        {
+            left = Snap(left, [edgeMargin, maxLeft], snapDistance);
+            top = Snap(top, [edgeMargin, maxTop], snapDistance);
+            foreach (var other in WidgetPanels.Where(candidate => candidate != widget && candidate.Visibility == Visibility.Visible))
+            {
+                var otherLeft = FiniteCanvasCoordinate(Canvas.GetLeft(other));
+                var otherTop = FiniteCanvasCoordinate(Canvas.GetTop(other));
+                var otherWidth = ScaledWidth(other);
+                var otherHeight = ScaledHeight(other);
+                left = Snap(left, [otherLeft, otherLeft + otherWidth, otherLeft - width, otherLeft + otherWidth - width], snapDistance);
+                top = Snap(top, [otherTop, otherTop + otherHeight, otherTop - height, otherTop + otherHeight - height], snapDistance);
+            }
+        }
+
+        Canvas.SetLeft(widget, Math.Clamp(left, edgeMargin, maxLeft));
+        Canvas.SetTop(widget, Math.Clamp(top, edgeMargin, maxTop));
+    }
+
+    private static double Snap(double value, IEnumerable<double> candidates, double distance)
+    {
+        var closest = candidates.OrderBy(candidate => Math.Abs(candidate - value)).FirstOrDefault(value);
+        return Math.Abs(closest - value) <= distance ? closest : value;
+    }
+
+    private double ScaledWidth(FrameworkElement widget) =>
+        Math.Max(1d, (double.IsNaN(widget.Width) ? widget.ActualWidth : widget.Width) * _overlayScale);
+
+    private double ScaledHeight(FrameworkElement widget) =>
+        Math.Max(1d, (double.IsNaN(widget.Height) ? widget.ActualHeight : widget.Height) * _overlayScale);
+
+    private static double FiniteCanvasCoordinate(double value) => double.IsFinite(value) ? value : 0d;
+
+    private void KeepWidgetsVisible()
+    {
+        foreach (var widget in WidgetPanels)
+        {
+            MoveWidget(
+                widget,
+                FiniteCanvasCoordinate(Canvas.GetLeft(widget)),
+                FiniteCanvasCoordinate(Canvas.GetTop(widget)),
+                snap: false);
+        }
+    }
+
+    private void KeepOverlayVisible() => KeepWidgetsVisible();
 
     private void SaveOverlayLayout()
     {
-        KeepOverlayVisible();
+        KeepWidgetsVisible();
         _layoutSettings = OverlayLayoutRules.Normalize(_layoutSettings with
         {
             Scale = _overlayScale,
-            Left = Left,
-            Top = Top
+            Left = null,
+            Top = null,
+            Widgets = new Dictionary<string, OverlayWidgetPosition>(StringComparer.OrdinalIgnoreCase)
+            {
+                [OverlayLayoutRules.MapWidget] = PositionOf(MapPanel),
+                [OverlayLayoutRules.StatsWidget] = PositionOf(StatsPanel),
+                [OverlayLayoutRules.TeamWidget] = PositionOf(TeamPanel),
+                [OverlayLayoutRules.PrimeWidget] = PositionOf(MissionPanel),
+                [OverlayLayoutRules.ControlsWidget] = PositionOf(LayoutControls)
+            }
         });
         _layoutSettingsStore.Save(_layoutSettings);
+    }
+
+    private static OverlayWidgetPosition PositionOf(FrameworkElement widget) => new()
+    {
+        Left = FiniteCanvasCoordinate(Canvas.GetLeft(widget)),
+        Top = FiniteCanvasCoordinate(Canvas.GetTop(widget))
+    };
+
+    private void ResetWidgetLayoutButton_Click(object sender, RoutedEventArgs e)
+    {
+        _layoutSettings = _layoutSettings with
+        {
+            Left = null,
+            Top = null,
+            Widgets = new Dictionary<string, OverlayWidgetPosition>(StringComparer.OrdinalIgnoreCase)
+        };
+        RestoreWidgetLayout();
+        SaveOverlayLayout();
     }
 
     private void LockButton_Click(object sender, RoutedEventArgs e) => SetClickThrough(true);
@@ -880,6 +1300,12 @@ public partial class MainWindow : Window
         if (enabled)
         {
             FinishOverlayResize();
+            if (_draggedWidget is not null)
+            {
+                _draggedWidget.ReleaseMouseCapture();
+                _draggedWidget = null;
+                SaveOverlayLayout();
+            }
         }
 
         var handle = new WindowInteropHelper(this).Handle;
@@ -888,9 +1314,18 @@ public partial class MainWindow : Window
         SetWindowLong(handle, GwlExStyle, style);
         _clickThrough = enabled;
         EditToolbar.Visibility = enabled ? Visibility.Collapsed : Visibility.Visible;
+        StatsMoveBadge.Visibility = enabled ? Visibility.Collapsed : Visibility.Visible;
+        TeamMoveBadge.Visibility = enabled ? Visibility.Collapsed : Visibility.Visible;
+        MissionMoveBadge.Visibility = enabled ? Visibility.Collapsed : Visibility.Visible;
         MapZoomControls.Visibility = enabled ? Visibility.Collapsed : Visibility.Visible;
+        MapLayerControls.Visibility = enabled ? Visibility.Collapsed : Visibility.Visible;
         LayoutControls.Visibility = enabled ? Visibility.Collapsed : Visibility.Visible;
+        foreach (var widget in WidgetPanels.Where(widget => widget != LayoutControls))
+        {
+            widget.Cursor = enabled ? Cursors.Arrow : Cursors.SizeAll;
+        }
         LockButton.Content = enabled ? "LOCKED" : "LOCK";
+        RefreshOptionalWidgetVisibility();
         if (!enabled)
         {
             Activate();
@@ -908,19 +1343,29 @@ public partial class MainWindow : Window
 
     private void RefreshWindowSizeToContent()
     {
-        // WPF can retain the smaller click-through window bounds after controls
-        // transition from Collapsed to Visible under a LayoutTransform. Toggling
-        // the sizing mode forces the native HWND to match the newly measured HUD.
-        SizeToContent = System.Windows.SizeToContent.Manual;
-        SizeToContent = System.Windows.SizeToContent.WidthAndHeight;
         OverlayScaleRoot.InvalidateMeasure();
         InvalidateMeasure();
         UpdateLayout();
+        KeepWidgetsVisible();
+    }
+
+    private void RefreshOptionalWidgetVisibility()
+    {
+        TeamPanel.Visibility = !_clickThrough || _pendingTeamState.HasActiveSession
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        MissionPanel.Visibility = !_clickThrough || (_hasMissions && _missionsVisible)
+            ? Visibility.Visible
+            : Visibility.Collapsed;
     }
 
     private IntPtr WindowMessageHook(IntPtr hwnd, int message, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
-        if (message == WmHotkey && wParam.ToInt32() == EditHotkeyId)
+        if (message == WmInput && _mapPanActive && RawMouseInput.TryReadDelta(lParam, out var delta))
+        {
+            MoveMapPan(delta);
+        }
+        else if (message == WmHotkey && wParam.ToInt32() == EditHotkeyId)
         {
             SetClickThrough(!_clickThrough);
             handled = true;
@@ -935,17 +1380,31 @@ public partial class MainWindow : Window
             ToggleHud();
             handled = true;
         }
+        else if (message == WmHotkey && wParam.ToInt32() == MapNotesHotkeyId)
+        {
+            if (HasCurrentProFeatures)
+            {
+                ToggleMapNotesWindow();
+            }
+            handled = true;
+        }
 
         return IntPtr.Zero;
     }
 
     private void MinimizeButton_Click(object sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
 
+    private void Window_StateChanged(object? sender, EventArgs e) =>
+        Dispatcher.BeginInvoke(PositionMap, DispatcherPriority.Loaded);
+
     private void CloseButton_Click(object sender, RoutedEventArgs e) => Close();
 
     private async void Window_Closed(object? sender, EventArgs e)
     {
         SaveOverlayLayout();
+        DetachMapNotes();
+        _proFeatureExpiryTimer?.Stop();
+        _proFeatureExpiryTimer = null;
         DetachTeamOverlay();
         App.CurrentTeam.ClearTelemetry();
         _shutdown.Cancel();
@@ -967,11 +1426,17 @@ public partial class MainWindow : Window
         if (_editHotkeyRegistered) UnregisterHotKey(handle, EditHotkeyId);
         if (_toggleMissionsNHotkeyRegistered) UnregisterHotKey(handle, ToggleMissionsNHotkeyId);
         if (_toggleHudHotkeyRegistered) UnregisterHotKey(handle, ToggleHudHotkeyId);
+        if (_mapNotesHotkeyRegistered) UnregisterHotKey(handle, MapNotesHotkeyId);
         if (_mouseShortcuts is not null)
         {
+            _mouseShortcuts.CanStartMapPan = null;
             _mouseShortcuts.ZoomInRequested -= ZoomInMap;
             _mouseShortcuts.ZoomOutRequested -= ZoomOutMap;
             _mouseShortcuts.ToggleMapRequested -= ToggleMap;
+            _mouseShortcuts.MapPanStarted -= StartMapPan;
+            _mouseShortcuts.MapPanMoved -= MoveMapPan;
+            _mouseShortcuts.MapPanEnded -= EndMapPan;
+            _mouseShortcuts.FollowMapRequested -= FollowPlayerMap;
             _mouseShortcuts.Dispose();
         }
         _windowSource?.RemoveHook(WindowMessageHook);
@@ -990,4 +1455,13 @@ public partial class MainWindow : Window
 
     [DllImport("user32.dll", EntryPoint = "SetWindowLongW")]
     private static extern int SetWindowLong(IntPtr hWnd, int index, int newStyle);
+
+    private sealed record MapScreenBounds(double Left, double Top, double Right, double Bottom)
+    {
+        public double Width => Right - Left;
+        public double Height => Bottom - Top;
+
+        public bool Contains(GlobalMousePoint point) =>
+            point.X >= Left && point.X < Right && point.Y >= Top && point.Y < Bottom;
+    }
 }

@@ -203,6 +203,28 @@ public sealed class RemotePlayerMapMarkerResolverTests
         Assert.NotEqual(result[0].Key, result[1].Key);
     }
 
+    [Fact]
+    public void Resolve_PreservesProvisionalStateForDistinctRendering()
+    {
+        var marker = Entity(
+            "pro-entity:player:pending",
+            "Deino",
+            RemoteEntityKind.Player,
+            "deinosuchus",
+            CreatureDiet.Carnivore,
+            point: new MapPoint(0.3, 0.4)) with
+        {
+            ProEntityIsProvisional = true
+        };
+
+        var result = Assert.Single(RemotePlayerMapMarkerResolver.Resolve(
+            new MapTelemetry { Markers = [marker] },
+            localPlayer: null));
+
+        Assert.True(result.IsProvisional);
+        Assert.Equal(RemoteEntityKind.Player, result.EntityKind);
+    }
+
     private static MapMarkerTelemetry Entity(
         string id,
         string label,

@@ -30,7 +30,12 @@ public sealed class GuidePromptTests
             }));
 
         Assert.Contains("CTRL + SHIFT + O", allCopy, StringComparison.Ordinal);
-        Assert.Contains("ALT + LĂN CHUỘT", allCopy, StringComparison.Ordinal);
+        Assert.Contains("ALT + M", allCopy, StringComparison.Ordinal);
+        Assert.Contains("NHỚ 7 PHÍM TẮT NÀY", allCopy, StringComparison.Ordinal);
+        Assert.Contains("ALT + KÉO CHUỘT TRÁI", allCopy, StringComparison.Ordinal);
+        Assert.Contains("ALT + CHUỘT PHẢI", allCopy, StringComparison.Ordinal);
+        Assert.Contains("PRO · ĐẶT SET POINT", allCopy, StringComparison.Ordinal);
+        Assert.Contains("FREE · ĐẶT LẠI MAP", allCopy, StringComparison.Ordinal);
         Assert.Contains("ALT + NÚT GIỮA", allCopy, StringComparison.Ordinal);
         Assert.Contains("ALT + N", allCopy, StringComparison.Ordinal);
         Assert.Contains("ALT + P", allCopy, StringComparison.Ordinal);

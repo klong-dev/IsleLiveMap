@@ -58,7 +58,18 @@ internal sealed record VerifiedMapEntity(
     WorldPosition Location,
     double DistanceFromLocal,
     int ConfirmationHits,
-    DateTimeOffset ObservedAt);
+    DateTimeOffset ObservedAt,
+    bool IsProvisional = false);
+
+internal sealed record PlayerSyncState(
+    bool IsSynchronizing,
+    int VerifiedPlayers,
+    int ProvisionalPlayers,
+    int CandidateActors,
+    int SpeciesEvidenceActors,
+    int LocatedActors,
+    long QueueDroppedPackets,
+    int QueueDepth);
 
 internal sealed record ProTelemetryFrame(
     long Sequence,
@@ -68,7 +79,8 @@ internal sealed record ProTelemetryFrame(
     double MapHeadingDegrees,
     IReadOnlyList<VerifiedMapEntity> RemoteEntities,
     string? LocalSpeciesId = null,
-    string? LocalSpeciesShortName = null);
+    string? LocalSpeciesShortName = null,
+    PlayerSyncState? PlayerSync = null);
 
 internal sealed class IpcJsonStream(Stream stream) : IAsyncDisposable
 {

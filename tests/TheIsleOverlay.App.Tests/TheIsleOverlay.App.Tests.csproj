@@ -36,6 +36,9 @@
     <Content Include="..\..\src\TheIsleOverlay.App\MainWindow.xaml"
              Link="TestAssets\MainWindow.xaml"
              CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\src\TheIsleOverlay.App\MapNotesWindow.xaml"
+             Link="TestAssets\MapNotesWindow.xaml"
+             CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\..\src\TheIsleOverlay.App\DonateWindow.xaml"
              Link="TestAssets\DonateWindow.xaml"
              CopyToOutputDirectory="PreserveNewest" />

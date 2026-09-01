@@ -45,6 +45,17 @@ public sealed class TeamCoordinator : IAsyncDisposable
     public Task LeaveAsync(CancellationToken cancellationToken = default) =>
         _client.LeaveAsync(cancellationToken);
 
+    public Task<TeamMapPingSnapshot> UpsertMapPingAsync(
+        TeamMapPingMutation mutation,
+        CancellationToken cancellationToken = default) =>
+        _client.UpsertMapPingAsync(mutation, cancellationToken);
+
+    public Task DeleteMapPingAsync(
+        Guid pingId,
+        long expectedRevision,
+        CancellationToken cancellationToken = default) =>
+        _client.DeleteMapPingAsync(pingId, expectedRevision, cancellationToken);
+
     public void UpdateTelemetry(TelemetrySnapshot snapshot, double? fallbackHeadingDegrees)
     {
         ArgumentNullException.ThrowIfNull(snapshot);

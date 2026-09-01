@@ -1,0 +1,1314 @@
+{
+  "schemaVersion": 1,
+  "mapId": "gateway",
+  "provenance": {
+    "zones": {
+      "provider": "IslePilot",
+      "serverSlug": "dinovietnam",
+      "snapshotMode": "one-time-local",
+      "sourceUrl": "https://dinovietnam.islepilot.eu/map",
+      "sourceSha256": "28EB3874B249C3B0AC49670257E851DDA8CAE767063FF30C8EC88811132DDFEB",
+      "bundledMapSha256": "D773E50DDD5FD691D4F751454F972EB49E70243E3326789BE9D6E32913481BB7",
+      "calibration": {
+        "a": {
+          "u": 0.9320964895641363,
+          "v": 0.3053043426801558,
+          "worldX": 534057.925,
+          "worldY": -267245.9
+        },
+        "b": {
+          "u": 0.5356221651318197,
+          "v": 0.4496109559223209,
+          "worldX": 87931.248,
+          "worldY": -104086.204
+        }
+      },
+      "migrationCount": 6,
+      "patrolCount": 28,
+      "heatmapEnabledAtSnapshot": false
+    },
+    "food": {
+      "sourceFile": "nguonthucan.png",
+      "sourceSha256": "C429209844FBA098A3172A8D62C3151A74013689E3F52B55293C366799292E4A",
+      "registration": {
+        "method": "SIFT + RANSAC homography",
+        "inlierCount": 205,
+        "inlierRatio": 0.734767,
+        "medianErrorPixelsAt7800": 4.034719,
+        "homography": [
+          [
+            10.256278,
+            -0.0024520054,
+            56.366304
+          ],
+          [
+            -0.013416686,
+            10.2849543,
+            -43.1749155
+          ],
+          [
+            -2.5746025e-06,
+            -1.24421219e-06,
+            1.0
+          ]
+        ]
+      }
+    }
+  },
+  "zones": [
+    {
+      "id": "cmsttxfmxh22dnu01dnd9ay9k",
+      "name": "Delta (MMZ)",
+      "kind": "migration",
+      "shape": "polygon",
+      "color": "#f59e0b",
+      "points": [
+        {
+          "left": 0.6205,
+          "top": 0.4749
+        },
+        {
+          "left": 0.652,
+          "top": 0.457
+        },
+        {
+          "left": 0.6844,
+          "top": 0.4471
+        },
+        {
+          "left": 0.6915,
+          "top": 0.4534
+        },
+        {
+          "left": 0.6924,
+          "top": 0.4606
+        },
+        {
+          "left": 0.6888,
+          "top": 0.4677
+        },
+        {
+          "left": 0.6583,
+          "top": 0.4875
+        },
+        {
+          "left": 0.6268,
+          "top": 0.5152
+        },
+        {
+          "left": 0.625,
+          "top": 0.5287
+        },
+        {
+          "left": 0.6367,
+          "top": 0.5493
+        },
+        {
+          "left": 0.679,
+          "top": 0.5815
+        },
+        {
+          "left": 0.6871,
+          "top": 0.5959
+        },
+        {
+          "left": 0.6835,
+          "top": 0.6111
+        },
+        {
+          "left": 0.6835,
+          "top": 0.6478
+        },
+        {
+          "left": 0.6736,
+          "top": 0.6568
+        },
+        {
+          "left": 0.661,
+          "top": 0.6631
+        },
+        {
+          "left": 0.6484,
+          "top": 0.6595
+        },
+        {
+          "left": 0.6457,
+          "top": 0.6326
+        },
+        {
+          "left": 0.634,
+          "top": 0.6237
+        },
+        {
+          "left": 0.6115,
+          "top": 0.6183
+        },
+        {
+          "left": 0.5881,
+          "top": 0.6048
+        },
+        {
+          "left": 0.5746,
+          "top": 0.5887
+        },
+        {
+          "left": 0.5629,
+          "top": 0.5493
+        },
+        {
+          "left": 0.5621,
+          "top": 0.5224
+        }
+      ]
+    },
+    {
+      "id": "cmsttxfmyh22enu01betdhdv0",
+      "name": "East Jungle",
+      "kind": "migration",
+      "shape": "polygon",
+      "color": "#f59e0b",
+      "points": [
+        {
+          "left": 0.6808,
+          "top": 0.457
+        },
+        {
+          "left": 0.7473,
+          "top": 0.457
+        },
+        {
+          "left": 0.7473,
+          "top": 0.6057
+        },
+        {
+          "left": 0.6808,
+          "top": 0.6057
+        }
+      ]
+    },
+    {
+      "id": "cmsttxfmyh22fnu0158e9sd0g",
+      "name": "Highlands",
+      "kind": "migration",
+      "shape": "polygon",
+      "color": "#f59e0b",
+      "points": [
+        {
+          "left": 0.4371,
+          "top": 0.3987
+        },
+        {
+          "left": 0.4784,
+          "top": 0.448
+        },
+        {
+          "left": 0.3462,
+          "top": 0.5376
+        },
+        {
+          "left": 0.3085,
+          "top": 0.4892
+        }
+      ]
+    },
+    {
+      "id": "cmsttxfmyh22gnu01zlalyqpk",
+      "name": "NE Cape",
+      "kind": "migration",
+      "shape": "polygon",
+      "color": "#f59e0b",
+      "points": [
+        {
+          "left": 0.7842,
+          "top": 0.0493
+        },
+        {
+          "left": 0.9182,
+          "top": 0.0493
+        },
+        {
+          "left": 0.9182,
+          "top": 0.2007
+        },
+        {
+          "left": 0.7842,
+          "top": 0.2007
+        }
+      ]
+    },
+    {
+      "id": "cmsttxfmyh22hnu01ul1uz3ed",
+      "name": "South Plains (MMZ)",
+      "kind": "migration",
+      "shape": "polygon",
+      "color": "#f59e0b",
+      "points": [
+        {
+          "left": 0.1214,
+          "top": 0.7231
+        },
+        {
+          "left": 0.143,
+          "top": 0.7115
+        },
+        {
+          "left": 0.1664,
+          "top": 0.7097
+        },
+        {
+          "left": 0.1781,
+          "top": 0.7294
+        },
+        {
+          "left": 0.1862,
+          "top": 0.75
+        },
+        {
+          "left": 0.2059,
+          "top": 0.7608
+        },
+        {
+          "left": 0.2284,
+          "top": 0.7554
+        },
+        {
+          "left": 0.2464,
+          "top": 0.7697
+        },
+        {
+          "left": 0.2608,
+          "top": 0.8091
+        },
+        {
+          "left": 0.2716,
+          "top": 0.8575
+        },
+        {
+          "left": 0.2572,
+          "top": 0.8701
+        },
+        {
+          "left": 0.17,
+          "top": 0.8163
+        },
+        {
+          "left": 0.1448,
+          "top": 0.7858
+        },
+        {
+          "left": 0.1214,
+          "top": 0.7464
+        }
+      ]
+    },
+    {
+      "id": "cmsttxfmyh22inu01qtj7cp6w",
+      "name": "Swamp",
+      "kind": "migration",
+      "shape": "polygon",
+      "color": "#f59e0b",
+      "points": [
+        {
+          "left": 0.4272,
+          "top": 0.7473
+        },
+        {
+          "left": 0.58,
+          "top": 0.7473
+        },
+        {
+          "left": 0.58,
+          "top": 0.8674
+        },
+        {
+          "left": 0.4272,
+          "top": 0.8674
+        }
+      ]
+    },
+    {
+      "id": "cmsttxfmyh22jnu017eup9q00",
+      "name": "Center Jungle",
+      "kind": "patrol",
+      "shape": "polygon",
+      "color": "#a78bfa",
+      "points": [
+        {
+          "left": 0.4955,
+          "top": 0.4507
+        },
+        {
+          "left": 0.5162,
+          "top": 0.4507
+        },
+        {
+          "left": 0.5162,
+          "top": 0.4955
+        },
+        {
+          "left": 0.4964,
+          "top": 0.4955
+        },
+        {
+          "left": 0.4955,
+          "top": 0.4507
+        }
+      ]
+    },
+    {
+      "id": "cmsttxfmyh22knu01onhsaggq",
+      "name": "Delta",
+      "kind": "patrol",
+      "shape": "polygon",
+      "color": "#a78bfa",
+      "points": [
+        {
+          "left": 0.6007,
+          "top": 0.5394
+        },
+        {
+          "left": 0.6205,
+          "top": 0.5385
+        },
+        {
+          "left": 0.6232,
+          "top": 0.5726
+        },
+        {
+          "left": 0.6034,
+          "top": 0.5735
+        },
+        {
+          "left": 0.6007,
+          "top": 0.5394
+        }
+      ]
+    },
+    {
+      "id": "cmsttxfmyh22lnu010ur2ef10",
+      "name": "Delta",
+      "kind": "patrol",
+      "shape": "polygon",
+      "color": "#a78bfa",
+      "points": [
+        {
+          "left": 0.6214,
+          "top": 0.5627
+        },
+        {
+          "left": 0.6304,
+          "top": 0.5502
+        },
+        {
+          "left": 0.6799,
+          "top": 0.5815
+        },
+        {
+          "left": 0.6718,
+          "top": 0.5941
+        },
+        {
+          "left": 0.6214,
+          "top": 0.5627
+        }
+      ]
+    },
+    {
+      "id": "cmsttxfmyh22mnu01do6bbjow",
+      "name": "Delta",
+      "kind": "patrol",
+      "shape": "polygon",
+      "color": "#a78bfa",
+      "points": [
+        {
+          "left": 0.5629,
+          "top": 0.5251
+        },
+        {
+          "left": 0.58,
+          "top": 0.5242
+        },
+        {
+          "left": 0.5827,
+          "top": 0.5708
+        },
+        {
+          "left": 0.5656,
+          "top": 0.5717
+        },
+        {
+          "left": 0.5629,
+          "top": 0.5251
+        }
+      ]
+    },
+    {
+      "id": "cmsttxfmyh22nnu010hl01o38",
+      "name": "Delta River",
+      "kind": "patrol",
+      "shape": "polygon",
+      "color": "#a78bfa",
+      "points": [
+        {
+          "left": 0.7248,
+          "top": 0.4292
+        },
+        {
+          "left": 0.7401,
+          "top": 0.4453
+        },
+        {
+          "left": 0.7149,
+          "top": 0.4668
+        },
+        {
+          "left": 0.6996,
+          "top": 0.4507
+        },
+        {
+          "left": 0.7248,
+          "top": 0.4292
+        }
+      ]
+    },
+    {
+      "id": "cmsttxfmyh22onu01rk2fehwl",
+      "name": "Fork Plains",
+      "kind": "patrol",
+      "shape": "polygon",
+      "color": "#a78bfa",
+      "points": [
+        {
+          "left": 0.6844,
+          "top": 0.3638
+        },
+        {
+          "left": 0.7221,
+          "top": 0.3638
+        },
+        {
+          "left": 0.7221,
+          "top": 0.3996
+        },
+        {
+          "left": 0.6844,
+          "top": 0.3996
+        },
+        {
+          "left": 0.6844,
+          "top": 0.3638
+        }
+      ]
+    },
+    {
+      "id": "cmsttxfmyh22pnu01z7qcp15w",
+      "name": "Fork Plains",
+      "kind": "patrol",
+      "shape": "polygon",
+      "color": "#a78bfa",
+      "points": [
+        {
+          "left": 0.6259,
+          "top": 0.4373
+        },
+        {
+          "left": 0.6538,
+          "top": 0.4373
+        },
+        {
+          "left": 0.6547,
+          "top": 0.4812
+        },
+        {
+          "left": 0.6466,
+          "top": 0.4848
+        },
+        {
+          "left": 0.6277,
+          "top": 0.4866
+        },
+        {
+          "left": 0.6259,
+          "top": 0.4373
+        }
+      ]
+    },
+    {
+      "id": "cmsttxfmyh22qnu01ti73guhk",
+      "name": "Highlands",
+      "kind": "patrol",
+      "shape": "polygon",
+      "color": "#a78bfa",
+      "points": [
+        {
+          "left": 0.4065,
+          "top": 0.3808
+        },
+        {
+          "left": 0.4218,
+          "top": 0.3987
+        },
+        {
+          "left": 0.4083,
+          "top": 0.4104
+        },
+        {
+          "left": 0.3921,
+          "top": 0.3916
+        },
+        {
+          "left": 0.4065,
+          "top": 0.3808
+        },
+        {
+          "left": 0.3354,
+          "top": 0.4973
+        }
+      ]
+    },
+    {
+      "id": "cmsttxfmyh22rnu01607py0gy",
+      "name": "Mudflats",
+      "kind": "patrol",
+      "shape": "circle",
+      "color": "#a78bfa",
+      "center": {
+        "left": 0.1888,
+        "top": 0.6747
+      },
+      "radius": 0.012
+    },
+    {
+      "id": "cmsttxfmzh22snu01999zfyl0",
+      "name": "NE Cape",
+      "kind": "patrol",
+      "shape": "polygon",
+      "color": "#a78bfa",
+      "points": [
+        {
+          "left": 0.8462,
+          "top": 0.0824
+        },
+        {
+          "left": 0.8705,
+          "top": 0.0887
+        },
+        {
+          "left": 0.848,
+          "top": 0.1729
+        },
+        {
+          "left": 0.8228,
+          "top": 0.164
+        },
+        {
+          "left": 0.8462,
+          "top": 0.0824
+        }
+      ]
+    },
+    {
+      "id": "cmsttxfmzh22tnu01slrd2h6r",
+      "name": "North Plains",
+      "kind": "patrol",
+      "shape": "polygon",
+      "color": "#a78bfa",
+      "points": [
+        {
+          "left": 0.7158,
+          "top": 0.1335
+        },
+        {
+          "left": 0.7635,
+          "top": 0.2357
+        },
+        {
+          "left": 0.7806,
+          "top": 0.2625
+        }
+      ]
+    },
+    {
+      "id": "cmsttxfmzh22unu011f6k7pul",
+      "name": "North Plains",
+      "kind": "patrol",
+      "shape": "polygon",
+      "color": "#a78bfa",
+      "points": [
+        {
+          "left": 0.6673,
+          "top": 0.1586
+        },
+        {
+          "left": 0.705,
+          "top": 0.1586
+        },
+        {
+          "left": 0.7059,
+          "top": 0.1873
+        },
+        {
+          "left": 0.7005,
+          "top": 0.1909
+        },
+        {
+          "left": 0.6673,
+          "top": 0.1909
+        },
+        {
+          "left": 0.6673,
+          "top": 0.1586
+        }
+      ]
+    },
+    {
+      "id": "cmsttxfmzh22vnu01u05qa5nw",
+      "name": "Northern Jungle",
+      "kind": "patrol",
+      "shape": "polygon",
+      "color": "#a78bfa",
+      "points": [
+        {
+          "left": 0.5495,
+          "top": 0.2312
+        },
+        {
+          "left": 0.5863,
+          "top": 0.2312
+        },
+        {
+          "left": 0.5863,
+          "top": 0.2652
+        },
+        {
+          "left": 0.5495,
+          "top": 0.2652
+        },
+        {
+          "left": 0.5495,
+          "top": 0.2312
+        }
+      ]
+    },
+    {
+      "id": "cmsttxfmzh22wnu0160klkxcf",
+      "name": "Northern Jungle",
+      "kind": "patrol",
+      "shape": "polygon",
+      "color": "#a78bfa",
+      "points": [
+        {
+          "left": 0.5513,
+          "top": 0.2715
+        },
+        {
+          "left": 0.5881,
+          "top": 0.2715
+        },
+        {
+          "left": 0.5881,
+          "top": 0.3073
+        },
+        {
+          "left": 0.5513,
+          "top": 0.3073
+        },
+        {
+          "left": 0.5513,
+          "top": 0.2715
+        }
+      ]
+    },
+    {
+      "id": "cmsttxfmzh22xnu01nvxqyt40",
+      "name": "Pits",
+      "kind": "patrol",
+      "shape": "polygon",
+      "color": "#a78bfa",
+      "points": [
+        {
+          "left": 0.1241,
+          "top": 0.707
+        },
+        {
+          "left": 0.1412,
+          "top": 0.7348
+        },
+        {
+          "left": 0.17,
+          "top": 0.7545
+        },
+        {
+          "left": 0.2194,
+          "top": 0.7715
+        },
+        {
+          "left": 0.2032,
+          "top": 0.802
+        },
+        {
+          "left": 0.2518,
+          "top": 0.7984
+        },
+        {
+          "left": 0.2293,
+          "top": 0.8566
+        },
+        {
+          "left": 0.2392,
+          "top": 0.9077
+        },
+        {
+          "left": 0.1942,
+          "top": 0.8557
+        },
+        {
+          "left": 0.1259,
+          "top": 0.8772
+        },
+        {
+          "left": 0.0558,
+          "top": 0.8306
+        }
+      ]
+    },
+    {
+      "id": "cmsttxfmzh22ynu01s5d1zeut",
+      "name": "Port hill",
+      "kind": "patrol",
+      "shape": "circle",
+      "color": "#a78bfa",
+      "center": {
+        "left": 0.8498,
+        "top": 0.2715
+      },
+      "radius": 0.012
+    },
+    {
+      "id": "cmsttxfmzh22znu01nt81ddel",
+      "name": "Radio Tower",
+      "kind": "patrol",
+      "shape": "circle",
+      "color": "#a78bfa",
+      "center": {
+        "left": 0.9308,
+        "top": 0.3584
+      },
+      "radius": 0.012
+    },
+    {
+      "id": "cmsttxfmzh230nu01r0e6npc7",
+      "name": "Sandbank Bay",
+      "kind": "patrol",
+      "shape": "polygon",
+      "color": "#a78bfa",
+      "points": [
+        {
+          "left": 0.7941,
+          "top": 0.5278
+        },
+        {
+          "left": 0.8444,
+          "top": 0.5421
+        },
+        {
+          "left": 0.8408,
+          "top": 0.5573
+        },
+        {
+          "left": 0.7905,
+          "top": 0.5439
+        },
+        {
+          "left": 0.7941,
+          "top": 0.5278
+        }
+      ]
+    },
+    {
+      "id": "cmsttxfmzh231nu01hgyqias8",
+      "name": "Sandbank Bay",
+      "kind": "patrol",
+      "shape": "polygon",
+      "color": "#a78bfa",
+      "points": [
+        {
+          "left": 0.7527,
+          "top": 0.526
+        },
+        {
+          "left": 0.7698,
+          "top": 0.5233
+        },
+        {
+          "left": 0.7779,
+          "top": 0.5762
+        },
+        {
+          "left": 0.7608,
+          "top": 0.5789
+        },
+        {
+          "left": 0.7527,
+          "top": 0.526
+        }
+      ]
+    },
+    {
+      "id": "cmsttxfmzh232nu01js94qlgg",
+      "name": "Sandbank Bay",
+      "kind": "patrol",
+      "shape": "polygon",
+      "color": "#a78bfa",
+      "points": [
+        {
+          "left": 0.7572,
+          "top": 0.5708
+        },
+        {
+          "left": 0.7725,
+          "top": 0.5815
+        },
+        {
+          "left": 0.741,
+          "top": 0.629
+        },
+        {
+          "left": 0.7257,
+          "top": 0.6174
+        },
+        {
+          "left": 0.7572,
+          "top": 0.5708
+        }
+      ]
+    },
+    {
+      "id": "cmsttxfmzh233nu01wxrjtg9f",
+      "name": "Southern Beach",
+      "kind": "patrol",
+      "shape": "polygon",
+      "color": "#a78bfa",
+      "points": [
+        {
+          "left": 0.4568,
+          "top": 0.8432
+        },
+        {
+          "left": 0.4901,
+          "top": 0.8746
+        },
+        {
+          "left": 0.4685,
+          "top": 0.8952
+        },
+        {
+          "left": 0.4353,
+          "top": 0.8638
+        },
+        {
+          "left": 0.4568,
+          "top": 0.8432
+        }
+      ]
+    },
+    {
+      "id": "cmsttxfmzh234nu01yblyi454",
+      "name": "Southern Beach",
+      "kind": "patrol",
+      "shape": "polygon",
+      "color": "#a78bfa",
+      "points": [
+        {
+          "left": 0.3975,
+          "top": 0.853
+        },
+        {
+          "left": 0.4649,
+          "top": 0.905
+        },
+        {
+          "left": 0.4451,
+          "top": 0.9283
+        },
+        {
+          "left": 0.3786,
+          "top": 0.8746
+        },
+        {
+          "left": 0.3975,
+          "top": 0.853
+        }
+      ]
+    },
+    {
+      "id": "cmsttxfmzh235nu01nko55634",
+      "name": "Swamps",
+      "kind": "patrol",
+      "shape": "polygon",
+      "color": "#a78bfa",
+      "points": [
+        {
+          "left": 0.5656,
+          "top": 0.7124
+        },
+        {
+          "left": 0.5791,
+          "top": 0.7527
+        },
+        {
+          "left": 0.5522,
+          "top": 0.7993
+        },
+        {
+          "left": 0.5962,
+          "top": 0.845
+        },
+        {
+          "left": 0.5018,
+          "top": 0.8495
+        }
+      ]
+    },
+    {
+      "id": "cmsttxfmzh236nu01gu7qol5x",
+      "name": "Swamps",
+      "kind": "patrol",
+      "shape": "polygon",
+      "color": "#a78bfa",
+      "points": [
+        {
+          "left": 0.5665,
+          "top": 0.7133
+        },
+        {
+          "left": 0.5989,
+          "top": 0.7133
+        },
+        {
+          "left": 0.5989,
+          "top": 0.7599
+        },
+        {
+          "left": 0.5656,
+          "top": 0.7599
+        },
+        {
+          "left": 0.5656,
+          "top": 0.7133
+        }
+      ]
+    },
+    {
+      "id": "cmsttxfmzh237nu01ziu25lmj",
+      "name": "Swamps",
+      "kind": "patrol",
+      "shape": "polygon",
+      "color": "#a78bfa",
+      "points": [
+        {
+          "left": 0.4901,
+          "top": 0.7303
+        },
+        {
+          "left": 0.5207,
+          "top": 0.7303
+        },
+        {
+          "left": 0.5207,
+          "top": 0.7778
+        },
+        {
+          "left": 0.4901,
+          "top": 0.7778
+        },
+        {
+          "left": 0.4901,
+          "top": 0.7303
+        },
+        {
+          "left": 0.4595,
+          "top": 0.7652
+        }
+      ]
+    },
+    {
+      "id": "cmsttxfn0h238nu01wdqiwqhx",
+      "name": "Swamps",
+      "kind": "patrol",
+      "shape": "polygon",
+      "color": "#a78bfa",
+      "points": [
+        {
+          "left": 0.4173,
+          "top": 0.8047
+        },
+        {
+          "left": 0.464,
+          "top": 0.8047
+        },
+        {
+          "left": 0.464,
+          "top": 0.836
+        },
+        {
+          "left": 0.4173,
+          "top": 0.836
+        },
+        {
+          "left": 0.4173,
+          "top": 0.8047
+        },
+        {
+          "left": 0.5027,
+          "top": 0.8324
+        },
+        {
+          "left": 0.5567,
+          "top": 0.8065
+        }
+      ]
+    },
+    {
+      "id": "cmsttxfn0h239nu01al682odb",
+      "name": "West Rail",
+      "kind": "patrol",
+      "shape": "polygon",
+      "color": "#a78bfa",
+      "points": [
+        {
+          "left": 0.1637,
+          "top": 0.5663
+        },
+        {
+          "left": 0.196,
+          "top": 0.5332
+        },
+        {
+          "left": 0.2311,
+          "top": 0.5672
+        },
+        {
+          "left": 0.2509,
+          "top": 0.5493
+        }
+      ]
+    },
+    {
+      "id": "cmsttxfn0h23anu010ja68cvn",
+      "name": "West Rail",
+      "kind": "patrol",
+      "shape": "polygon",
+      "color": "#a78bfa",
+      "points": [
+        {
+          "left": 0.1079,
+          "top": 0.4857
+        },
+        {
+          "left": 0.1439,
+          "top": 0.4857
+        },
+        {
+          "left": 0.1439,
+          "top": 0.5573
+        },
+        {
+          "left": 0.1079,
+          "top": 0.5573
+        },
+        {
+          "left": 0.1079,
+          "top": 0.4857
+        }
+      ]
+    }
+  ],
+  "foodRegions": [
+    {
+      "id": "turtle-north",
+      "label": "Rùa 2",
+      "foods": [
+        "Rùa"
+      ],
+      "center": {
+        "left": 0.74475492,
+        "top": 0.222819769
+      },
+      "radiusX": 0.032977443,
+      "radiusY": 0.032955516
+    },
+    {
+      "id": "turtle-northwest",
+      "label": "Rùa",
+      "foods": [
+        "Rùa"
+      ],
+      "center": {
+        "left": 0.520643482,
+        "top": 0.311300965
+      },
+      "radiusX": 0.03163316,
+      "radiusY": 0.031628675
+    },
+    {
+      "id": "pig-goat-north",
+      "label": "Heo · Dê",
+      "foods": [
+        "Heo",
+        "Dê"
+      ],
+      "center": {
+        "left": 0.626109993,
+        "top": 0.332317586
+      },
+      "radiusX": 0.039559165,
+      "radiusY": 0.03954587
+    },
+    {
+      "id": "rabbit-pig-east",
+      "label": "Thỏ · Heo",
+      "foods": [
+        "Thỏ",
+        "Heo"
+      ],
+      "center": {
+        "left": 0.834530206,
+        "top": 0.344049605
+      },
+      "radiusX": 0.048830847,
+      "radiusY": 0.048794638
+    },
+    {
+      "id": "west-mixed",
+      "label": "Heo · Nai · Dê · Thỏ",
+      "foods": [
+        "Heo",
+        "Nai",
+        "Dê",
+        "Thỏ"
+      ],
+      "center": {
+        "left": 0.373085847,
+        "top": 0.416809377
+      },
+      "radiusX": 0.050063715,
+      "radiusY": 0.050075134
+    },
+    {
+      "id": "turtle-crab-north",
+      "label": "Rùa · Cua 2",
+      "foods": [
+        "Rùa",
+        "Cua"
+      ],
+      "center": {
+        "left": 0.62747524,
+        "top": 0.464148122
+      },
+      "radiusX": 0.032969823,
+      "radiusY": 0.032962986
+    },
+    {
+      "id": "deer-goat-west",
+      "label": "Dê · Nai",
+      "foods": [
+        "Dê",
+        "Nai"
+      ],
+      "center": {
+        "left": 0.222949179,
+        "top": 0.572349054
+      },
+      "radiusX": 0.040822718,
+      "radiusY": 0.040850418
+    },
+    {
+      "id": "central-mixed",
+      "label": "Heo · Nai · Dê · Gà",
+      "foods": [
+        "Heo",
+        "Nai",
+        "Dê",
+        "Gà"
+      ],
+      "center": {
+        "left": 0.511488178,
+        "top": 0.598665433
+      },
+      "radiusX": 0.055373635,
+      "radiusY": 0.055380501
+    },
+    {
+      "id": "pig-goat-chicken-east",
+      "label": "Heo · Dê · Gà",
+      "foods": [
+        "Heo",
+        "Dê",
+        "Gà"
+      ],
+      "center": {
+        "left": 0.700045128,
+        "top": 0.536650959
+      },
+      "radiusX": 0.038258865,
+      "radiusY": 0.038247923
+    },
+    {
+      "id": "goat-pig-arena",
+      "label": "Dê · Heo",
+      "foods": [
+        "Dê",
+        "Heo"
+      ],
+      "center": {
+        "left": 0.340179289,
+        "top": 0.716009674
+      },
+      "radiusX": 0.038211511,
+      "radiusY": 0.038233961
+    },
+    {
+      "id": "pig-deer-southwest",
+      "label": "Heo · Nai",
+      "foods": [
+        "Heo",
+        "Nai"
+      ],
+      "center": {
+        "left": 0.176853637,
+        "top": 0.756851723
+      },
+      "radiusX": 0.044773379,
+      "radiusY": 0.044815437
+    },
+    {
+      "id": "turtle-crab-south",
+      "label": "Rùa · Cua",
+      "foods": [
+        "Rùa",
+        "Cua"
+      ],
+      "center": {
+        "left": 0.552414818,
+        "top": 0.79912817
+      },
+      "radiusX": 0.047478972,
+      "radiusY": 0.047490432
+    },
+    {
+      "id": "turtle-southwest",
+      "label": "Rùa",
+      "foods": [
+        "Rùa"
+      ],
+      "center": {
+        "left": 0.222940962,
+        "top": 0.864960365
+      },
+      "radiusX": 0.030295577,
+      "radiusY": 0.030324839
+    }
+  ],
+  "generatedAt": "2026-08-31T16:54:38.052259Z"
+}

@@ -13,6 +13,7 @@ public sealed record TelemetrySnapshot
     public bool LiveDataStale { get; init; }
     public string? StatusMessage { get; init; }
     public bool ProPlayerTrackingActive { get; init; }
+    public RemotePlayerSyncState? ProPlayerSync { get; init; }
 }
 
 public sealed record PlayerTelemetry

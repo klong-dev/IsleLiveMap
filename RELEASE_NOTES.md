@@ -1,23 +1,26 @@
-# Isle Live Map 1.4.2
+# Isle Live Map 1.4.3
 
-## Home Pro Gold–Black
+## Map linh hoạt hơn cho mọi người dùng Free
 
-- Tài khoản Pro còn hiệu lực nhận giao diện Home vàng Gold–đen riêng, đồng nhất từ tiêu đề, nút, viền đến trạng thái hoạt động.
-- Nút chính đổi thành **MỞ MAP PRO** để phân biệt rõ trải nghiệm premium với Live Map Free.
-- Trạng thái quyền đổi từ **XÁC MINH LẠI** sang **ĐÃ XÁC MINH** và khóa thao tác sau khi Agent đã sẵn sàng; muốn đổi tài khoản, người dùng chủ động chọn **ĐĂNG XUẤT PRO**.
-- Tài khoản đã có Pro không còn thấy modal mời kích hoạt Pro khi mở ứng dụng.
-- Khi quyền có thời hạn kết thúc, Home tự trở lại theme Free và dừng cấp nguồn Player + AI Tracking Pro.
+- Giữ **ALT + kéo chuột trái** để di chuyển minimap tự do và **ALT + chuột phải** để đưa map trở lại chính giữa, tiếp tục bám GPS.
+- **Ctrl + Shift + O** nay cho phép kéo Map, Status, Team và Prime thành từng block độc lập thay vì cả cụm.
+- Cải thiện pipeline Npcap/Iris với sequence-gap detection, partial-bunch assembly, cache state và recovery từ nhiều replication batch để giảm mất dấu sau reconnect hoặc đổi server.
 
-## Player + AI Tracking ổn định hơn
+## Tactical map mới cho Pro
 
-- Phát hành Pro Agent 0.3.19 với pipeline packet đã được kiểm thử qua restart Live Map, reconnect và đổi nhiều server.
-- Giữ bootstrap replication lâu hơn trong lúc game tải server để giảm thiếu player sau khi connect chậm.
-- Ổn định roster trước packet đến sai thứ tự, loại PlayerState ghost và hạn chế chấm player nhấp nháy.
-- Bổ sung nhận diện Hypsilophodon bằng nhãn **Hypsi** từ protocol/archetype đã được xác minh bằng packet.
-- Phạm vi player và AI Pro tiếp tục hỗ trợ tối đa 1 km; chính sách AI mục tiêu vẫn được giữ nguyên.
+- **ALT + M** mở bản đồ lớn; click vào vị trí muốn đặt set point và chọn biểu tượng phù hợp.
+- Set point có thể chia sẻ realtime giữa các đồng đội trong cùng nhóm sinh tồn.
+- Bổ sung lớp Migration Zone, Patrol Zone, vùng thức ăn local và Player heatmap khi server IslePilot hỗ trợ.
+- Ghép các mảnh ongoing replication để dựng player sớm hơn, tăng độ đầy đủ và độ ổn định của Player + AI Tracking.
 
-## Trải nghiệm rõ ràng hơn
+## Hướng dẫn update dạng từng bước
 
-- Nút đăng xuất IslePilot giờ có nhãn **ĐĂNG XUẤT STEAM**, không còn xuất hiện như một đường điều khiển trống.
-- Nội dung trạng thái Home thay đổi theo đúng Free, Pro đang tải, Pro đã sẵn sàng, offline license hoặc hết hạn.
-- GPS và dino stats Free vẫn hoạt động độc lập; mã nguồn Pro tiếp tục được phân phối bằng Agent riêng có chữ ký và chỉ tải cho SteamID64 có quyền.
+- Modal mới chia nội dung thành 4 trang ngắn, phân biệt rõ tính năng **Free** và **Pro**, kèm ảnh thao tác thật.
+- Modal phím tắt được cập nhật đầy đủ cho các thao tác map mới.
+- Sau khi xem hết, người dùng có thể chọn **Không hiển thị lại thông báo này** cho riêng phiên bản 1.4.3.
+
+## Kiểm duyệt quyền Pro
+
+- Player/AI tracking, Zone, full-map set point và ping nhóm chỉ khởi tạo khi SteamID64 có Pro access còn hiệu lực.
+- Free không đăng ký hotkey Pro, không load dữ liệu Zone và không nhận marker/ping Pro.
+- Khi Pro hết hạn trong lúc Live Map đang mở, các lớp Pro được đóng và gỡ khỏi giao diện mà không ảnh hưởng GPS/stats Free.

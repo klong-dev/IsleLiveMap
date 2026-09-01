@@ -18,11 +18,15 @@ public sealed class IslePilotTelemetryProvider : ITelemetryProvider
     private readonly HttpClient _httpClient;
     private readonly IslePilotOptions _options;
     private readonly SemaphoreSlim _statsGate = new(1, 1);
+    private readonly SemaphoreSlim _heatmapGate = new(1, 1);
     private readonly object _statsStateLock = new();
+    private readonly object _heatmapStateLock = new();
     private readonly string? _personaName;
     private IslePilotPlayerPage? _cachedStats;
     private DateTimeOffset _statsExpiresAt;
     private Task? _backgroundStatsRefresh;
+    private IslePilotHeatmapResponse? _cachedHeatmap;
+    private DateTimeOffset _heatmapExpiresAt;
 
     public IslePilotTelemetryProvider(HttpClient httpClient, IslePilotOptions options)
     {
@@ -45,6 +49,7 @@ public sealed class IslePilotTelemetryProvider : ITelemetryProvider
     public async Task<TelemetrySnapshot> GetSnapshotAsync(CancellationToken cancellationToken = default)
     {
         var markersTask = GetMarkersAsync(cancellationToken);
+        var heatmapTask = GetHeatmapOrFallbackAsync(cancellationToken);
         var stats = ReadCachedStats();
         if (stats is null)
         {
@@ -58,6 +63,7 @@ public sealed class IslePilotTelemetryProvider : ITelemetryProvider
         }
 
         var markers = await markersTask;
+        var heatmap = await heatmapTask;
         var marker = markers.Markers.FirstOrDefault(item => item.Self) ?? markers.Markers.FirstOrDefault();
         var online = marker is not null || stats.Online;
 
@@ -68,6 +74,7 @@ public sealed class IslePilotTelemetryProvider : ITelemetryProvider
             ServerOnline = markers.Ok,
             PlayerOnline = online,
             UpdatedAt = DateTimeOffset.UtcNow,
+            Map = ToMapTelemetry(heatmap),
             Player = online
                 ? new PlayerTelemetry
                 {
@@ -93,6 +100,127 @@ public sealed class IslePilotTelemetryProvider : ITelemetryProvider
                 }
                 : null
         };
+    }
+
+    private static MapTelemetry ToMapTelemetry(IslePilotHeatmapResponse heatmap)
+    {
+        var cells = heatmap.Ok
+            ? heatmap.Cells
+                .Where(cell => double.IsFinite(cell.U)
+                               && double.IsFinite(cell.V)
+                               && double.IsFinite(cell.Intensity)
+                               && cell.U is >= 0d and <= 1d
+                               && cell.V is >= 0d and <= 1d)
+                .Take(2048)
+                .Select(cell => new MapHeatCellTelemetry
+                {
+                    Location = new MapPoint(cell.U, cell.V),
+                    Intensity = Math.Clamp(cell.Intensity, 0d, 1d)
+                })
+                .ToArray()
+            : [];
+        return new MapTelemetry
+        {
+            PlayerHeatmapEnabled = heatmap.Ok && cells.Length > 0,
+            PlayerHeatmapCells = cells,
+            PlayerHeatmapRadius = NormalizeHeatRadius(heatmap.Radius)
+        };
+    }
+
+    private async Task<IslePilotHeatmapResponse> GetHeatmapOrFallbackAsync(
+        CancellationToken cancellationToken)
+    {
+        var fresh = ReadFreshHeatmap();
+        if (fresh is not null)
+        {
+            return fresh;
+        }
+
+        await _heatmapGate.WaitAsync(cancellationToken);
+        try
+        {
+            fresh = ReadFreshHeatmap();
+            if (fresh is not null)
+            {
+                return fresh;
+            }
+
+            try
+            {
+                var relative = $"api/p/{Uri.EscapeDataString(_options.ServerSlug)}/map/heatmap";
+                using var request = CreateRequest(new Uri(_options.BaseUri, relative));
+                using var response = await _httpClient.SendAsync(
+                    request,
+                    HttpCompletionOption.ResponseHeadersRead,
+                    cancellationToken);
+                ThrowIfAuthenticationFailed(response);
+                response.EnsureSuccessStatusCode();
+                await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+                var parsed = await JsonSerializer.DeserializeAsync<IslePilotHeatmapResponse>(
+                                 stream,
+                                 JsonOptions,
+                                 cancellationToken)
+                             ?? IslePilotHeatmapResponse.Empty;
+                WriteHeatmapState(parsed, DateTimeOffset.UtcNow + _options.HeatmapRefreshInterval);
+                return parsed;
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception) when (exception is HttpRequestException
+                                               or InvalidDataException
+                                               or JsonException
+                                               or ArgumentException
+                                               or OperationCanceledException)
+            {
+                var fallback = ReadCachedHeatmap() ?? IslePilotHeatmapResponse.Empty;
+                WriteHeatmapState(fallback, DateTimeOffset.UtcNow + TimeSpan.FromSeconds(3));
+                return fallback;
+            }
+        }
+        finally
+        {
+            _heatmapGate.Release();
+        }
+    }
+
+    private IslePilotHeatmapResponse? ReadFreshHeatmap()
+    {
+        lock (_heatmapStateLock)
+        {
+            return _cachedHeatmap is not null && DateTimeOffset.UtcNow < _heatmapExpiresAt
+                ? _cachedHeatmap
+                : null;
+        }
+    }
+
+    private IslePilotHeatmapResponse? ReadCachedHeatmap()
+    {
+        lock (_heatmapStateLock)
+        {
+            return _cachedHeatmap;
+        }
+    }
+
+    private void WriteHeatmapState(IslePilotHeatmapResponse heatmap, DateTimeOffset expiresAt)
+    {
+        lock (_heatmapStateLock)
+        {
+            _cachedHeatmap = heatmap;
+            _heatmapExpiresAt = expiresAt;
+        }
+    }
+
+    private static double? NormalizeHeatRadius(double? radius)
+    {
+        if (radius is not { } value || !double.IsFinite(value) || value <= 0d)
+        {
+            return null;
+        }
+
+        var normalized = value > 1d ? value / 1000d : value;
+        return normalized is >= 0.001d and <= 0.25d ? normalized : null;
     }
 
     private async Task<IslePilotPlayerPage> GetInitialPlayerStatsOrFallbackAsync(
@@ -280,4 +408,20 @@ public sealed record IslePilotMarker
     public double Y { get; init; }
     public double? Yaw { get; init; }
     public bool Self { get; init; }
+}
+
+public sealed record IslePilotHeatmapResponse
+{
+    public static IslePilotHeatmapResponse Empty { get; } = new();
+
+    public bool Ok { get; init; }
+    public IReadOnlyList<IslePilotHeatCell> Cells { get; init; } = [];
+    public double? Radius { get; init; }
+}
+
+public sealed record IslePilotHeatCell
+{
+    public double U { get; init; }
+    public double V { get; init; }
+    public double Intensity { get; init; }
 }

@@ -57,10 +57,13 @@ public sealed class IpcJsonStreamTests
                     new WorldPosition(80, 220, 30),
                     28.28,
                     1,
-                    observedAt)
+                    observedAt,
+                    IsProvisional: true)
             ],
             "carnotaurus",
-            "Carno");
+            "Carno",
+            new PlayerSyncState(
+                true, 1, 1, 4, 2, 2, 0, 3));
 
         await ipc.WriteAsync(expected, TestContext.Current.CancellationToken);
         memory.Position = 0;
@@ -74,6 +77,8 @@ public sealed class IpcJsonStreamTests
         Assert.Equal(expected.RemoteEntities, actual.RemoteEntities);
         Assert.Equal(expected.LocalSpeciesId, actual.LocalSpeciesId);
         Assert.Equal(expected.LocalSpeciesShortName, actual.LocalSpeciesShortName);
+        Assert.Equal(expected.PlayerSync, actual.PlayerSync);
+        Assert.True(actual.RemoteEntities[1].IsProvisional);
     }
 
     [Fact]

@@ -92,17 +92,23 @@ public sealed class LocalPositionTelemetrySession : ITelemetrySession
                 }
 
                 var now = DateTimeOffset.UtcNow;
+                var usableRemotePlayerFrame = remotePlayerFrame is { } candidateFrame
+                                              && LocalPositionSnapshotMerger.IsRemoteFrameFresh(
+                                                  candidateFrame,
+                                                  now)
+                                              && IsRemoteFrameCompatibleWithLocal(
+                                                  candidateFrame,
+                                                  local,
+                                                  now)
+                    ? candidateFrame
+                    : null;
                 IReadOnlyList<VerifiedRemoteEntityTelemetry>? remotePlayers =
                     _remotePlayerSource is null
                         ? null
-                        : remotePlayerFrame is { } frame &&
-                          LocalPositionSnapshotMerger.IsRemoteFrameFresh(frame, now)
+                        : usableRemotePlayerFrame is { } frame
                             ? frame.RemoteEntities
                             : [];
-                var verifiedLocalSpeciesId = remotePlayerFrame is { } localSpeciesFrame
-                                             && LocalPositionSnapshotMerger.IsRemoteFrameFresh(
-                                                 localSpeciesFrame,
-                                                 now)
+                var verifiedLocalSpeciesId = usableRemotePlayerFrame is { } localSpeciesFrame
                     ? localSpeciesFrame.LocalSpeciesId
                     : null;
                 var merged = LocalPositionSnapshotMerger.Merge(
@@ -112,7 +118,7 @@ public sealed class LocalPositionTelemetrySession : ITelemetrySession
                     _sourceName,
                     remotePlayers,
                     verifiedLocalSpeciesId,
-                    remotePlayerFrame);
+                    usableRemotePlayerFrame);
                 if (remote is null
                     && local is null
                     && !string.IsNullOrWhiteSpace(localError))
@@ -134,6 +140,25 @@ public sealed class LocalPositionTelemetrySession : ITelemetrySession
             {
             }
         }
+    }
+
+    internal static bool IsRemoteFrameCompatibleWithLocal(
+        RemotePlayerTelemetryFrame frame,
+        LocalMovementObservation? local,
+        DateTimeOffset now)
+    {
+        if (local is not { } localObservation
+            || now - localObservation.ObservedAt > LocalPositionSnapshotMerger.LocalFreshness
+            || string.IsNullOrWhiteSpace(localObservation.ServerEndpoint))
+        {
+            return true;
+        }
+
+        return !string.IsNullOrWhiteSpace(frame.ServerEndpoint)
+               && string.Equals(
+                   localObservation.ServerEndpoint.Trim(),
+                   frame.ServerEndpoint.Trim(),
+                   StringComparison.OrdinalIgnoreCase);
     }
 
     public async ValueTask DisposeAsync()

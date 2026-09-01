@@ -34,9 +34,15 @@ public sealed class IslePilotCredentialStore
             throw new ArgumentException("The IslePilot credentials are invalid.", nameof(credentials));
         }
 
+        if (!IsValidOptionalCookie(credentials.PlayerCookie))
+        {
+            throw new ArgumentException("The IslePilot player cookie is invalid.", nameof(credentials));
+        }
+
         var cleartext = JsonSerializer.SerializeToUtf8Bytes(new StoredCredential(
             credentials.SteamId,
-            credentials.OverlayToken));
+            credentials.OverlayToken,
+            credentials.PlayerCookie));
         byte[]? protectedData = null;
         try
         {
@@ -122,7 +128,15 @@ public sealed class IslePilotCredentialStore
                 return null;
             }
 
-            return new IslePilotOverlayAuthResult(stored.SteamId, stored.OverlayToken);
+            if (!IsValidOptionalCookie(stored.PlayerCookie))
+            {
+                return null;
+            }
+
+            return new IslePilotOverlayAuthResult(
+                stored.SteamId,
+                stored.OverlayToken,
+                stored.PlayerCookie);
         }
         catch (CryptographicException)
         {
@@ -152,7 +166,14 @@ public sealed class IslePilotCredentialStore
 
     private sealed record StoredCredential(
         string SteamId,
-        string OverlayToken);
+        string OverlayToken,
+        string? PlayerCookie = null);
+
+    private static bool IsValidOptionalCookie(string? value) =>
+        value is null
+        || value.Length is > 0 and <= 16_384
+        && !value.Contains('\r')
+        && !value.Contains('\n');
 }
 
 internal static class WindowsDataProtection

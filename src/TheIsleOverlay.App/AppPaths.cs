@@ -15,8 +15,20 @@ public static class AppPaths
         Root,
         "islepilot-overlay.credential");
 
+    public static string IslePilotVoiceCredential { get; } = Path.Combine(
+        Root,
+        "islepilot-voice.credential");
+
     public static string OverlayLayoutSettings { get; } = Path.Combine(
         Root,
         "overlay-layout.json");
+
+    public static string MapNotes { get; } = Path.Combine(
+        Root,
+        "map-notes.json");
+
+    public static string ReleaseHighlightsPreferences { get; } = Path.Combine(
+        Root,
+        "release-highlights.json");
 
 }

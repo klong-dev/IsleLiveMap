@@ -16,12 +16,15 @@ Texture Gateway được đóng gói trong app dưới dạng JPEG tương thíc
 ## Tính năng
 
 - Minimap Gateway dùng texture EraGaming/MyIsleMap đóng gói local dạng JPEG, không tải ảnh map qua mạng và không phụ thuộc codec WebP của Windows.
+- Migration Zone, Patrol Zone và 13 vùng nguồn thức ăn Gateway được hiệu chỉnh rồi đóng gói local; app không tải lại các polygon IslePilot khi chạy.
+- Player heatmap chỉ xuất hiện khi IslePilot trả cell heatmap thật cho server hiện tại; app không suy diễn heatmap từ marker player/AI.
 - Marker luôn giữ giữa viewport và dùng chung map Gateway cho mọi server Evrima tương thích.
-- Dán tọa độ `Lat, Long, Alt` copy từ game trong Edit Mode để vẽ đường, beacon và khoảng cách tới đích.
+- Đặt nhiều mốc trực tiếp trên toàn bản đồ; mỗi mốc có line từ GPS và biểu tượng theo mục đích.
 - Tọa độ và hướng realtime từ local packet capture, với tracker chống packet cũ, burst và candidate tọa độ giả.
 - Growth, Health, Stamina, Hunger và Water khi nguồn cung cấp trường tương ứng.
 - Danh sách nhiệm vụ Prime được Việt hóa; khi nhiệm vụ chuyển sang hoàn thành, overlay hiện notify ngắn rồi tự ẩn.
 - Tạo nhóm tạm thời bằng mã mời 6 ký tự; đồng đội cùng server xuất hiện trên minimap với tên và hướng quay.
+- Ping tạo trong phiên nhóm được relay realtime cho mọi thành viên; chỉ owner của từng ping được đổi biểu tượng hoặc xóa.
 - Tùy chọn **Isle Live Map Pro** phân loại chấm đỏ (ăn thịt khác loài), xanh lá (cùng loài), xanh dương (ăn cỏ khác loài) và vàng (AI); nhãn rút gọn theo loài + cân nặng như `T-Rex 12T` hoặc `Trice 200K`.
 - Mỗi đồng đội có một hàng HP, Đói và Nước; người mất tín hiệu hoặc đang ở server khác được đánh dấu riêng.
 - Home ưu tiên **KÍCH HOẠT LIVE MAP** miễn phí; **KÍCH HOẠT PRO** nằm cuối trang như một nâng cấp tùy chọn.
@@ -38,6 +41,7 @@ Texture Gateway được đóng gói trong app dưới dạng JPEG tương thíc
 1. Nhập tên hiển thị rồi bấm **TẠO NHÓM**.
 2. Gửi mã mời 6 ký tự cho bạn bè. Người nhận nhập tên + mã rồi bấm **NHẬP MÃ**.
 3. Mở overlay như bình thường. Vị trí, hướng quay và status sẽ tự đồng bộ khi mọi người cùng server.
+4. Bấm `Alt + M` và click bản đồ để ping cho cả nhóm. Mọi người đều nhìn thấy, nhưng chỉ người tạo ping được sửa/xóa.
 
 Nhóm không phải tài khoản cố định: mã, thành viên và telemetry chỉ nằm trong RAM của app/relay. Khi app đóng hoặc cả nhóm ngừng gửi heartbeat, phiên tự hết hạn và không thể khôi phục; lần sau cần tạo/nhập lại mã. Client chỉ kết nối endpoint cố định `https://isle-relay.klong.dev` và không ghi member token xuống ổ đĩa.
 
@@ -45,16 +49,19 @@ Nhóm không phải tài khoản cố định: mã, thành viên và telemetry c
 
 | Phím | Tác dụng |
 |---|---|
+| `Alt + kéo chuột trái trên map` | Chuyển sang Free Look; map đứng yên tại vùng đang xem trong khi GPS vẫn cập nhật |
+| `Alt + chuột phải trên map` | Trở về Follow GPS và tự center người chơi |
 | `Alt + cuộn lên` | Zoom in map |
 | `Alt + cuộn xuống` | Zoom out map |
 | `Alt + nút chuột giữa` | Ẩn / hiện map |
 | `Alt + N` | Ẩn / hiện danh sách nhiệm vụ Prime |
 | `Alt + P` | Ẩn / hiện toàn bộ HUD |
-| `Ctrl + Shift + O` | Mở / khóa Edit Mode để kéo, resize hoặc nhập tọa độ chỉ đường |
+| `Ctrl + Shift + O` | Mở / khóa Edit Mode để kéo độc lập từng block hoặc resize HUD |
+| `Alt + M` | Mở / đóng toàn bản đồ để tạo, đổi loại hoặc xóa mốc |
 
 Các phím tắt hoạt động kể cả khi game hoặc ứng dụng khác đang focus. Low-level mouse hook chỉ nhận tổ hợp có `Alt`, không inject DLL và không đọc memory game.
 
-Để đổi kích thước, bấm `Ctrl + Shift + O`, sau đó dùng `− / RESET / +` hoặc giữ `DRAG ↘` ở cuối overlay. Cũng tại đây, dán chuỗi như `-3,007.455, -4,606.069, 44,728.061` rồi bấm **CHỈ ĐƯỜNG**. Map, status, nhiệm vụ và danh sách đồng đội cùng scale; thiết lập được lưu tự động.
+Để chỉnh bố cục, bấm `Ctrl + Shift + O`, kéo riêng Map, Status, Team hoặc Prime; dùng `− / RESET / +` hay `DRAG ↘` để resize toàn HUD. Bấm `Alt + M` để mở toàn bản đồ, click tạo mốc rồi chọn biểu tượng. Mốc cá nhân được lưu trên máy; ping nhóm chỉ tồn tại trong room relay hiện tại.
 
 ## Đăng nhập và quyền riêng tư
 
@@ -113,7 +120,7 @@ Texture nền Gateway được nhúng vào ứng dụng. Các provider chỉ l�
 
 - Marker nhóm chỉ được vẽ khi hai người đang ở cùng server; status khác server vẫn hiện trong danh sách.
 - Nhóm là phiên tạm thời, tối đa 10 người và phải tạo lại sau khi đóng app.
-- Mất Internet không ảnh hưởng Live Map Free hay texture map local; đăng nhập/cập nhật quyền Pro cần backend hoạt động.
+- Mất Internet không ảnh hưởng texture, zone hay vùng thức ăn local; đăng nhập, heatmap live và cập nhật quyền Pro cần backend tương ứng hoạt động.
 - Isle Live Map Pro cần SteamID64 đang có quyền hợp lệ; app giữ license offline ngắn hạn để chịu được gián đoạn mạng tạm thời.
 - Texture Gateway local được cập nhật theo từng bản phát hành của ứng dụng khi map game thay đổi.
 - Bản phát hành chưa được ký bằng chứng thư thương mại, vì vậy Windows SmartScreen có thể cảnh báo ở lần chạy đầu.

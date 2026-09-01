@@ -41,4 +41,27 @@ public sealed class IslePilotOverlayDtoTests
         Assert.Equal(1200, frame?.Data?.Position?.Z);
         Assert.Equal(157.37, frame?.Data?.Position?.Yaw);
     }
+
+    [Fact]
+    public void Map_DeserializesExplicitHeatCellsAndRadius()
+    {
+        const string json = """
+            {
+              "heatmapEnabled": true,
+              "heat": [{ "u": 0.2, "v": 0.7, "intensity": 0.6 }],
+              "heatRadius": 30
+            }
+            """;
+
+        var map = JsonSerializer.Deserialize<IslePilotOverlayMapDto>(
+            json,
+            IslePilotOverlayJson.Options);
+
+        Assert.True(map?.HeatmapEnabled);
+        Assert.Equal(30, map?.HeatRadius);
+        var cell = Assert.Single(map?.Heat ?? []);
+        Assert.Equal(0.2, cell.U);
+        Assert.Equal(0.7, cell.V);
+        Assert.Equal(0.6, cell.Intensity);
+    }
 }

@@ -94,11 +94,35 @@ public sealed record IslePilotOverlayMapDto
 {
     public bool? LiveMapEnabled { get; init; }
     public bool? Allowed { get; init; }
+    public bool? HeatmapEnabled { get; init; }
+    // These aliases keep the desktop client compatible with both the current
+    // IslePilot map vocabulary and an overlay-specific response shape.
+    public IReadOnlyList<IslePilotHeatCellDto>? Heat { get; init; }
+    public IReadOnlyList<IslePilotHeatCellDto>? HeatmapCells { get; init; }
+    public IReadOnlyList<IslePilotHeatCellDto>? PlayerHeatmap { get; init; }
+    public double? HeatRadius { get; init; }
+    public double? HeatmapRadius { get; init; }
     public string? Reason { get; init; }
     public IslePilotMapCalibrationDto? Calibration { get; init; }
     public IReadOnlyList<IslePilotOverlayMapMarkerDto>? Markers { get; init; } = [];
     public IReadOnlyList<IslePilotOverlayMapCategoryDto>? Categories { get; init; } = [];
     public IReadOnlyList<IslePilotOverlayMapPoiDto>? Pois { get; init; } = [];
+}
+
+public sealed record IslePilotHeatCellDto
+{
+    public double? U { get; init; }
+    public double? V { get; init; }
+    public double? Intensity { get; init; }
+}
+
+public sealed record IslePilotOverlayHeatmapDto
+{
+    public static IslePilotOverlayHeatmapDto Empty { get; } = new();
+
+    public bool Ok { get; init; }
+    public IReadOnlyList<IslePilotHeatCellDto>? Cells { get; init; } = [];
+    public double? Radius { get; init; }
 }
 
 public sealed record IslePilotMapCalibrationDto

@@ -17,6 +17,7 @@ public sealed class TeamRelayClient : IAsyncDisposable
     private readonly SemaphoreSlim _lifecycleGate = new(1, 1);
     private readonly object _stateGate = new();
     private readonly Dictionary<Guid, TeamMemberSnapshot> _members = [];
+    private readonly Dictionary<Guid, TeamMapPingSnapshot> _mapPings = [];
 
     private TeamRelayState _state = new();
     private TeamSession? _session;
@@ -96,6 +97,57 @@ public sealed class TeamRelayClient : IAsyncDisposable
         catch
         {
             return false;
+        }
+    }
+
+    public async Task<TeamMapPingSnapshot> UpsertMapPingAsync(
+        TeamMapPingMutation mutation,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(mutation);
+        ThrowIfDisposed();
+        var connection = RequireLiveConnection();
+        try
+        {
+            return await connection.InvokeAsync<TeamMapPingSnapshot>(
+                    "UpsertMapPing",
+                    mutation,
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            throw MapPingException(exception);
+        }
+    }
+
+    public async Task DeleteMapPingAsync(
+        Guid pingId,
+        long expectedRevision,
+        CancellationToken cancellationToken = default)
+    {
+        ThrowIfDisposed();
+        var connection = RequireLiveConnection();
+        try
+        {
+            await connection.InvokeAsync<bool>(
+                    "DeleteMapPing",
+                    pingId,
+                    expectedRevision,
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            throw MapPingException(exception);
         }
     }
 
@@ -209,6 +261,7 @@ public sealed class TeamRelayClient : IAsyncDisposable
         connection.On<TeamSnapshot>("ReceiveSnapshot", ReceiveSnapshot);
         connection.On<TeamMemberSnapshot>("MemberUpdated", MemberUpdated);
         connection.On<Guid>("MemberRemoved", MemberRemoved);
+        connection.On<IReadOnlyList<TeamMapPingSnapshot>>("MapPingsChanged", MapPingsChanged);
         connection.On("TeamClosed", () => MarkExpired("Nhóm đã kết thúc."));
 
         connection.Reconnecting += _ =>
@@ -325,6 +378,7 @@ public sealed class TeamRelayClient : IAsyncDisposable
         lock (_stateGate)
         {
             _members.Clear();
+            _mapPings.Clear();
         }
     }
 
@@ -398,6 +452,11 @@ public sealed class TeamRelayClient : IAsyncDisposable
             {
                 _members[member.MemberId] = member;
             }
+            _mapPings.Clear();
+            foreach (var ping in snapshot.MapPings ?? [])
+            {
+                _mapPings[ping.PingId] = ping;
+            }
         }
 
         SetState(TeamRelayConnectionState.Live);
@@ -420,6 +479,20 @@ public sealed class TeamRelayClient : IAsyncDisposable
         lock (_stateGate)
         {
             _members.Remove(memberId);
+        }
+
+        SetState(CurrentState.ConnectionState);
+    }
+
+    private void MapPingsChanged(IReadOnlyList<TeamMapPingSnapshot> mapPings)
+    {
+        lock (_stateGate)
+        {
+            _mapPings.Clear();
+            foreach (var ping in mapPings)
+            {
+                _mapPings[ping.PingId] = ping;
+            }
         }
 
         SetState(CurrentState.ConnectionState);
@@ -452,6 +525,7 @@ public sealed class TeamRelayClient : IAsyncDisposable
             if (clearMembers)
             {
                 _members.Clear();
+                _mapPings.Clear();
             }
 
             state = new TeamRelayState
@@ -460,6 +534,10 @@ public sealed class TeamRelayClient : IAsyncDisposable
                 Session = _session,
                 Members = _members.Values
                     .OrderBy(member => member.DisplayName, StringComparer.CurrentCultureIgnoreCase)
+                    .ToArray(),
+                MapPings = _mapPings.Values
+                    .OrderBy(ping => ping.CreatedAt)
+                    .ThenBy(ping => ping.PingId)
                     .ToArray(),
                 Message = message
             };
@@ -515,6 +593,48 @@ public sealed class TeamRelayClient : IAsyncDisposable
     private void ThrowIfDisposed()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
+    }
+
+    private HubConnection RequireLiveConnection()
+    {
+        var connection = _connection;
+        if (connection is null || connection.State != HubConnectionState.Connected)
+        {
+            throw new TeamMapPingException("relay_not_connected", "Relay nhóm chưa kết nối.");
+        }
+
+        return connection;
+    }
+
+    private TeamMapPingException MapPingException(Exception exception)
+    {
+        if (IsMemberExpired(exception))
+        {
+            MarkExpired("Phiên nhóm đã hết hạn.");
+        }
+
+        var codes = new[]
+        {
+            "invalid_ping",
+            "ping_limit_reached",
+            "ping_not_found",
+            "ping_not_owned",
+            "stale_ping_revision",
+            "member_expired"
+        };
+        var code = codes.FirstOrDefault(value =>
+            exception.Message.Contains(value, StringComparison.OrdinalIgnoreCase))
+            ?? "relay_error";
+        return new TeamMapPingException(code, code switch
+        {
+            "ping_limit_reached" => "Bạn đã đạt giới hạn ping của nhóm.",
+            "ping_not_found" => "Ping không còn tồn tại.",
+            "ping_not_owned" => "Chỉ chủ ping mới được sửa hoặc xóa.",
+            "stale_ping_revision" => "Ping vừa được cập nhật ở nơi khác; hãy thử lại.",
+            "member_expired" => "Phiên nhóm đã hết hạn.",
+            "invalid_ping" => "Vị trí ping không hợp lệ.",
+            _ => "Không thể đồng bộ ping qua relay."
+        }, exception);
     }
 
     private static bool IsMemberExpired(Exception exception) =>

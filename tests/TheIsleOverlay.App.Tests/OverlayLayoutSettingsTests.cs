@@ -51,6 +51,71 @@ public sealed class OverlayLayoutSettingsTests
     }
 
     [Fact]
+    public void MapPan_DragMovesTheAbsoluteFocusWithThePointer()
+    {
+        var focus = MapPanRules.ApplyDragToFocus(
+            new TheIsleOverlay.Core.MapPoint(0.5d, 0.5d),
+            horizontalDelta: 120d,
+            verticalDelta: -60d,
+            imageWidth: 1200d,
+            imageHeight: 600d);
+
+        Assert.Equal(0.4d, focus.Left, precision: 10);
+        Assert.Equal(0.6d, focus.Top, precision: 10);
+    }
+
+    [Fact]
+    public void MapPan_ClampsAtImageEdgesWithoutAccumulatingHiddenOverscroll()
+    {
+        var focus = MapPanRules.ClampFocus(
+            new TheIsleOverlay.Core.MapPoint(-10d, 10d),
+            viewportWidth: 300d,
+            viewportHeight: 300d,
+            imageWidth: 1200d,
+            imageHeight: 600d);
+
+        Assert.Equal(0.125d, focus.Left, precision: 10);
+        Assert.Equal(0.75d, focus.Top, precision: 10);
+    }
+
+    [Fact]
+    public void MapPan_KeepsImageCenteredWhenItDoesNotExceedViewport()
+    {
+        var focus = MapPanRules.ClampFocus(
+            new TheIsleOverlay.Core.MapPoint(0.2d, 0.8d),
+            viewportWidth: 300d,
+            viewportHeight: 300d,
+            imageWidth: 300d,
+            imageHeight: 250d);
+
+        Assert.Equal(0.5d, focus.Left);
+        Assert.Equal(0.5d, focus.Top);
+    }
+
+    [Fact]
+    public void FreeLookFocusStaysAbsoluteWhenThePlayerGpsMoves()
+    {
+        var startingFocus = new TheIsleOverlay.Core.MapPoint(0.6, 0.4);
+        var dragged = MapPanRules.ApplyDragToFocus(
+            startingFocus,
+            horizontalDelta: 120,
+            verticalDelta: -80,
+            imageWidth: 1200,
+            imageHeight: 1000);
+        var clamped = MapPanRules.ClampFocus(
+            dragged,
+            viewportWidth: 300,
+            viewportHeight: 300,
+            imageWidth: 1200,
+            imageHeight: 1000);
+
+        Assert.Equal(0.5, clamped.Left, 8);
+        Assert.Equal(0.48, clamped.Top, 8);
+        var playerMovedTo = new TheIsleOverlay.Core.MapPoint(0.9, 0.9);
+        Assert.NotEqual(playerMovedTo, clamped);
+    }
+
+    [Fact]
     public void Store_RoundTripsScaleAndPositionAndRecoversFromMalformedJson()
     {
         var directory = Path.Combine(
@@ -61,21 +126,38 @@ public sealed class OverlayLayoutSettingsTests
         try
         {
             var store = new OverlayLayoutSettingsStore(path);
-            Assert.Equal(new OverlayLayoutSettings(), store.Load());
+            var defaults = store.Load();
+            Assert.Equal(2, defaults.Version);
+            Assert.Equal(OverlayLayoutRules.DefaultScale, defaults.Scale);
+            Assert.Null(defaults.Left);
+            Assert.Null(defaults.Top);
+            Assert.Empty(defaults.Widgets);
 
             store.Save(new OverlayLayoutSettings
             {
                 Scale = 1.37d,
                 Left = 120.5d,
-                Top = 80.25d
+                Top = 80.25d,
+                Widgets = new Dictionary<string, OverlayWidgetPosition>
+                {
+                    [OverlayLayoutRules.MapWidget] = new() { Left = 900d, Top = 70d },
+                    [OverlayLayoutRules.StatsWidget] = new() { Left = 900d, Top = 382d }
+                }
             });
             var restored = store.Load();
             Assert.Equal(1.37d, restored.Scale);
             Assert.Equal(120.5d, restored.Left);
             Assert.Equal(80.25d, restored.Top);
+            Assert.Equal(900d, restored.Widgets[OverlayLayoutRules.MapWidget].Left);
+            Assert.Equal(382d, restored.Widgets[OverlayLayoutRules.StatsWidget].Top);
 
             File.WriteAllText(path, "{broken");
-            Assert.Equal(new OverlayLayoutSettings(), store.Load());
+            var recovered = store.Load();
+            Assert.Equal(2, recovered.Version);
+            Assert.Equal(OverlayLayoutRules.DefaultScale, recovered.Scale);
+            Assert.Null(recovered.Left);
+            Assert.Null(recovered.Top);
+            Assert.Empty(recovered.Widgets);
         }
         finally
         {
@@ -103,11 +185,18 @@ public sealed class OverlayLayoutSettingsTests
                 StringComparison.Ordinal));
 
         var window = document.Root ?? throw new InvalidOperationException("Window root is missing.");
-        Assert.Equal("WidthAndHeight", (string?)window.Attribute("SizeToContent"));
+        Assert.Equal("Manual", (string?)window.Attribute("SizeToContent"));
         Assert.Null(window.Attribute("Width"));
-        Assert.Equal("318", (string?)Control("OverlayScaleRoot").Attribute("Width"));
-        Assert.NotNull(Control("OverlayScaleTransform"));
+        Assert.Null(Control("OverlayScaleRoot").Attribute("Width"));
+        Assert.NotNull(Control("WidgetCanvas"));
         Assert.NotNull(Control("LayoutControls"));
+        Assert.NotNull(Control("MapPanel"));
+        Assert.NotNull(Control("StatsPanel"));
+        Assert.NotNull(Control("TeamPanel"));
+        Assert.NotNull(Control("MissionPanel"));
+        Assert.Equal("MapFocusModeButton_Click", (string?)Control("MapFocusModeButton").Attribute("Click"));
+        Assert.Equal("WidgetPanel_MouseLeftButtonDown", (string?)Control("MapPanel").Attribute("PreviewMouseLeftButtonDown"));
+        Assert.Equal("WidgetPanel_MouseLeftButtonDown", (string?)Control("StatsPanel").Attribute("PreviewMouseLeftButtonDown"));
         Assert.NotNull(Control("ScaleDownButton"));
         Assert.NotNull(Control("ScaleResetButton"));
         Assert.NotNull(Control("ScaleUpButton"));
@@ -117,5 +206,6 @@ public sealed class OverlayLayoutSettingsTests
         Assert.Equal("ResizeGrip_DragDelta", (string?)resizeGrip.Attribute("DragDelta"));
         Assert.Equal("ResizeGrip_DragCompleted", (string?)resizeGrip.Attribute("DragCompleted"));
         Assert.Equal("100%", (string?)Control("OverlayScaleLabel").Attribute("Text"));
+        Assert.Equal("ResetWidgetLayoutButton_Click", (string?)Control("ResetWidgetLayoutButton").Attribute("Click"));
     }
 }

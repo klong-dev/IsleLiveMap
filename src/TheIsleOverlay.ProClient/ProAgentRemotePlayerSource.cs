@@ -184,7 +184,9 @@ public sealed class ProAgentRemotePlayerSource : IRemotePlayerTelemetrySource
                 entity.TrackId,
                 MapKind(entity.Kind),
                 entity.Kind == MapEntityKind.Player
-                    ? entity.PlayerProofName!.Trim()
+                    ? string.IsNullOrWhiteSpace(entity.PlayerProofName)
+                        ? null
+                        : entity.PlayerProofName.Trim()
                     : null,
                 entity.SpeciesId?.Trim() ?? string.Empty,
                 entity.SpeciesShortName?.Trim() ?? string.Empty,
@@ -198,7 +200,8 @@ public sealed class ProAgentRemotePlayerSource : IRemotePlayerTelemetrySource
                 },
                 entity.DistanceFromLocal,
                 entity.ConfirmationHits,
-                entity.ObservedAt))
+                entity.ObservedAt,
+                entity.IsProvisional))
             .ToArray();
 
         return new RemotePlayerTelemetryFrame(
@@ -215,7 +218,18 @@ public sealed class ProAgentRemotePlayerSource : IRemotePlayerTelemetrySource
             entities,
             hasValidLocalSpecies ? frame.LocalSpeciesId!.Trim() : null,
             hasValidLocalSpecies ? frame.LocalSpeciesShortName!.Trim() : null,
-            DateTimeOffset.UtcNow);
+            DateTimeOffset.UtcNow,
+            frame.PlayerSync is null
+                ? null
+                : new RemotePlayerSyncState(
+                    frame.PlayerSync.IsSynchronizing,
+                    frame.PlayerSync.VerifiedPlayers,
+                    frame.PlayerSync.ProvisionalPlayers,
+                    frame.PlayerSync.CandidateActors,
+                    frame.PlayerSync.SpeciesEvidenceActors,
+                    frame.PlayerSync.LocatedActors,
+                    frame.PlayerSync.QueueDroppedPackets,
+                    frame.PlayerSync.QueueDepth));
     }
 
     private static bool IsValidEntity(VerifiedMapEntity entity) =>
@@ -228,8 +242,12 @@ public sealed class ProAgentRemotePlayerSource : IRemotePlayerTelemetrySource
         && (entity.Kind == MapEntityKind.Ai
             && HasValidSpecies(entity)
             || entity.Kind == MapEntityKind.Player
-            && HasValidPlayerProof(entity)
-            && HasValidOptionalSpecies(entity))
+            && (entity.IsProvisional
+                && !HasValidPlayerProof(entity)
+                && HasValidSpecies(entity)
+                || !entity.IsProvisional
+                && HasValidPlayerProof(entity)
+                && HasValidOptionalSpecies(entity)))
         && entity.ConfirmationHits > 0
         && double.IsFinite(entity.DistanceFromLocal)
         && entity.DistanceFromLocal >= 0

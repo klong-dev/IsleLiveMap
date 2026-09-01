@@ -81,8 +81,12 @@ public static class LocalPositionSnapshotMerger
             PlayerOnline = true,
             UpdatedAt = observedAt,
             Player = player,
-            Map = MergeRemotePlayers(baseSnapshot.Map, remotePlayers, location),
+            Map = MergeRemotePlayers(
+                baseSnapshot.Map,
+                remotePlayers,
+                location),
             ProPlayerTrackingActive = remotePlayers is not null,
+            ProPlayerSync = verifiedLocalFallback?.PlayerSync,
             SessionState = TelemetrySessionState.Live,
             LiveDataStale = false,
             StatusMessage = baseSnapshot.SessionState == TelemetrySessionState.UnsupportedServer
@@ -135,7 +139,8 @@ public static class LocalPositionSnapshotMerger
                     CreatureSpeciesId = entity.SpeciesId,
                     CreatureSpeciesShortName = entity.SpeciesShortName,
                     ProCreatureDiet = entity.Diet,
-                    CreatureMassKg = entity.MassKg
+                    CreatureMassKg = entity.MassKg,
+                    ProEntityIsProvisional = entity.IsProvisional
                 };
             })
             .ToArray();
@@ -156,7 +161,11 @@ public static class LocalPositionSnapshotMerger
             && !string.IsNullOrWhiteSpace(entity.SpeciesId)
             && !string.IsNullOrWhiteSpace(entity.SpeciesShortName)
             || entity.Kind == RemoteEntityKind.Player
-            && !string.IsNullOrWhiteSpace(entity.PlayerProofName));
+            && (entity.IsProvisional
+                && !string.IsNullOrWhiteSpace(entity.SpeciesId)
+                && !string.IsNullOrWhiteSpace(entity.SpeciesShortName)
+                || !entity.IsProvisional
+                && !string.IsNullOrWhiteSpace(entity.PlayerProofName)));
 
     private static bool IsWithinRemoteEntityDistance(
         WorldLocation entity,

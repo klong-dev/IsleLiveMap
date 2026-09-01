@@ -7,4 +7,5 @@ public sealed record IslePilotOptions
     public string DisplayName { get; init; } = "DinoVietnam";
     public required string PlayerCookie { get; init; }
     public TimeSpan StatsRefreshInterval { get; init; } = TimeSpan.FromSeconds(10);
+    public TimeSpan HeatmapRefreshInterval { get; init; } = TimeSpan.FromSeconds(15);
 }

@@ -2,7 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Hướng dẫn Isle Live Map"
-        Width="820" Height="740"
+        Width="820" Height="800"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
         ResizeMode="NoResize" WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
         FontFamily="Segoe UI" FontSize="13"
@@ -115,7 +115,7 @@
                     <StackPanel>
                         <TextBlock Text="TRƯỚC KHI VÀO GAME" Foreground="{StaticResource GuideTeal}"
                                    FontFamily="Bahnschrift SemiCondensed" FontSize="11" FontWeight="SemiBold" />
-                        <TextBlock Text="NHỚ 5 PHÍM TẮT NÀY."
+                        <TextBlock Text="NHỚ 7 PHÍM TẮT NÀY."
                                    Foreground="{StaticResource GuideBone}" FontFamily="Bahnschrift SemiCondensed"
                                    FontSize="30" FontWeight="Bold" Margin="-1,2,0,0" />
                     </StackPanel>
@@ -131,17 +131,35 @@
                             <Border Style="{StaticResource ShortcutKey}">
                                 <TextBlock Text="CTRL + SHIFT + O" Foreground="#E9F4EE" FontFamily="Bahnschrift" FontSize="12" FontWeight="Bold" />
                             </Border>
-                            <TextBlock Grid.Column="1" Text="CHỈNH OVERLAY" Foreground="#DCEAE4" FontFamily="Bahnschrift SemiCondensed" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" />
-                            <TextBlock Grid.Column="2" Text="Di chuyển, resize và nhập tọa độ chỉ đường" Foreground="{StaticResource GuideMuted}" FontSize="11.5" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="1" Text="FREE · CHỈNH OVERLAY" Foreground="#DCEAE4" FontFamily="Bahnschrift SemiCondensed" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="2" Text="Kéo độc lập Map, Status, Team và Prime" Foreground="{StaticResource GuideMuted}" FontSize="11.5" VerticalAlignment="Center" />
+                        </Grid>
+                        <Rectangle Height="1" Fill="#304A45" />
+                        <Grid Height="52">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="190" /><ColumnDefinition Width="170" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <Border Style="{StaticResource ShortcutKey}" BorderBrush="#756A3A">
+                                <TextBlock Text="ALT + M" Foreground="#FFE18A" FontFamily="Bahnschrift" FontSize="12" FontWeight="Bold" />
+                            </Border>
+                            <TextBlock Grid.Column="1" Text="PRO · ĐẶT SET POINT" Foreground="#FFE18A" FontFamily="Bahnschrift SemiCondensed" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="2" Text="Mở map lớn, click điểm muốn đặt và chia sẻ nhóm" Foreground="{StaticResource GuideMuted}" FontSize="11.5" VerticalAlignment="Center" />
                         </Grid>
                         <Rectangle Height="1" Fill="#304A45" />
                         <Grid Height="52">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="190" /><ColumnDefinition Width="170" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
                             <Border Style="{StaticResource ShortcutKey}">
-                                <TextBlock Text="ALT + LĂN CHUỘT" Foreground="#E9F4EE" FontFamily="Bahnschrift" FontSize="12" FontWeight="Bold" />
+                                <TextBlock Text="ALT + KÉO CHUỘT TRÁI" Foreground="#E9F4EE" FontFamily="Bahnschrift" FontSize="11.5" FontWeight="Bold" />
                             </Border>
-                            <TextBlock Grid.Column="1" Text="ZOOM MAP" Foreground="#DCEAE4" FontFamily="Bahnschrift SemiCondensed" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" />
-                            <TextBlock Grid.Column="2" Text="Lăn lên để phóng to, lăn xuống để thu nhỏ" Foreground="{StaticResource GuideMuted}" FontSize="11.5" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="1" Text="FREE · DI CHUYỂN MAP" Foreground="#DCEAE4" FontFamily="Bahnschrift SemiCondensed" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="2" Text="Giữ chuột trái và kéo để quan sát tự do" Foreground="{StaticResource GuideMuted}" FontSize="11.5" VerticalAlignment="Center" />
+                        </Grid>
+                        <Rectangle Height="1" Fill="#304A45" />
+                        <Grid Height="52">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="190" /><ColumnDefinition Width="170" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <Border Style="{StaticResource ShortcutKey}">
+                                <TextBlock Text="ALT + CHUỘT PHẢI" Foreground="#E9F4EE" FontFamily="Bahnschrift" FontSize="11.5" FontWeight="Bold" />
+                            </Border>
+                            <TextBlock Grid.Column="1" Text="FREE · ĐẶT LẠI MAP" Foreground="#DCEAE4" FontFamily="Bahnschrift SemiCondensed" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="2" Text="Đưa map về chính giữa và tiếp tục bám GPS" Foreground="{StaticResource GuideMuted}" FontSize="11.5" VerticalAlignment="Center" />
                         </Grid>
                         <Rectangle Height="1" Fill="#304A45" />
                         <Grid Height="52">
@@ -188,8 +206,8 @@
                     <StackPanel>
                         <TextBlock Text="01  MAP CỤC BỘ + HƯỚNG QUAY" Foreground="#D8EAE4" FontFamily="Bahnschrift SemiCondensed" FontSize="11.5" FontWeight="SemiBold" Margin="0,0,0,8" />
                         <TextBlock Text="02  HP · STAMINA · HUNGER · WATER" Foreground="#D8EAE4" FontFamily="Bahnschrift SemiCondensed" FontSize="11.5" FontWeight="SemiBold" Margin="0,0,0,8" />
-                        <TextBlock Text="03  CHỈ ĐƯỜNG BẰNG TỌA ĐỘ" Foreground="#FFE18A" FontFamily="Bahnschrift SemiCondensed" FontSize="11.5" FontWeight="SemiBold" Margin="0,0,0,8" />
-                        <TextBlock Text="04  RESIZE TOÀN BỘ OVERLAY" Foreground="#D8EAE4" FontFamily="Bahnschrift SemiCondensed" FontSize="11.5" FontWeight="SemiBold" />
+                        <TextBlock Text="03  PING NHÓM · OWNER QUẢN LÝ" Foreground="#FFE18A" FontFamily="Bahnschrift SemiCondensed" FontSize="11.5" FontWeight="SemiBold" Margin="0,0,0,8" />
+                        <TextBlock Text="04  MOVE TỪNG BLOCK + RESIZE HUD" Foreground="#D8EAE4" FontFamily="Bahnschrift SemiCondensed" FontSize="11.5" FontWeight="SemiBold" />
                     </StackPanel>
                     <Rectangle Grid.Column="1" Width="1" Fill="#304A45" HorizontalAlignment="Center" />
                     <StackPanel Grid.Column="2">

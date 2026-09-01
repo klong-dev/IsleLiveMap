@@ -133,13 +133,42 @@ public sealed class IslePilotTelemetryProviderTests
         Assert.True(second.Success);
     }
 
-    private sealed class IslePilotHandler(string markers, string page) : HttpMessageHandler
+    [Fact]
+    public async Task GetSnapshotAsync_UsesOfficialHeatmapCellsWithoutInferringFromMarkers()
+    {
+        const string markers = """
+            {"ok":true,"markers":[{"steamId":"1","x":1000,"y":-2000,"self":true}]}
+            """;
+        const string heatmap = """
+            {"ok":true,"cells":[{"u":0.25,"v":0.75,"intensity":0.8}],"radius":30}
+            """;
+        var handler = new IslePilotHandler(markers, "<h1>Pteranodon</h1>", heatmap);
+        var provider = new IslePilotTelemetryProvider(
+            new HttpClient(handler),
+            new IslePilotOptions { PlayerCookie = "test-cookie" });
+
+        var snapshot = await provider.GetSnapshotAsync();
+
+        Assert.True(snapshot.Map?.PlayerHeatmapEnabled);
+        Assert.Equal(0.03, snapshot.Map?.PlayerHeatmapRadius);
+        var cell = Assert.Single(snapshot.Map?.PlayerHeatmapCells ?? []);
+        Assert.Equal(new TheIsleOverlay.Core.MapPoint(0.25, 0.75), cell.Location);
+        Assert.Equal(0.8, cell.Intensity);
+        Assert.Equal(1, handler.HeatmapRequests);
+    }
+
+    private sealed class IslePilotHandler(
+        string markers,
+        string page,
+        string heatmap = "{\"ok\":false}") : HttpMessageHandler
     {
         private int _markerRequests;
         private int _playerPageRequests;
+        private int _heatmapRequests;
 
         public int MarkerRequests => _markerRequests;
         public int PlayerPageRequests => _playerPageRequests;
+        public int HeatmapRequests => _heatmapRequests;
         public string? LastCookie { get; private set; }
         public string? LastHost { get; private set; }
         public List<string> RequestPaths { get; } = [];
@@ -156,6 +185,12 @@ public sealed class IslePilotTelemetryProviderTests
             {
                 Interlocked.Increment(ref _markerRequests);
                 return Task.FromResult(Response(markers, "application/json"));
+            }
+
+            if (request.RequestUri?.AbsolutePath.EndsWith("/map/heatmap", StringComparison.Ordinal) == true)
+            {
+                Interlocked.Increment(ref _heatmapRequests);
+                return Task.FromResult(Response(heatmap, "application/json"));
             }
 
             Interlocked.Increment(ref _playerPageRequests);
@@ -187,6 +222,12 @@ public sealed class IslePilotTelemetryProviderTests
             {
                 Interlocked.Increment(ref _markerRequests);
                 return Response(markers, "application/json");
+            }
+
+
+            if (request.RequestUri?.AbsolutePath.EndsWith("/map/heatmap", StringComparison.Ordinal) == true)
+            {
+                return Response("{\"ok\":false}", "application/json");
             }
 
             if (Interlocked.Increment(ref _statsRequests) == 2)
@@ -222,6 +263,15 @@ public sealed class IslePilotTelemetryProviderTests
                 return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
                 {
                     Content = new StringContent(markers, Encoding.UTF8, "application/json")
+                });
+            }
+
+
+            if (request.RequestUri?.AbsolutePath.EndsWith("/map/heatmap", StringComparison.Ordinal) == true)
+            {
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent("{\"ok\":false}", Encoding.UTF8, "application/json")
                 });
             }
 

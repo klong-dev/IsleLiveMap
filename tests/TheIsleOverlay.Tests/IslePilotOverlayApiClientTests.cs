@@ -56,6 +56,39 @@ public sealed class IslePilotOverlayApiClientTests
         Assert.Equal(new Uri("https://islepilot.eu/api/overlay/map"), handler.RequestUri);
     }
 
+    [Fact]
+    public async Task GetHeatmapAsync_UsesTenantEndpointCookieAndExplicitCells()
+    {
+        using var handler = new RecordingHandler(HttpStatusCode.OK, """
+            {"ok":true,"cells":[{"u":0.25,"v":0.75,"intensity":0.8}],"radius":30}
+            """);
+        using var httpClient = new HttpClient(handler);
+        var client = CreateClient(httpClient, "signed-cookie");
+
+        var heatmap = await client.GetHeatmapAsync("Dino Vietnam Premium 2");
+
+        Assert.True(heatmap?.Ok);
+        Assert.Equal(
+            new Uri("https://dinovietnampremium.islepilot.eu/api/p/dinovietnampremium/map/heatmap"),
+            handler.RequestUri);
+        Assert.Equal("islepilot_player=signed-cookie", handler.Cookie);
+        Assert.Equal(30, heatmap?.Radius);
+        Assert.Single(heatmap?.Cells ?? []);
+    }
+
+    [Fact]
+    public async Task GetHeatmapAsync_WithoutPlayerCookie_FailsClosedWithoutNetworkCall()
+    {
+        using var handler = new RecordingHandler(HttpStatusCode.OK, "{}");
+        using var httpClient = new HttpClient(handler);
+        var client = CreateClient(httpClient);
+
+        var heatmap = await client.GetHeatmapAsync("DinoVietnam");
+
+        Assert.Null(heatmap);
+        Assert.Null(handler.RequestUri);
+    }
+
     [Theory]
     [InlineData(HttpStatusCode.Unauthorized)]
     [InlineData(HttpStatusCode.Forbidden)]
@@ -80,9 +113,15 @@ public sealed class IslePilotOverlayApiClientTests
         Assert.Throws<ArgumentException>(() => new IslePilotOverlayApiClient(httpClient, options));
     }
 
-    private static IslePilotOverlayApiClient CreateClient(HttpClient httpClient) => new(
+    private static IslePilotOverlayApiClient CreateClient(
+        HttpClient httpClient,
+        string? playerCookie = null) => new(
         httpClient,
-        new IslePilotOverlayOptions { OverlayToken = Token });
+        new IslePilotOverlayOptions
+        {
+            OverlayToken = Token,
+            PlayerCookie = playerCookie
+        });
 
     private sealed class RecordingHandler(HttpStatusCode statusCode, string responseBody) : HttpMessageHandler
     {
@@ -92,6 +131,7 @@ public sealed class IslePilotOverlayApiClientTests
         public string? AuthorizationParameter { get; private set; }
         public string? OverlayVersion { get; private set; }
         public string? Accept { get; private set; }
+        public string? Cookie { get; private set; }
 
         protected override Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request,
@@ -105,6 +145,9 @@ public sealed class IslePilotOverlayApiClientTests
                 ? versions.Single()
                 : null;
             Accept = request.Headers.Accept.SingleOrDefault()?.MediaType;
+            Cookie = request.Headers.TryGetValues("Cookie", out var cookies)
+                ? cookies.Single()
+                : null;
 
             return Task.FromResult(new HttpResponseMessage(statusCode)
             {

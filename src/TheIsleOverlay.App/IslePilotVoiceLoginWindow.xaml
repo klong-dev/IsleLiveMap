@@ -1,0 +1,76 @@
+<Window x:Class="TheIsleOverlay.App.IslePilotVoiceLoginWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
+        Title="Xác thực Steam · Player lân cận" Width="1060" Height="760"
+        MinWidth="820" MinHeight="620" WindowStartupLocation="CenterOwner"
+        Background="#0C0A06" Foreground="#FFF5D8"
+        FontFamily="Segoe UI Variable Text"
+        Loaded="Window_Loaded" Closed="Window_Closed">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="68" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="62" />
+        </Grid.RowDefinitions>
+
+        <Border Background="#151008" BorderBrush="#5C4720" BorderThickness="0,0,0,1">
+            <Grid Margin="18,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock Text="XÁC THỰC PLAYER LÂN CẬN"
+                               FontFamily="Bahnschrift SemiCondensed" FontSize="18"
+                               FontWeight="SemiBold" />
+                    <TextBlock Text="Bước xác thực riêng của IsleVOIP dành cho Live Map Pro"
+                               Foreground="#B8A56F" FontSize="10.5" Margin="0,3,0,0" />
+                </StackPanel>
+                <StackPanel Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Right">
+                    <TextBlock Text="STEAMID64 VERIFIED" Foreground="#E6B94C"
+                               FontFamily="Bahnschrift SemiCondensed" FontSize="10"
+                               FontWeight="SemiBold" HorizontalAlignment="Right" />
+                    <TextBlock Text="Vị trí lân cận · Không hiển thị SteamID"
+                               Foreground="#8E7A48" FontFamily="Bahnschrift" FontSize="9"
+                               Margin="0,3,0,0" HorizontalAlignment="Right" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <Border Grid.Row="1" Margin="12" Background="#100D07"
+                BorderBrush="#5C4720" BorderThickness="1">
+            <Grid>
+                <wv2:WebView2 x:Name="LoginBrowser" />
+                <Border x:Name="BrowserLoadingPanel" Background="#F20C0A06">
+                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <Ellipse Width="24" Height="24" Stroke="#E6B94C" StrokeThickness="2" />
+                        <TextBlock Text="ĐANG XÁC THỰC STEAM VỚI ISLEVOIP…"
+                                   Foreground="#B8A56F" FontFamily="Bahnschrift SemiCondensed"
+                                   FontSize="10" Margin="0,12,0,0" />
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </Border>
+
+        <Border Grid.Row="2" Background="#151008" BorderBrush="#5C4720" BorderThickness="0,1,0,0">
+            <Grid Margin="18,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock x:Name="LoginStatusLabel"
+                           Text="Token chỉ được lưu mã hóa bằng tài khoản Windows hiện tại."
+                           Foreground="#B8A56F" FontSize="10.5" VerticalAlignment="Center"
+                           TextWrapping="Wrap" />
+                <Button Grid.Column="1" Content="THỬ LẠI" Padding="15,7" Margin="10,0,0,0"
+                        Click="RetryButton_Click" Background="#3A2A08" Foreground="#FFF5D8"
+                        BorderBrush="#8E6C24" FontFamily="Bahnschrift SemiCondensed" Cursor="Hand" />
+                <Button Grid.Column="2" Content="BỎ QUA" Padding="15,7" Margin="8,0,0,0"
+                        Click="CancelButton_Click" Background="Transparent" Foreground="#C9B984"
+                        BorderBrush="#5C4720" FontFamily="Bahnschrift SemiCondensed" Cursor="Hand" />
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

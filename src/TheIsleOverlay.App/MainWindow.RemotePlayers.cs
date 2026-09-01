@@ -17,11 +17,25 @@ public partial class MainWindow
 
     private void SyncRemotePlayerMarkers(TelemetrySnapshot snapshot)
     {
+        if (!HasCurrentProFeatures)
+        {
+            ClearRemotePlayerMarkers();
+            return;
+        }
+
         var markers = RemotePlayerMapMarkerResolver.Resolve(snapshot.Map, snapshot.Player);
         var visibleKeys = new HashSet<string>(StringComparer.Ordinal);
-        var playerCount = markers.Count(marker => marker.EntityKind == RemoteEntityKind.Player);
+        var playerCount = markers.Count(marker =>
+            marker.EntityKind == RemoteEntityKind.Player && !marker.IsProvisional);
+        var provisionalCount = markers.Count(marker =>
+            marker.EntityKind == RemoteEntityKind.Player && marker.IsProvisional);
         var aiCount = markers.Count(marker => marker.EntityKind == RemoteEntityKind.Ai);
-        RemotePlayerCountLabel.Text = $"PLAYER {playerCount} · AI {aiCount}";
+        var isSynchronizing = snapshot.ProPlayerSync?.IsSynchronizing == true;
+        RemotePlayerCountLabel.Text = provisionalCount > 0
+            ? $"PLAYER {playerCount} · ĐANG XÁC MINH {provisionalCount} · AI {aiCount}"
+            : isSynchronizing
+                ? $"PLAYER {playerCount} · ĐANG ĐỒNG BỘ · AI {aiCount}"
+            : $"PLAYER {playerCount} · AI {aiCount}";
         RemotePlayerCountLabel.Visibility = snapshot.ProPlayerTrackingActive
             ? Visibility.Visible
             : Visibility.Collapsed;
@@ -34,7 +48,10 @@ public partial class MainWindow
             visibleKeys.Add(marker.Key);
             if (!_remotePlayerMapDots.TryGetValue(marker.Key, out var dot))
             {
-                dot = CreateRemotePlayerDot(marker.Label!, marker.Category);
+                dot = CreateRemotePlayerDot(
+                    marker.Label!,
+                    marker.Category,
+                    marker.IsProvisional);
                 _remotePlayerMapDots.Add(marker.Key, dot);
                 RemotePlayerMarkerLayer.Children.Add(dot.Visual);
             }
@@ -46,6 +63,7 @@ public partial class MainWindow
             {
                 ApplyPalette(dot, marker.Category);
             }
+            ApplyProvisionalStyle(dot, marker.IsProvisional);
         }
 
         foreach (var key in _remotePlayerMapDots.Keys
@@ -59,7 +77,8 @@ public partial class MainWindow
 
     private static RemotePlayerMapDot CreateRemotePlayerDot(
         string label,
-        RemoteEntityMapCategory category)
+        RemoteEntityMapCategory category,
+        bool isProvisional)
     {
         var shape = new Ellipse
         {
@@ -94,7 +113,20 @@ public partial class MainWindow
         visual.Children.Add(nameLabel);
         var dot = new RemotePlayerMapDot(visual, shape, nameLabel);
         ApplyPalette(dot, category);
+        ApplyProvisionalStyle(dot, isProvisional);
         return dot;
+    }
+
+    private static void ApplyProvisionalStyle(
+        RemotePlayerMapDot dot,
+        bool isProvisional)
+    {
+        dot.Shape.Fill = isProvisional ? Brushes.Transparent : dot.Shape.Fill;
+        dot.Shape.StrokeDashArray = isProvisional
+            ? new DoubleCollection { 1.5d, 1.5d }
+            : null;
+        dot.Visual.Opacity = isProvisional ? 0.82d : 1d;
+        dot.IsProvisional = isProvisional;
     }
 
     private static void ApplyPalette(
@@ -177,6 +209,7 @@ public partial class MainWindow
         public TextBlock Label { get; } = label;
         public MapPoint Point { get; set; }
         public RemoteEntityMapCategory Category { get; set; }
+        public bool IsProvisional { get; set; }
     }
 
     private readonly record struct MarkerPalette(

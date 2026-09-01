@@ -17,7 +17,8 @@ public sealed class IslePilotCredentialStoreTests : IDisposable
         var store = new IslePilotCredentialStore(path);
         var expected = new IslePilotOverlayAuthResult(
             "76561198000000000",
-            "header.payload.signature");
+            "header.payload.signature",
+            "signed-player-cookie");
 
         await store.SaveAsync(expected);
         var actual = await store.LoadAsync();
@@ -32,13 +33,15 @@ public sealed class IslePilotCredentialStoreTests : IDisposable
         var store = new IslePilotCredentialStore(path);
         const string steamId = "76561198000000000";
         const string token = "plain-text-token-must-not-leak";
+        const string playerCookie = "plain-text-cookie-must-not-leak";
 
-        await store.SaveAsync(new IslePilotOverlayAuthResult(steamId, token));
+        await store.SaveAsync(new IslePilotOverlayAuthResult(steamId, token, playerCookie));
         var stored = await File.ReadAllBytesAsync(path);
 
         Assert.Equal(-1, stored.AsSpan().IndexOf(Encoding.UTF8.GetBytes(token)));
         Assert.Equal(-1, stored.AsSpan().IndexOf(Encoding.Unicode.GetBytes(token)));
         Assert.Equal(-1, stored.AsSpan().IndexOf(Encoding.UTF8.GetBytes(steamId)));
+        Assert.Equal(-1, stored.AsSpan().IndexOf(Encoding.UTF8.GetBytes(playerCookie)));
     }
 
     [Fact]

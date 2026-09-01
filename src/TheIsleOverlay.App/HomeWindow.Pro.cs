@@ -122,6 +122,7 @@ public partial class HomeWindow
         try
         {
             await _proAccessService.LogoutAsync(_shutdown.Token);
+            _islePilotVoiceCredentialStore.Clear();
             _proAccess = ProAccessSnapshot.SignedOut;
             ApplyProAccessState(_proAccess);
             SourceStatusLabel.Text = "Đã xóa phiên Isle Live Map Pro trên máy này.";

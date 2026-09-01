@@ -8,6 +8,7 @@ namespace TheIsleOverlay.App;
 public partial class IslePilotSteamLoginWindow : Window
 {
     private bool _completed;
+    private bool _completing;
 
     public IslePilotSteamLoginWindow()
     {
@@ -98,17 +99,45 @@ public partial class IslePilotSteamLoginWindow : Window
             return false;
         }
 
-        if (!IslePilotOverlayAuthService.TryParseCallback(callback, out var credentials))
+        if (!IslePilotOverlayAuthService.TryParseCallback(callback, out var credentials)
+            || credentials is null)
         {
             LoginStatusLabel.Text = "IslePilot trả về callback không hợp lệ. Hãy thử đăng nhập lại.";
             return true;
         }
 
-        Credentials = credentials;
+        if (!_completing)
+        {
+            _completing = true;
+            BrowserLoadingPanel.Visibility = Visibility.Visible;
+            LoginStatusLabel.Text = "Đang hoàn tất phiên IslePilot…";
+            _ = CompleteFromCallbackAsync(credentials);
+        }
+
+        return true;
+    }
+
+    private async Task CompleteFromCallbackAsync(IslePilotOverlayAuthResult credentials)
+    {
+        string? playerCookie = null;
+        try
+        {
+            if (LoginBrowser.CoreWebView2 is not null)
+            {
+                playerCookie = await IslePilotPlayerCookieReader.ReadAsync(
+                    LoginBrowser.CoreWebView2.CookieManager);
+            }
+        }
+        catch
+        {
+            // The overlay token remains valid if the optional tenant cookie
+            // cannot be read. Only server-specific heatmap will be unavailable.
+        }
+
+        Credentials = credentials with { PlayerCookie = playerCookie };
         _completed = true;
         DialogResult = true;
         Close();
-        return true;
     }
 
     private void NavigateToLogin()
@@ -125,7 +154,13 @@ public partial class IslePilotSteamLoginWindow : Window
 
     private void RetryButton_Click(object sender, RoutedEventArgs e) => NavigateToLogin();
 
-    private void CancelButton_Click(object sender, RoutedEventArgs e) => Close();
+    private void CancelButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (!_completing)
+        {
+            Close();
+        }
+    }
 
     private void Window_Closed(object? sender, EventArgs e)
     {

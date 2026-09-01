@@ -212,6 +212,30 @@ public sealed class IslePilotOverlayStateReducerTests
         Assert.Equal(90d, player?.ExactMapHeadingDegrees);
     }
 
+    [Fact]
+    public void ExplicitHeatmap_IsValidatedAndNormalizedWithoutUsingMarkers()
+    {
+        var reducer = new IslePilotOverlayStateReducer();
+        reducer.ApplyMap(new IslePilotOverlayMapDto
+        {
+            HeatmapEnabled = true,
+            HeatRadius = 30,
+            Heat =
+            [
+                new IslePilotHeatCellDto { U = 0.25, V = 0.75, Intensity = 0.8 },
+                new IslePilotHeatCellDto { U = -1, V = 0.5, Intensity = 1 }
+            ]
+        }, Now);
+
+        var map = reducer.BuildSnapshot(Now).Map;
+
+        Assert.True(map?.PlayerHeatmapEnabled);
+        Assert.Equal(0.03, map?.PlayerHeatmapRadius);
+        var cell = Assert.Single(map?.PlayerHeatmapCells ?? []);
+        Assert.Equal(new MapPoint(0.25, 0.75), cell.Location);
+        Assert.Equal(0.8, cell.Intensity);
+    }
+
     private static IslePilotOverlayMeDto Baseline() => new()
     {
         HasData = true,

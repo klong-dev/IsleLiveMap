@@ -59,6 +59,33 @@ public sealed record TeamMemberSnapshot(
 public sealed record TeamSnapshot(
     Guid TeamId,
     string InviteCode,
-    IReadOnlyList<TeamMemberSnapshot> Members);
+    IReadOnlyList<TeamMemberSnapshot> Members,
+    IReadOnlyList<TeamMapPingSnapshot>? MapPings = null);
+
+public sealed record TeamMapPingMutation
+{
+    public Guid PingId { get; init; }
+    public long ExpectedRevision { get; init; }
+    public string MapId { get; init; } = "gateway";
+    public int Kind { get; init; }
+    public double MapLeft { get; init; }
+    public double MapTop { get; init; }
+    public double WorldX { get; init; }
+    public double WorldY { get; init; }
+}
+
+public sealed record TeamMapPingSnapshot(
+    Guid PingId,
+    Guid OwnerMemberId,
+    string OwnerDisplayName,
+    long Revision,
+    string MapId,
+    int Kind,
+    double MapLeft,
+    double MapTop,
+    double WorldX,
+    double WorldY,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset UpdatedAt);
 
 public sealed record TeamApiError(string Code, string Message);

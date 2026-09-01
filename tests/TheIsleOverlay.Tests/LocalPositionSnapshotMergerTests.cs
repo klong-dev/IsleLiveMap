@@ -310,6 +310,57 @@ public sealed class LocalPositionSnapshotMergerTests
     }
 
     [Fact]
+    public void RemoteFrameCompatibility_RejectsOldServerWhileLocalEndpointIsFresh()
+    {
+        var frame = RemoteFrame(
+            Now,
+            98_700,
+            -247_700,
+            27_800,
+            312.5,
+            "115.72.226.156:7777");
+        var local = Observation(98_700, -247_700, 27_800, 312.5) with
+        {
+            ServerEndpoint = "15.235.226.98:7777"
+        };
+
+        Assert.False(LocalPositionTelemetrySession.IsRemoteFrameCompatibleWithLocal(
+            frame,
+            local,
+            Now));
+    }
+
+    [Fact]
+    public void RemoteFrameCompatibility_AllowsMatchingEndpointAndIgnoresStaleLocalEndpoint()
+    {
+        var frame = RemoteFrame(
+            Now,
+            98_700,
+            -247_700,
+            27_800,
+            312.5,
+            "115.72.226.156:7777");
+        var matching = Observation(98_700, -247_700, 27_800, 312.5) with
+        {
+            ServerEndpoint = "115.72.226.156:7777"
+        };
+        var staleDifferent = matching with
+        {
+            ObservedAt = Now - LocalPositionSnapshotMerger.LocalFreshness - TimeSpan.FromSeconds(1),
+            ServerEndpoint = "15.235.226.98:7777"
+        };
+
+        Assert.True(LocalPositionTelemetrySession.IsRemoteFrameCompatibleWithLocal(
+            frame,
+            matching,
+            Now));
+        Assert.True(LocalPositionTelemetrySession.IsRemoteFrameCompatibleWithLocal(
+            frame,
+            staleDifferent,
+            Now));
+    }
+
+    [Fact]
     public void Merge_AddsInboundRemotePlayersWithoutDroppingProviderMapData()
     {
         var pointOfInterest = new MapPointOfInterestTelemetry { Id = "water" };
