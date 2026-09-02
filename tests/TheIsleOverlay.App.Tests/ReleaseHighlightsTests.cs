@@ -51,13 +51,14 @@ public sealed class ReleaseHighlightsTests
                 (string?)element.Attribute("Content")
             }));
 
-        Assert.Equal("1.4.3", ReleaseHighlightsWindow.ReleaseVersion);
+        Assert.Equal("1.4.5", ReleaseHighlightsWindow.ReleaseVersion);
         Assert.Equal(4, ReleaseHighlightsWindow.PageCount);
-        Assert.Contains("FREE UPDATE", allCopy, StringComparison.Ordinal);
-        Assert.Contains("ALT + KÉO GIỮ CHUỘT TRÁI", allCopy, StringComparison.Ordinal);
-        Assert.Contains("ALT + CHUỘT PHẢI", allCopy, StringComparison.Ordinal);
-        Assert.Contains("CTRL + SHIFT + O", allCopy, StringComparison.Ordinal);
+        Assert.Contains("FREE + PRO · PERFORMANCE", allCopy, StringComparison.Ordinal);
+        Assert.Contains("20 HZ UI", allCopy, StringComparison.Ordinal);
+        Assert.Contains("LATEST SNAPSHOT", allCopy, StringComparison.Ordinal);
+        Assert.Contains("zoom tối đa tăng thêm 25%", allCopy, StringComparison.Ordinal);
         Assert.Contains("PRO · ALT + M", allCopy, StringComparison.Ordinal);
+        Assert.Contains("CLICK HOẶC DÁN XYZ", allCopy, StringComparison.Ordinal);
         Assert.Contains("CHIA SẺ CHO NHÓM", allCopy, StringComparison.Ordinal);
         Assert.Contains("PRO · MAP ZONES", allCopy, StringComparison.Ordinal);
         Assert.Contains("PLAYER ĐƯỢC DỰNG NHANH VÀ ĐỦ HƠN", allCopy, StringComparison.Ordinal);

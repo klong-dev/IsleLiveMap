@@ -10,7 +10,7 @@ namespace TheIsleOverlay.App;
 
 public partial class ReleaseHighlightsWindow : Window
 {
-    public const string ReleaseVersion = "1.4.3";
+    public const string ReleaseVersion = "1.4.5";
     public const int PageCount = 4;
     public const string SetPointPreviewResourcePath = "Assets/SetPointTip.png";
     public const string MapZonePreviewResourcePath = "Assets/MapZoneTip.png";

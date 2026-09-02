@@ -1,26 +1,25 @@
-# Isle Live Map 1.4.3
+# Isle Live Map 1.4.5
 
-## Map linh hoạt hơn cho mọi người dùng Free
+## Giảm lag cho Free và Pro
 
-- Giữ **ALT + kéo chuột trái** để di chuyển minimap tự do và **ALT + chuột phải** để đưa map trở lại chính giữa, tiếp tục bám GPS.
-- **Ctrl + Shift + O** nay cho phép kéo Map, Status, Team và Prime thành từng block độc lập thay vì cả cụm.
-- Cải thiện pipeline Npcap/Iris với sequence-gap detection, partial-bunch assembly, cache state và recovery từ nhiều replication batch để giảm mất dấu sau reconnect hoặc đổi server.
+- Giới hạn render UI ở **20 Hz** và luôn lấy telemetry snapshot mới nhất, không xếp hàng các frame cũ trong packet burst.
+- Heatmap, zone và food geometry chỉ được dựng lại khi dữ liệu thực sự thay đổi.
+- Kết quả đo beta trên máy phát triển giảm CPU overlay từ khoảng **5,8–6,1% xuống 2,8%** khi hiển thị.
+- Tăng mức zoom tối đa của minimap thêm **25%** (từ 9x lên 11,25x).
 
-## Tactical map mới cho Pro
+## Đặt mốc bằng tọa độ cho Pro
 
-- **ALT + M** mở bản đồ lớn; click vào vị trí muốn đặt set point và chọn biểu tượng phù hợp.
-- Set point có thể chia sẻ realtime giữa các đồng đội trong cùng nhóm sinh tồn.
-- Bổ sung lớp Migration Zone, Patrol Zone, vùng thức ăn local và Player heatmap khi server IslePilot hỗ trợ.
-- Ghép các mảnh ongoing replication để dựng player sớm hơn, tăng độ đầy đủ và độ ổn định của Player + AI Tracking.
+- Nhấn **ALT + M**, dán đủ tọa độ X, Y, Z theo định dạng game, ví dụ `-238,743.261, 88,587.6, 28,509.171`, rồi nhấn **Enter** hoặc **ĐẶT MỐC**.
+- Mốc tọa độ dùng đúng calibration Gateway và cùng pipeline với mốc tạo bằng click.
+- Khi đang trong nhóm sinh tồn, mốc tọa độ tiếp tục được chia sẻ realtime cho đồng đội.
 
-## Hướng dẫn update dạng từng bước
+## Kết nối team rõ ràng hơn
 
-- Modal mới chia nội dung thành 4 trang ngắn, phân biệt rõ tính năng **Free** và **Pro**, kèm ảnh thao tác thật.
-- Modal phím tắt được cập nhật đầy đủ cho các thao tác map mới.
-- Sau khi xem hết, người dùng có thể chọn **Không hiển thị lại thông báo này** cho riêng phiên bản 1.4.3.
+- Create/join team có deadline 12 giây bao trùm cả REST bootstrap và SignalR handshake.
+- Nếu relay hoặc mạng không phản hồi, UI thoát trạng thái chờ, hiển thị lỗi và mở lại nút để người dùng thử lại.
+- Production relay đã được kiểm tra health và smoke test REST + SignalR trước khi phát hành.
 
-## Kiểm duyệt quyền Pro
+## Quyền truy cập
 
-- Player/AI tracking, Zone, full-map set point và ping nhóm chỉ khởi tạo khi SteamID64 có Pro access còn hiệu lực.
-- Free không đăng ký hotkey Pro, không load dữ liệu Zone và không nhận marker/ping Pro.
-- Khi Pro hết hạn trong lúc Live Map đang mở, các lớp Pro được đóng và gỡ khỏi giao diện mà không ảnh hưởng GPS/stats Free.
+- Tối ưu render, zoom và cải thiện lỗi team có hiệu lực cho mọi người dùng.
+- ALT + M, nhập tọa độ, chia sẻ set point, Player/AI tracking và map layers vẫn chỉ khởi tạo khi Pro access còn hiệu lực.

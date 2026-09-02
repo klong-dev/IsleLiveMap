@@ -19,6 +19,7 @@ public partial class MainWindow : Window
     private static readonly Uri GatewayMapResourceUri = new("Assets/GatewayMap.jpg", UriKind.Relative);
     private static readonly TimeSpan LiveHeadingAnimationDuration = TimeSpan.FromMilliseconds(35);
     private static readonly TimeSpan MovementHeadingAnimationDuration = TimeSpan.FromMilliseconds(80);
+    private static readonly TimeSpan UiRenderInterval = TimeSpan.FromMilliseconds(50);
 
     private const int EditHotkeyId = 0x714;
     private const int ToggleMissionsNHotkeyId = 0x715;
@@ -50,10 +51,9 @@ public partial class MainWindow : Window
     private readonly ILocalMovementSource? _providedLocalSource;
     private ProFeatureAccessGrant _proFeatureAccess;
     private readonly OverlayLayoutSettingsStore _layoutSettingsStore = new();
-    private readonly object _renderSnapshotGate = new();
+    private readonly LatestValueBuffer<TelemetrySnapshot> _renderSnapshotBuffer = new();
     private ITelemetrySession? _telemetrySession;
     private Task? _telemetryWatchTask;
-    private TelemetrySnapshot? _pendingRenderSnapshot;
     private OverlayLayoutSettings _layoutSettings = new();
     private string _configuredSource = "ERA";
     private WorldLocation? _location;
@@ -81,10 +81,10 @@ public partial class MainWindow : Window
     private bool _mapNotesHotkeyRegistered;
     private bool _hudVisible = true;
     private bool _remotePlayerSourceOwnedBySession;
-    private bool _renderSnapshotScheduled;
     private bool _mapPanActive;
     private bool _rawMapPanReceived;
     private DispatcherTimer? _proFeatureExpiryTimer;
+    private DispatcherTimer? _uiRenderTimer;
     private MapFocusMode _mapFocusMode = MapFocusMode.FollowPlayer;
     private MapPoint? _freeMapFocus;
     private MapPoint _mapPanStartFocus = new(0.5d, 0.5d);
@@ -240,6 +240,7 @@ public partial class MainWindow : Window
             _remotePlayerSourceOwnedBySession = _remotePlayerSource is not null;
         }
 
+        StartUiRenderTimer();
         LoadMap();
         _telemetryWatchTask = WatchTelemetryAsync();
     }
@@ -406,55 +407,40 @@ public partial class MainWindow : Window
 
     private void QueueRenderSnapshot(TelemetrySnapshot snapshot)
     {
-        lock (_renderSnapshotGate)
-        {
-            _pendingRenderSnapshot = snapshot;
-            if (_renderSnapshotScheduled)
-            {
-                return;
-            }
-
-            _renderSnapshotScheduled = true;
-        }
-
-        Dispatcher.BeginInvoke(
-            RenderPendingSnapshot,
-            DispatcherPriority.Render);
+        _renderSnapshotBuffer.Publish(snapshot);
     }
 
-    private void RenderPendingSnapshot()
+    private void StartUiRenderTimer()
     {
-        TelemetrySnapshot? snapshot;
-        lock (_renderSnapshotGate)
+        if (_uiRenderTimer is not null)
         {
-            snapshot = _pendingRenderSnapshot;
-            _pendingRenderSnapshot = null;
+            return;
         }
 
-        if (snapshot is not null)
+        _uiRenderTimer = new DispatcherTimer(DispatcherPriority.Render, Dispatcher)
         {
-            try
-            {
-                RenderSnapshot(snapshot);
-            }
-            catch
-            {
-                ShowTelemetryUnavailable("MẤT KẾT NỐI", "Telemetry session đã dừng");
-            }
+            Interval = UiRenderInterval
+        };
+        _uiRenderTimer.Tick += UiRenderTimer_Tick;
+        _uiRenderTimer.Start();
+    }
+
+    private void UiRenderTimer_Tick(object? sender, EventArgs e)
+    {
+        if (WindowState == WindowState.Minimized
+            || !_renderSnapshotBuffer.TryTake(out var snapshot))
+        {
+            return;
         }
 
-        lock (_renderSnapshotGate)
+        try
         {
-            if (_pendingRenderSnapshot is null)
-            {
-                _renderSnapshotScheduled = false;
-                return;
-            }
+            RenderSnapshot(snapshot);
         }
-
-        Dispatcher.BeginInvoke(
-            RenderPendingSnapshot,
-            DispatcherPriority.Render);
+        catch
+        {
+            ShowTelemetryUnavailable("MẤT KẾT NỐI", "Telemetry session đã dừng");
+        }
     }
 
     private void RenderSnapshot(TelemetrySnapshot snapshot)
@@ -524,7 +510,7 @@ public partial class MainWindow : Window
             _location = player.Location;
             _mapLocation = player.MapLocation;
             UpdateMapNotesPlayer();
-            SyncPlayerHeatmap(snapshot.Map, snapshot.Player);
+            SyncPlayerHeatmap(snapshot.Map);
             SyncRemotePlayerMarkers(snapshot);
             if (_location is not null)
             {
@@ -1403,6 +1389,12 @@ public partial class MainWindow : Window
     {
         SaveOverlayLayout();
         DetachMapNotes();
+        if (_uiRenderTimer is not null)
+        {
+            _uiRenderTimer.Stop();
+            _uiRenderTimer.Tick -= UiRenderTimer_Tick;
+            _uiRenderTimer = null;
+        }
         _proFeatureExpiryTimer?.Stop();
         _proFeatureExpiryTimer = null;
         DetachTeamOverlay();

@@ -12,7 +12,9 @@ namespace TheIsleOverlay.App;
 
 public partial class MapNotesWindow : Window
 {
-    private static readonly Uri GatewayMapResourceUri = new("Assets/GatewayMap.jpg", UriKind.Relative);
+    private static readonly Uri GatewayMapResourceUri = new(
+        "pack://application:,,,/IsleLiveMap;component/Assets/GatewayMap.jpg",
+        UriKind.Absolute);
     private readonly MapNoteStore _store;
     private readonly CancellationTokenSource _shutdown = new();
     private Guid? _selectedNoteId;
@@ -20,6 +22,7 @@ public partial class MapNotesWindow : Window
     private double _playerHeading;
     private TeamRelayState _teamState;
     private bool _paletteBusy;
+    private bool _noteCreationBusy;
 
     public MapNotesWindow(
         MapNoteStore store,
@@ -130,47 +133,138 @@ public partial class MapNotesWindow : Window
 
         var position = e.GetPosition(MapSurface);
         e.Handled = true;
-        var u = position.X / width;
-        var v = position.Y / height;
-        if (_teamState.HasActiveSession)
+        var error = await TryCreateNoteAtAsync(new MapPoint(
+            position.X / width,
+            position.Y / height));
+        if (error is not null)
         {
-            if (_teamState.ConnectionState != TeamRelayConnectionState.Live)
+            if (error.Length > 0)
             {
-                SelectionDetailLabel.Text = "Relay đang nối lại · chưa thể đặt ping nhóm";
-                return;
+                SelectionDetailLabel.Text = error;
             }
-
-            try
-            {
-                var ping = await App.CurrentTeam.UpsertMapPingAsync(
-                    MapNotePresentationBuilder.Mutation(
-                        Guid.NewGuid(),
-                        expectedRevision: 0,
-                        MapNoteKind.Pin,
-                        u,
-                        v),
-                    _shutdown.Token);
-                ApplyTeamPing(ping);
-                _selectedNoteId = ping.PingId;
-            }
-            catch (OperationCanceledException) when (_shutdown.IsCancellationRequested)
-            {
-                return;
-            }
-            catch (TeamMapPingException exception)
-            {
-                SelectionDetailLabel.Text = FriendlyPingError(exception);
-                return;
-            }
-        }
-        else
-        {
-            var note = _store.AddDefault(u, v);
-            _selectedNoteId = note.Id;
+            return;
         }
 
         RenderMap();
         OpenPalette(position);
+    }
+
+    private async void CoordinateSubmitButton_Click(object sender, RoutedEventArgs e) =>
+        await PlaceCoordinateNoteAsync();
+
+    private async void CoordinateInputTextBox_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter)
+        {
+            return;
+        }
+
+        e.Handled = true;
+        await PlaceCoordinateNoteAsync();
+    }
+
+    private async Task PlaceCoordinateNoteAsync()
+    {
+        if (!WorldCoordinateInput.TryParse(CoordinateInputTextBox.Text, out var location))
+        {
+            SetCoordinateFeedback(
+                "Sai định dạng · dán đủ X, Y, Z như -238,743.261, 88,587.6, 28,509.171",
+                isError: true);
+            CoordinateInputTextBox.Focus();
+            CoordinateInputTextBox.SelectAll();
+            return;
+        }
+
+        if (!WorldCoordinateInput.TryProjectToGateway(location, out var point))
+        {
+            SetCoordinateFeedback("Tọa độ nằm ngoài bản đồ Gateway", isError: true);
+            CoordinateInputTextBox.Focus();
+            CoordinateInputTextBox.SelectAll();
+            return;
+        }
+
+        SetCoordinateFeedback("Đang tạo mốc…", isError: false);
+        var error = await TryCreateNoteAtAsync(point);
+        if (error is not null)
+        {
+            if (error.Length > 0)
+            {
+                SetCoordinateFeedback(error, isError: true);
+            }
+            return;
+        }
+
+        RenderMap();
+        SetCoordinateFeedback("Đã đặt mốc · chọn biểu tượng cho điểm vừa tạo", isError: false);
+        OpenPalette(new Point(
+            point.Left * MapSurface.ActualWidth,
+            point.Top * MapSurface.ActualHeight));
+        CoordinateInputTextBox.Focus();
+        CoordinateInputTextBox.SelectAll();
+    }
+
+    private async Task<string?> TryCreateNoteAtAsync(MapPoint point)
+    {
+        if (_noteCreationBusy)
+        {
+            return "Đang tạo mốc trước đó…";
+        }
+
+        _noteCreationBusy = true;
+        CoordinateSubmitButton.IsEnabled = false;
+        try
+        {
+            var u = Math.Clamp(point.Left, 0d, 1d);
+            var v = Math.Clamp(point.Top, 0d, 1d);
+            if (_teamState.HasActiveSession)
+            {
+                if (_teamState.ConnectionState != TeamRelayConnectionState.Live)
+                {
+                    return "Relay đang nối lại · chưa thể đặt ping nhóm";
+                }
+
+                try
+                {
+                    var ping = await App.CurrentTeam.UpsertMapPingAsync(
+                        MapNotePresentationBuilder.Mutation(
+                            Guid.NewGuid(),
+                            expectedRevision: 0,
+                            MapNoteKind.Pin,
+                            u,
+                            v),
+                        _shutdown.Token);
+                    ApplyTeamPing(ping);
+                    _selectedNoteId = ping.PingId;
+                }
+                catch (OperationCanceledException) when (_shutdown.IsCancellationRequested)
+                {
+                    return string.Empty;
+                }
+                catch (TeamMapPingException exception)
+                {
+                    return FriendlyPingError(exception);
+                }
+            }
+            else
+            {
+                var note = _store.AddDefault(u, v);
+                _selectedNoteId = note.Id;
+            }
+
+            return null;
+        }
+        finally
+        {
+            _noteCreationBusy = false;
+            CoordinateSubmitButton.IsEnabled = true;
+        }
+    }
+
+    private void SetCoordinateFeedback(string message, bool isError)
+    {
+        CoordinateFeedbackLabel.Text = message;
+        CoordinateFeedbackLabel.Foreground = BrushFrom(isError ? "#EF8D7C" : "#8FE3D0");
+        CoordinateInputBorder.BorderBrush = BrushFrom(isError ? "#C9695C" : "#8E793D");
     }
 
     private void NoteButton_Click(object sender, RoutedEventArgs e)

@@ -9,10 +9,13 @@ namespace TheIsleOverlay.TeamRelay;
 public sealed class TeamRelayClient : IAsyncDisposable
 {
     public static readonly Uri DefaultBaseUri = new("https://isle-relay.klong.dev/");
+    public static readonly TimeSpan SessionStartTimeout = TimeSpan.FromSeconds(12);
+    private static readonly TimeSpan FailedSessionCleanupTimeout = TimeSpan.FromSeconds(3);
 
     private readonly Uri _baseUri;
     private readonly HttpClient _httpClient;
     private readonly bool _ownsHttpClient;
+    private readonly TimeSpan _sessionStartTimeout;
     private readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web);
     private readonly SemaphoreSlim _lifecycleGate = new(1, 1);
     private readonly object _stateGate = new();
@@ -27,11 +30,22 @@ public sealed class TeamRelayClient : IAsyncDisposable
     private bool _intentionalStop;
     private bool _disposed;
 
-    public TeamRelayClient(Uri? baseUri = null, HttpClient? httpClient = null)
+    public TeamRelayClient(
+        Uri? baseUri = null,
+        HttpClient? httpClient = null,
+        TimeSpan? sessionStartTimeout = null)
     {
         _baseUri = EnsureTrailingSlash(baseUri ?? DefaultBaseUri);
         _httpClient = httpClient ?? new HttpClient { Timeout = TimeSpan.FromSeconds(12) };
         _ownsHttpClient = httpClient is null;
+        _sessionStartTimeout = sessionStartTimeout ?? SessionStartTimeout;
+        if (_sessionStartTimeout <= TimeSpan.Zero
+            || _sessionStartTimeout > TimeSpan.FromMinutes(1))
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(sessionStartTimeout),
+                "Session start timeout must be between zero and one minute.");
+        }
     }
 
     public event EventHandler<TeamRelayState>? StateChanged;
@@ -201,52 +215,92 @@ public sealed class TeamRelayClient : IAsyncDisposable
         CancellationToken cancellationToken)
     {
         ThrowIfDisposed();
-        await _lifecycleGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        deadline.CancelAfter(_sessionStartTimeout);
+        var operationToken = deadline.Token;
+        var gateEntered = false;
         try
         {
-            await EndCurrentSessionAsync(sendLeave: true, cancellationToken).ConfigureAwait(false);
-            SetState(
-                TeamRelayConnectionState.Connecting,
-                "Đang kết nối relay…",
-                clearSession: true,
-                clearMembers: true);
-
+            await _lifecycleGate.WaitAsync(operationToken).ConfigureAwait(false);
+            gateEntered = true;
             TeamSession? session = null;
             try
             {
-                session = await PostSessionAsync(path, request, cancellationToken).ConfigureAwait(false);
+                await EndCurrentSessionAsync(sendLeave: true, operationToken).ConfigureAwait(false);
+                SetState(
+                    TeamRelayConnectionState.Connecting,
+                    "Đang kết nối relay…",
+                    clearSession: true,
+                    clearMembers: true);
+
+                session = await PostSessionAsync(path, request, operationToken).ConfigureAwait(false);
                 _session = session;
                 SetState(TeamRelayConnectionState.Connecting, "Đang mở kênh nhóm…");
 
                 var connection = BuildConnection(session);
                 _connection = connection;
                 _intentionalStop = false;
-                await connection.StartAsync(cancellationToken).ConfigureAwait(false);
+                await connection.StartAsync(operationToken).ConfigureAwait(false);
                 StartHeartbeat(session);
                 SetState(TeamRelayConnectionState.Live);
                 return session;
             }
             catch (Exception exception)
             {
+                var failure = TimeoutFailure(exception, cancellationToken, deadline);
+                using var cleanup = new CancellationTokenSource(FailedSessionCleanupTimeout);
                 if (session is not null)
                 {
-                    await TryDeleteSessionAsync(session, cancellationToken).ConfigureAwait(false);
+                    await TryDeleteSessionAsync(session, cleanup.Token).ConfigureAwait(false);
                 }
 
-                await EndCurrentSessionAsync(sendLeave: false, cancellationToken).ConfigureAwait(false);
+                await EndCurrentSessionAsync(sendLeave: false, cleanup.Token).ConfigureAwait(false);
                 SetState(
                     TeamRelayConnectionState.Error,
-                    exception.Message,
+                    failure.Message,
                     clearSession: true,
                     clearMembers: true);
-                throw;
+                throw failure;
             }
+        }
+        catch (OperationCanceledException exception) when (
+            !gateEntered
+            && !cancellationToken.IsCancellationRequested
+            && deadline.IsCancellationRequested)
+        {
+            var failure = new TimeoutException(
+                TimeoutMessage(),
+                exception);
+            SetState(
+                TeamRelayConnectionState.Error,
+                failure.Message,
+                clearSession: true,
+                clearMembers: true);
+            throw failure;
         }
         finally
         {
-            _lifecycleGate.Release();
+            if (gateEntered)
+            {
+                _lifecycleGate.Release();
+            }
         }
     }
+
+    private Exception TimeoutFailure(
+        Exception exception,
+        CancellationToken callerToken,
+        CancellationTokenSource deadline) =>
+        exception is OperationCanceledException
+        && !callerToken.IsCancellationRequested
+        && deadline.IsCancellationRequested
+            ? new TimeoutException(
+                TimeoutMessage(),
+                exception)
+            : exception;
+
+    private string TimeoutMessage() =>
+        $"Relay không phản hồi trong {_sessionStartTimeout.TotalSeconds:0.#} giây. Hãy kiểm tra mạng rồi thử lại.";
 
     private HubConnection BuildConnection(TeamSession session)
     {
@@ -360,7 +414,17 @@ public sealed class TeamRelayClient : IAsyncDisposable
             {
             }
 
-            await connection.DisposeAsync().ConfigureAwait(false);
+            try
+            {
+                await connection.DisposeAsync()
+                    .AsTask()
+                    .WaitAsync(cancellationToken)
+                    .ConfigureAwait(false);
+            }
+            catch
+            {
+                // Cleanup must never keep create/join or app shutdown waiting forever.
+            }
         }
 
         if (heartbeatTask is not null && heartbeatTask.Id != Task.CurrentId)

@@ -272,6 +272,7 @@ public partial class HomeWindow
         TeamRelayApiException { Code: "invite_not_found" } => "Không tìm thấy mã mời hoặc nhóm đã tự hết hạn.",
         TeamRelayApiException { Code: "team_full" } => "Nhóm đã đủ thành viên.",
         TeamRelayApiException { Code: "rate_limited" } => "Bạn thao tác quá nhanh. Chờ một chút rồi thử lại.",
+        TimeoutException => "Relay không phản hồi trong 12 giây. Nút đã mở lại để bạn thử lại.",
         HttpRequestException => "Không liên lạc được isle-relay.klong.dev.",
         _ => $"Không mở được nhóm: {exception.Message}"
     };

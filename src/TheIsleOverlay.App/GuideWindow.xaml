@@ -141,7 +141,7 @@
                                 <TextBlock Text="ALT + M" Foreground="#FFE18A" FontFamily="Bahnschrift" FontSize="12" FontWeight="Bold" />
                             </Border>
                             <TextBlock Grid.Column="1" Text="PRO · ĐẶT SET POINT" Foreground="#FFE18A" FontFamily="Bahnschrift SemiCondensed" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" />
-                            <TextBlock Grid.Column="2" Text="Mở map lớn, click điểm muốn đặt và chia sẻ nhóm" Foreground="{StaticResource GuideMuted}" FontSize="11.5" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="2" Text="Mở map lớn, click hoặc dán tọa độ XYZ và chia sẻ nhóm" Foreground="{StaticResource GuideMuted}" FontSize="11.5" VerticalAlignment="Center" />
                         </Grid>
                         <Rectangle Height="1" Fill="#304A45" />
                         <Grid Height="52">

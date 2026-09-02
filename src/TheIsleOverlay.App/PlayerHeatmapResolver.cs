@@ -22,6 +22,8 @@ internal static class PlayerHeatmapResolver
                            && cell.Location.Left is >= 0d and <= 1d
                            && cell.Location.Top is >= 0d and <= 1d)
             .OrderByDescending(cell => cell.Intensity)
+            .ThenBy(cell => cell.Location.Left)
+            .ThenBy(cell => cell.Location.Top)
             .Take(MaximumHeatPoints)
             .Select(cell => new PlayerHeatPoint(
                 cell.Location,
@@ -50,4 +52,22 @@ internal readonly record struct PlayerHeatmapRenderData(
     double Radius)
 {
     public static PlayerHeatmapRenderData Empty { get; } = new([], 0d);
+
+    public bool ContentEquals(PlayerHeatmapRenderData other)
+    {
+        if (!Radius.Equals(other.Radius) || Points.Count != other.Points.Count)
+        {
+            return false;
+        }
+
+        for (var index = 0; index < Points.Count; index++)
+        {
+            if (Points[index] != other.Points[index])
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
 }

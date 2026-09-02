@@ -19,6 +19,7 @@ public partial class MainWindow
         new(StringComparer.Ordinal);
     private readonly List<PlayerHeatVisual> _playerHeatVisuals = [];
     private GatewayStaticMapLayers _staticMapLayers = GatewayStaticMapLayers.Empty;
+    private PlayerHeatmapRenderData _renderedPlayerHeatmap = PlayerHeatmapRenderData.Empty;
     private double _positionedLayerImageWidth = double.NaN;
     private double _positionedLayerImageHeight = double.NaN;
     private bool _mapLayersInitialized;
@@ -94,18 +95,24 @@ public partial class MainWindow
         MapLayerSummaryLabel.Foreground = BrushFrom("#84785A");
     }
 
-    private void SyncPlayerHeatmap(MapTelemetry? map, PlayerTelemetry? localPlayer)
+    private void SyncPlayerHeatmap(MapTelemetry? map)
     {
-        _ = localPlayer;
         var heatmap = PlayerHeatmapResolver.Resolve(map);
+        if (_renderedPlayerHeatmap.ContentEquals(heatmap))
+        {
+            return;
+        }
+
         var points = heatmap.Points;
-        _playerHeatmapAvailable = points.Count > 0;
-        if (!_playerHeatmapAvailable)
+        if (points.Count == 0)
         {
             ClearPlayerHeatmap();
             UpdateMapLayerControls();
             return;
         }
+
+        _renderedPlayerHeatmap = heatmap;
+        _playerHeatmapAvailable = true;
 
         while (_playerHeatVisuals.Count < points.Count)
         {
@@ -497,8 +504,16 @@ public partial class MainWindow
 
     private void ClearPlayerHeatmap()
     {
+        if (_renderedPlayerHeatmap.Points.Count == 0
+            && _playerHeatVisuals.Count == 0
+            && !_playerHeatmapAvailable)
+        {
+            return;
+        }
+
         MapHeatmapLayer.Children.Clear();
         _playerHeatVisuals.Clear();
+        _renderedPlayerHeatmap = PlayerHeatmapRenderData.Empty;
         _playerHeatmapAvailable = false;
         _mapLayerGeometryDirty = true;
     }

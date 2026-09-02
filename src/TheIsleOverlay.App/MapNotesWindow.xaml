@@ -37,6 +37,34 @@
                 </Setter.Value>
             </Setter>
         </Style>
+        <Style x:Key="CoordinateSubmitButtonStyle" TargetType="Button">
+            <Setter Property="Foreground" Value="#171304" />
+            <Setter Property="Background" Value="#F1C75B" />
+            <Setter Property="BorderBrush" Value="#FFE49A" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="FontFamily" Value="Bahnschrift SemiCondensed" />
+            <Setter Property="FontSize" Value="10" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Chrome" Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="2" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Chrome" Property="Background" Value="#FFE184" /></Trigger>
+                            <Trigger Property="IsPressed" Value="True"><Setter TargetName="Chrome" Property="Background" Value="#D6A83E" /></Trigger>
+                            <Trigger Property="IsEnabled" Value="False"><Setter TargetName="Chrome" Property="Opacity" Value="0.48" /></Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True"><Setter Property="BorderBrush" Value="#FFFFFF" /><Setter Property="BorderThickness" Value="2" /></Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
 
     <Border x:Name="WindowChrome" Margin="12" Background="#F2071717"
@@ -79,15 +107,62 @@
             <Border x:Name="MapFrame" Grid.Row="1" Margin="10,10,10,0"
                     Background="#102423" BorderBrush="#4A655E" BorderThickness="1"
                     ClipToBounds="True">
-                <Grid x:Name="MapSurface" Background="#102423"
-                      AutomationProperties.Name="Bề mặt đặt mốc Gateway"
-                      MouseLeftButtonUp="MapSurface_MouseLeftButtonUp"
-                      SizeChanged="MapSurface_SizeChanged">
-                    <Image x:Name="MapImage" Stretch="Fill" Opacity="0.96" IsHitTestVisible="False" />
-                    <Rectangle Fill="#0800BBAA" IsHitTestVisible="False" />
-                    <Canvas x:Name="NoteLineLayer" IsHitTestVisible="False" />
-                    <Canvas x:Name="NoteMarkerLayer" />
-                    <Canvas x:Name="PlayerLayer" IsHitTestVisible="False" />
+                <Grid>
+                    <Grid x:Name="MapSurface" Background="#102423"
+                          AutomationProperties.Name="Bề mặt đặt mốc Gateway"
+                          MouseLeftButtonUp="MapSurface_MouseLeftButtonUp"
+                          SizeChanged="MapSurface_SizeChanged">
+                        <Image x:Name="MapImage" Stretch="Fill" Opacity="0.96" IsHitTestVisible="False" />
+                        <Rectangle Fill="#0800BBAA" IsHitTestVisible="False" />
+                        <Canvas x:Name="NoteLineLayer" IsHitTestVisible="False" />
+                        <Canvas x:Name="NoteMarkerLayer" />
+                        <Canvas x:Name="PlayerLayer" IsHitTestVisible="False" />
+                    </Grid>
+
+                    <Border x:Name="CoordinateEntryPanel" Panel.ZIndex="4"
+                            Width="390" HorizontalAlignment="Left" VerticalAlignment="Top"
+                            Margin="14" Padding="10,9" CornerRadius="4"
+                            Background="#F2071513" BorderBrush="#A88E793D" BorderThickness="1">
+                        <Border.Effect>
+                            <DropShadowEffect Color="#000000" BlurRadius="16" ShadowDepth="3" Opacity="0.72" />
+                        </Border.Effect>
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <TextBlock Text="ĐẶT MỐC BẰNG TỌA ĐỘ" Foreground="#FFE18A"
+                                           FontFamily="Bahnschrift SemiCondensed" FontSize="10" FontWeight="Bold" />
+                                <TextBlock Grid.Column="1" Text="PRO · XYZ" Foreground="#8CA59D"
+                                           FontFamily="Bahnschrift" FontSize="8.5" VerticalAlignment="Center" />
+                            </Grid>
+                            <Grid Grid.Row="1" Margin="0,7,0,0">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="8" /><ColumnDefinition Width="88" /></Grid.ColumnDefinitions>
+                                <Border x:Name="CoordinateInputBorder" Background="#E50A1B18"
+                                        BorderBrush="#526B63" BorderThickness="1" CornerRadius="2">
+                                    <TextBox x:Name="CoordinateInputTextBox"
+                                             Background="Transparent" BorderThickness="0" Foreground="#F2F4EC"
+                                             CaretBrush="#FFE18A" FontFamily="Cascadia Mono, Consolas" FontSize="10.5"
+                                             Padding="8,6" VerticalContentAlignment="Center"
+                                             ToolTip="Ví dụ: -238,743.261, 88,587.6, 28,509.171"
+                                             AutomationProperties.Name="Tọa độ X Y Z để đặt mốc"
+                                             AutomationProperties.HelpText="Dán ba giá trị X Y Z rồi nhấn Enter"
+                                             KeyDown="CoordinateInputTextBox_KeyDown" />
+                                </Border>
+                                <Button x:Name="CoordinateSubmitButton" Grid.Column="2"
+                                        Style="{StaticResource CoordinateSubmitButtonStyle}"
+                                        Content="ĐẶT MỐC" Height="30" Padding="8,0"
+                                        AutomationProperties.Name="Đặt mốc theo tọa độ"
+                                        Click="CoordinateSubmitButton_Click" />
+                            </Grid>
+                            <TextBlock x:Name="CoordinateFeedbackLabel" Grid.Row="2"
+                                       Text="Dán X, Y, Z · Enter để đặt · map định vị theo X/Y"
+                                       Foreground="#7F9991" FontSize="8.8" Margin="1,6,0,0" />
+                        </Grid>
+                    </Border>
                 </Grid>
             </Border>
 

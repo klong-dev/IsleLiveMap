@@ -85,7 +85,7 @@ public static class MapZoomRules
 {
     public const double DefaultZoom = 4d;
     public const double MinimumZoom = 1d;
-    public const double MaximumZoom = 9d;
+    public const double MaximumZoom = 11.25d;
     public const double WheelStep = 0.35d;
 
     public static double ZoomIn(double current) =>
