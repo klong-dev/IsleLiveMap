@@ -18,9 +18,10 @@ public sealed class GlobalMouseShortcutHook : IDisposable
     private readonly Dispatcher _dispatcher;
     private readonly LowLevelMouseProcedure _procedure;
     private IntPtr _hook;
-    private bool _mapPanActive;
+    private volatile bool _mapPanActive;
     private long _latestMapPanPoint;
     private int _mapPanMoveQueued;
+    private int _disposed;
 
     public GlobalMouseShortcutHook(Dispatcher dispatcher)
     {
@@ -38,8 +39,18 @@ public sealed class GlobalMouseShortcutHook : IDisposable
 
     public Func<GlobalMousePoint, bool>? CanStartMapPan { get; set; }
 
+    public bool HasActiveGesture => _mapPanActive;
+
+    public static bool IsActivationKeyPressed() =>
+        (GetAsyncKeyState(VirtualKeyAlt) & 0x8000) != 0;
+
     public bool Install()
     {
+        if (Volatile.Read(ref _disposed) != 0)
+        {
+            return false;
+        }
+
         if (_hook != IntPtr.Zero)
         {
             return true;
@@ -55,9 +66,8 @@ public sealed class GlobalMouseShortcutHook : IDisposable
         return _hook != IntPtr.Zero;
     }
 
-    public void Dispose()
+    public void Uninstall()
     {
-        _mapPanActive = false;
         if (_hook == IntPtr.Zero)
         {
             return;
@@ -65,6 +75,17 @@ public sealed class GlobalMouseShortcutHook : IDisposable
 
         UnhookWindowsHookEx(_hook);
         _hook = IntPtr.Zero;
+    }
+
+    public void Dispose()
+    {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+        {
+            return;
+        }
+
+        _mapPanActive = false;
+        Uninstall();
         GC.SuppressFinalize(this);
     }
 
@@ -76,6 +97,11 @@ public sealed class GlobalMouseShortcutHook : IDisposable
         }
 
         var mouseMessage = message.ToInt32();
+        if (!_mapPanActive && mouseMessage == WmMouseMove)
+        {
+            return CallNextHookEx(_hook, code, message, data);
+        }
+
         if (_mapPanActive && mouseMessage is WmMouseMove or WmLeftButtonUp)
         {
             var point = ReadPoint(data);
@@ -91,7 +117,7 @@ public sealed class GlobalMouseShortcutHook : IDisposable
             return (IntPtr)1;
         }
 
-        if ((GetAsyncKeyState(VirtualKeyAlt) & 0x8000) != 0)
+        if (IsActivationKeyPressed())
         {
             if (mouseMessage == WmLeftButtonDown)
             {
@@ -215,3 +241,9 @@ public sealed class GlobalMouseShortcutHook : IDisposable
 }
 
 public readonly record struct GlobalMousePoint(int X, int Y);
+
+internal static class MouseShortcutActivationPolicy
+{
+    public static bool ShouldInstall(bool activationKeyPressed, bool gestureActive) =>
+        activationKeyPressed || gestureActive;
+}

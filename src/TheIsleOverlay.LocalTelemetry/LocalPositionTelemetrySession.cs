@@ -22,7 +22,7 @@ public sealed class LocalPositionTelemetrySession : ITelemetrySession
         IRemotePlayerTelemetrySource? remotePlayerSource = null)
     {
         _remoteSession = remoteSession;
-        _localSource = localSource ?? new NpcapLocalMovementSource();
+        _localSource = localSource ?? new NpcapLocalMovementSource(trackIrisSequenceDiagnostics: false);
         _sourceName = sourceName;
         _remotePlayerSource = remotePlayerSource;
     }

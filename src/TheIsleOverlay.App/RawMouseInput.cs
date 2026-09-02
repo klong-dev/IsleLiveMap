@@ -8,6 +8,7 @@ internal static class RawMouseInput
 {
     private const uint GenericDesktopUsagePage = 0x01;
     private const uint MouseUsage = 0x02;
+    private const uint RidevRemove = 0x00000001;
     private const uint RidevInputSink = 0x00000100;
     private const uint RidInput = 0x10000003;
     private const uint RimTypeMouse = 0;
@@ -28,6 +29,24 @@ internal static class RawMouseInput
                 Usage = (ushort)MouseUsage,
                 Flags = RidevInputSink,
                 Target = windowHandle
+            }
+        };
+        return RegisterRawInputDevices(
+            devices,
+            (uint)devices.Length,
+            (uint)Marshal.SizeOf<RawInputDevice>());
+    }
+
+    public static bool TryUnregister()
+    {
+        var devices = new[]
+        {
+            new RawInputDevice
+            {
+                UsagePage = (ushort)GenericDesktopUsagePage,
+                Usage = (ushort)MouseUsage,
+                Flags = RidevRemove,
+                Target = IntPtr.Zero
             }
         };
         return RegisterRawInputDevices(

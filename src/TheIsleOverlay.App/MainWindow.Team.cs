@@ -69,8 +69,6 @@ public partial class MainWindow
         App.CurrentTeam.UpdateTelemetry(
             snapshot,
             _hasMovementHeading ? _headingDegrees : null);
-        _pendingTeamState = App.CurrentTeam.CurrentState;
-        _teamStateDirty = true;
     }
 
     private void RenderTeamState(TeamRelayState state)

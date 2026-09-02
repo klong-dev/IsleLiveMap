@@ -14,13 +14,21 @@ public partial class MainWindow
 
     private readonly Dictionary<string, RemotePlayerMapDot> _remotePlayerMapDots =
         new(StringComparer.Ordinal);
+    private IReadOnlyList<RemotePlayerMapMarker> _renderedRemotePlayerMarkers = [];
 
-    private void SyncRemotePlayerMarkers(TelemetrySnapshot snapshot)
+    private bool SyncRemotePlayerMarkers(TelemetrySnapshot snapshot)
     {
         if (!HasCurrentProFeatures)
         {
-            ClearRemotePlayerMarkers();
-            return;
+            var changed = _renderedRemotePlayerMarkers.Count > 0
+                          || _remotePlayerMapDots.Count > 0
+                          || RemotePlayerCountLabel.Visibility != Visibility.Collapsed
+                          || RemoteEntityLegend.Visibility != Visibility.Collapsed;
+            if (changed)
+            {
+                ClearRemotePlayerMarkers();
+            }
+            return changed;
         }
 
         var markers = RemotePlayerMapMarkerResolver.Resolve(snapshot.Map, snapshot.Player);
@@ -42,6 +50,11 @@ public partial class MainWindow
         RemoteEntityLegend.Visibility = snapshot.ProPlayerTrackingActive
             ? Visibility.Visible
             : Visibility.Collapsed;
+
+        if (_renderedRemotePlayerMarkers.SequenceEqual(markers))
+        {
+            return false;
+        }
 
         foreach (var marker in markers)
         {
@@ -73,6 +86,9 @@ public partial class MainWindow
             RemotePlayerMarkerLayer.Children.Remove(_remotePlayerMapDots[key].Visual);
             _remotePlayerMapDots.Remove(key);
         }
+
+        _renderedRemotePlayerMarkers = markers.ToArray();
+        return true;
     }
 
     private static RemotePlayerMapDot CreateRemotePlayerDot(
@@ -195,6 +211,7 @@ public partial class MainWindow
     {
         RemotePlayerMarkerLayer.Children.Clear();
         _remotePlayerMapDots.Clear();
+        _renderedRemotePlayerMarkers = [];
         RemotePlayerCountLabel.Visibility = Visibility.Collapsed;
         RemoteEntityLegend.Visibility = Visibility.Collapsed;
     }

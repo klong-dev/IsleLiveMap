@@ -528,9 +528,18 @@ public sealed class TeamRelayClient : IAsyncDisposable
 
     private void MemberUpdated(TeamMemberSnapshot member)
     {
+        bool isLocalMember;
         lock (_stateGate)
         {
             _members[member.MemberId] = member;
+            isLocalMember = _session?.MemberId == member.MemberId;
+        }
+
+        // The sender already owns its local telemetry. Echoing that member back
+        // into WPF at 10 Hz only invalidates the overlay while the camera turns.
+        if (isLocalMember)
+        {
+            return;
         }
 
         SetState(CurrentState.ConnectionState is TeamRelayConnectionState.Reconnecting

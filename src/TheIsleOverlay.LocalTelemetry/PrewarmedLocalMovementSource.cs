@@ -28,7 +28,7 @@ public sealed class PrewarmedLocalMovementSource : ILocalMovementSource
 
     public PrewarmedLocalMovementSource(ILocalMovementSource? inner = null)
     {
-        _inner = inner ?? new NpcapLocalMovementSource();
+        _inner = inner ?? new NpcapLocalMovementSource(trackIrisSequenceDiagnostics: false);
     }
 
     public void Start()

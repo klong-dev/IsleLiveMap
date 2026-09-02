@@ -15,6 +15,7 @@ public sealed class NpcapLocalMovementSource : ILocalMovementSource
     private readonly string _processName;
     private readonly WindowsUdpPortOwnerResolver _portResolver;
     private readonly LocalMovementTracker _tracker;
+    private readonly bool _trackIrisSequenceDiagnostics;
     private readonly UnrealIrisPacketParser _irisPacketParser = new();
     private readonly IrisPacketSequenceTracker _sequenceTracker = new();
     private readonly object _movementTrackerGate = new();
@@ -29,11 +30,13 @@ public sealed class NpcapLocalMovementSource : ILocalMovementSource
     public NpcapLocalMovementSource(
         string processName = DefaultGameProcessName,
         WindowsUdpPortOwnerResolver? portResolver = null,
-        LocalMovementTracker? tracker = null)
+        LocalMovementTracker? tracker = null,
+        bool trackIrisSequenceDiagnostics = true)
     {
         _processName = processName;
         _portResolver = portResolver ?? new WindowsUdpPortOwnerResolver();
         _tracker = tracker ?? new LocalMovementTracker();
+        _trackIrisSequenceDiagnostics = trackIrisSequenceDiagnostics;
     }
 
     public async IAsyncEnumerable<LocalMovementObservation> WatchAsync(
@@ -336,7 +339,7 @@ public sealed class NpcapLocalMovementSource : ILocalMovementSource
         {
             var payload = packet.Payload;
             var observedAt = packet.ObservedAt;
-            if (packet.Outbound)
+            if (_trackIrisSequenceDiagnostics && packet.Outbound)
             {
                 ObserveIrisSequence(packet, inbound: false);
             }

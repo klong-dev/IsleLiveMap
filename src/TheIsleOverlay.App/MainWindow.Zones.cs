@@ -95,12 +95,12 @@ public partial class MainWindow
         MapLayerSummaryLabel.Foreground = BrushFrom("#84785A");
     }
 
-    private void SyncPlayerHeatmap(MapTelemetry? map)
+    private bool SyncPlayerHeatmap(MapTelemetry? map)
     {
         var heatmap = PlayerHeatmapResolver.Resolve(map);
         if (_renderedPlayerHeatmap.ContentEquals(heatmap))
         {
-            return;
+            return false;
         }
 
         var points = heatmap.Points;
@@ -108,7 +108,7 @@ public partial class MainWindow
         {
             ClearPlayerHeatmap();
             UpdateMapLayerControls();
-            return;
+            return true;
         }
 
         _renderedPlayerHeatmap = heatmap;
@@ -141,6 +141,7 @@ public partial class MainWindow
 
         _mapLayerGeometryDirty = true;
         UpdateMapLayerControls();
+        return true;
     }
 
     private static MapZoneVisual CreateMapZoneVisual(GatewayStaticMapZone zone)

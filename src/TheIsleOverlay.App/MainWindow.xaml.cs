@@ -20,6 +20,7 @@ public partial class MainWindow : Window
     private static readonly TimeSpan LiveHeadingAnimationDuration = TimeSpan.FromMilliseconds(35);
     private static readonly TimeSpan MovementHeadingAnimationDuration = TimeSpan.FromMilliseconds(80);
     private static readonly TimeSpan UiRenderInterval = TimeSpan.FromMilliseconds(50);
+    private static readonly TimeSpan MouseShortcutActivationPollInterval = TimeSpan.FromMilliseconds(25);
 
     private const int EditHotkeyId = 0x714;
     private const int ToggleMissionsNHotkeyId = 0x715;
@@ -83,8 +84,10 @@ public partial class MainWindow : Window
     private bool _remotePlayerSourceOwnedBySession;
     private bool _mapPanActive;
     private bool _rawMapPanReceived;
+    private bool _rawMouseInputRegistered;
     private DispatcherTimer? _proFeatureExpiryTimer;
     private DispatcherTimer? _uiRenderTimer;
+    private DispatcherTimer? _mouseShortcutActivationTimer;
     private MapFocusMode _mapFocusMode = MapFocusMode.FollowPlayer;
     private MapPoint? _freeMapFocus;
     private MapPoint _mapPanStartFocus = new(0.5d, 0.5d);
@@ -207,7 +210,6 @@ public partial class MainWindow : Window
         var handle = new WindowInteropHelper(this).Handle;
         _windowSource = HwndSource.FromHwnd(handle);
         _windowSource?.AddHook(WindowMessageHook);
-        RawMouseInput.TryRegister(handle);
         _editHotkeyRegistered = RegisterHotKey(handle, EditHotkeyId, ModControl | ModShift, KeyO);
         _toggleMissionsNHotkeyRegistered = RegisterHotKey(handle, ToggleMissionsNHotkeyId, ModAlt, KeyN);
         _toggleHudHotkeyRegistered = RegisterHotKey(handle, ToggleHudHotkeyId, ModAlt, KeyP);
@@ -352,7 +354,32 @@ public partial class MainWindow : Window
         _mouseShortcuts.MapPanMoved += MoveMapPan;
         _mouseShortcuts.MapPanEnded += EndMapPan;
         _mouseShortcuts.FollowMapRequested += FollowPlayerMap;
-        _mouseShortcuts.Install();
+        _mouseShortcutActivationTimer = new DispatcherTimer(
+            MouseShortcutActivationPollInterval,
+            DispatcherPriority.Background,
+            MouseShortcutActivationTimer_Tick,
+            Dispatcher);
+        _mouseShortcutActivationTimer.Start();
+    }
+
+    private void MouseShortcutActivationTimer_Tick(object? sender, EventArgs e)
+    {
+        if (_mouseShortcuts is null)
+        {
+            return;
+        }
+
+        var shouldInstall = MouseShortcutActivationPolicy.ShouldInstall(
+            GlobalMouseShortcutHook.IsActivationKeyPressed(),
+            _mouseShortcuts.HasActiveGesture);
+        if (shouldInstall)
+        {
+            _mouseShortcuts.Install();
+        }
+        else
+        {
+            _mouseShortcuts.Uninstall();
+        }
     }
 
     private void LoadMap()
@@ -506,12 +533,14 @@ public partial class MainWindow : Window
 
             UpdatedLabel.Text = $"SYNC {(snapshot.UpdatedAt ?? DateTimeOffset.Now).ToLocalTime():HH:mm:ss}";
 
+            var mapPositionChanged = !Equals(_location, player.Location)
+                                     || _mapLocation != player.MapLocation;
             UpdateHeading(player);
             _location = player.Location;
             _mapLocation = player.MapLocation;
             UpdateMapNotesPlayer();
-            SyncPlayerHeatmap(snapshot.Map);
-            SyncRemotePlayerMarkers(snapshot);
+            var heatmapChanged = SyncPlayerHeatmap(snapshot.Map);
+            var remoteMarkersChanged = SyncRemotePlayerMarkers(snapshot);
             if (_location is not null)
             {
                 var altitude = _location.Z is null ? "—" : $"{_location.Z.Value / 1000d:0.0}";
@@ -522,10 +551,19 @@ public partial class MainWindow : Window
                 CoordinateLabel.Text = "X —  Y —  Z —";
             }
 
-            PlayerMarker.Visibility = ResolvePlayerMapPoint() is null
+            var markerVisibility = ResolvePlayerMapPoint() is null
                 ? Visibility.Collapsed
                 : Visibility.Visible;
-            PositionMap();
+            var markerVisibilityChanged = PlayerMarker.Visibility != markerVisibility;
+            PlayerMarker.Visibility = markerVisibility;
+            if (MapRenderInvalidationPolicy.ShouldPositionMap(
+                    mapPositionChanged,
+                    heatmapChanged,
+                    remoteMarkersChanged,
+                    markerVisibilityChanged))
+            {
+                PositionMap();
+            }
         }
         finally
         {
@@ -799,6 +837,7 @@ public partial class MainWindow : Window
         _mapFocusMode = MapFocusMode.FreeLook;
         _mapPanStartScreenPoint = point;
         _mapPanActive = true;
+        EnableRawMouseInput();
         MapPanel.Cursor = Cursors.Hand;
         UpdateMapFocusIndicator();
     }
@@ -852,7 +891,30 @@ public partial class MainWindow : Window
             MoveMapPan(point);
         }
         _mapPanActive = false;
+        DisableRawMouseInput();
         MapPanel.Cursor = _clickThrough ? Cursors.Arrow : Cursors.SizeAll;
+    }
+
+    private void EnableRawMouseInput()
+    {
+        if (_rawMouseInputRegistered)
+        {
+            return;
+        }
+
+        _rawMouseInputRegistered = RawMouseInput.TryRegister(
+            new WindowInteropHelper(this).Handle);
+    }
+
+    private void DisableRawMouseInput()
+    {
+        if (!_rawMouseInputRegistered)
+        {
+            return;
+        }
+
+        _ = RawMouseInput.TryUnregister();
+        _rawMouseInputRegistered = false;
     }
 
     private void FollowPlayerMap()
@@ -1389,6 +1451,9 @@ public partial class MainWindow : Window
     {
         SaveOverlayLayout();
         DetachMapNotes();
+        _mouseShortcutActivationTimer?.Stop();
+        _mouseShortcutActivationTimer = null;
+        DisableRawMouseInput();
         if (_uiRenderTimer is not null)
         {
             _uiRenderTimer.Stop();
