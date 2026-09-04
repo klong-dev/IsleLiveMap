@@ -61,7 +61,7 @@ public sealed class HomeSteamLoginTests
         Assert.Contains("IslePilotRealtimeSession.Create", source, StringComparison.Ordinal);
         Assert.Contains("new LocalPositionTelemetrySession(", source, StringComparison.Ordinal);
         Assert.Contains("App.CurrentApp.TakeLocalTelemetrySource()", source, StringComparison.Ordinal);
-        Assert.Contains("CreateProPlayerSource()", source, StringComparison.Ordinal);
+        Assert.Contains("TakeProPlayerSource()", source, StringComparison.Ordinal);
     }
 
     [Fact]

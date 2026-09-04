@@ -13,6 +13,7 @@ public partial class HomeWindow
     private bool _proAccessLoading;
     private bool _proAccessInitialized;
     private Task<ProAccessSnapshot>? _proAccessInitializationTask;
+    private PrewarmedRemotePlayerTelemetrySource? _warmProTelemetry;
     private bool _premiumHomeTheme;
     private DispatcherTimer? _proExpiryTimer;
 
@@ -73,13 +74,14 @@ public partial class HomeWindow
         finally
         {
             _proAccessLoading = false;
+            await RefreshProTelemetryWarmupAsync();
             RefreshMapLaunchControls();
         }
 
         return _proAccess;
     }
 
-    private void ProAccessButton_Click(object sender, RoutedEventArgs e)
+    private async void ProAccessButton_Click(object sender, RoutedEventArgs e)
     {
         var presentation = HomeProPresentationPolicy.Evaluate(
             _proAccess,
@@ -100,6 +102,7 @@ public partial class HomeWindow
         {
             _proAccess = access;
             ApplyProAccessState(access);
+            await RefreshProTelemetryWarmupAsync();
             SourceStatusLabel.Text = access.IsPro
                 ? access.AgentReady
                     ? "Steam đã xác minh. Player + AI Tracking Pro đã sẵn sàng."
@@ -121,6 +124,7 @@ public partial class HomeWindow
         RefreshMapLaunchControls();
         try
         {
+            await StopProTelemetryWarmupAsync();
             await _proAccessService.LogoutAsync(_shutdown.Token);
             _islePilotVoiceCredentialStore.Clear();
             _proAccess = ProAccessSnapshot.SignedOut;
@@ -137,8 +141,48 @@ public partial class HomeWindow
         }
     }
 
-    private IRemotePlayerTelemetrySource? CreateProPlayerSource() =>
-        _proAccessService.CreateRemotePlayerSource();
+    private IRemotePlayerTelemetrySource? TakeProPlayerSource()
+    {
+        if (_warmProTelemetry is not null)
+        {
+            var source = _warmProTelemetry;
+            _warmProTelemetry = null;
+            return source;
+        }
+
+        return _proAccessService.CreateRemotePlayerSource();
+    }
+
+    private Task RefreshProTelemetryWarmupAsync()
+    {
+        var presentation = HomeProPresentationPolicy.Evaluate(
+            _proAccess,
+            DateTimeOffset.UtcNow);
+        if (presentation.IsVerified)
+        {
+            if (_warmProTelemetry is null
+                && _proAccessService.CreateRemotePlayerSource() is { } source)
+            {
+                _warmProTelemetry = new PrewarmedRemotePlayerTelemetrySource(source);
+                _warmProTelemetry.Start();
+            }
+
+            return Task.CompletedTask;
+        }
+
+        return StopProTelemetryWarmupAsync();
+    }
+
+    private async Task StopProTelemetryWarmupAsync()
+    {
+        if (_warmProTelemetry is not { } source)
+        {
+            return;
+        }
+
+        _warmProTelemetry = null;
+        await source.DisposeAsync();
+    }
 
     private void ApplyProAccessState(ProAccessSnapshot access)
     {
@@ -240,7 +284,7 @@ public partial class HomeWindow
         _proExpiryTimer.Start();
     }
 
-    private void ProExpiryTimer_Tick(object? sender, EventArgs e)
+    private async void ProExpiryTimer_Tick(object? sender, EventArgs e)
     {
         var now = DateTimeOffset.UtcNow;
         if (_proAccess.Entitlement.ExpiresAt is not { } expiresAt)
@@ -259,6 +303,7 @@ public partial class HomeWindow
         }
 
         _proExpiryTimer?.Stop();
+        await StopProTelemetryWarmupAsync();
         ApplyProAccessState(_proAccess);
         RefreshMapLaunchControls();
         SourceStatusLabel.Text = "Quyền Pro đã hết hạn. Home đã tự chuyển về giao diện Free.";

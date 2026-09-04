@@ -13,6 +13,10 @@ public sealed record TelemetrySnapshot
     public bool LiveDataStale { get; init; }
     public string? StatusMessage { get; init; }
     public bool ProPlayerTrackingActive { get; init; }
+    // Sequence of the latest Pro/Iris frame that contributed to this
+    // snapshot. It is diagnostic metadata only; consumers should not use it
+    // as a gameplay timestamp.
+    public long? ProPlayerSequence { get; init; }
     public RemotePlayerSyncState? ProPlayerSync { get; init; }
 }
 

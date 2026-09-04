@@ -1,4 +1,5 @@
 using System.Net.Http;
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
@@ -9,6 +10,7 @@ using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
+using System.Text.Json;
 using TheIsleOverlay.Core;
 using TheIsleOverlay.LocalTelemetry;
 
@@ -53,6 +55,8 @@ public partial class MainWindow : Window
     private ProFeatureAccessGrant _proFeatureAccess;
     private readonly OverlayLayoutSettingsStore _layoutSettingsStore = new();
     private readonly LatestValueBuffer<TelemetrySnapshot> _renderSnapshotBuffer = new();
+    private readonly object _diagnosticsGate = new();
+    private StreamWriter? _diagnosticsWriter;
     private ITelemetrySession? _telemetrySession;
     private Task? _telemetryWatchTask;
     private OverlayLayoutSettings _layoutSettings = new();
@@ -199,6 +203,91 @@ public partial class MainWindow : Window
         InitializeMapNotes();
         _layoutSettings = _layoutSettingsStore.Load();
         ApplyOverlayScale(_layoutSettings.Scale, persist: false);
+        InitializeDiagnosticsWriter();
+    }
+
+    private void InitializeDiagnosticsWriter()
+    {
+        var configuredPath = Environment.GetEnvironmentVariable("ISLE_MAP_DIAGNOSTICS_PATH");
+        if (string.IsNullOrWhiteSpace(configuredPath))
+        {
+            return;
+        }
+
+        try
+        {
+            var path = Path.GetFullPath(configuredPath);
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            _diagnosticsWriter = new StreamWriter(
+                new FileStream(path, FileMode.Append, FileAccess.Write, FileShare.ReadWrite),
+                new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false))
+            {
+                AutoFlush = true
+            };
+            WriteMapDiagnostic("window-created", null);
+        }
+        catch
+        {
+            _diagnosticsWriter = null;
+        }
+    }
+
+    private void WriteMapDiagnostic(string stage, TelemetrySnapshot? snapshot)
+    {
+        var writer = _diagnosticsWriter;
+        if (writer is null)
+        {
+            return;
+        }
+
+        var record = new
+        {
+            ReceivedAt = DateTimeOffset.UtcNow,
+            stage,
+            snapshot?.Source,
+            snapshot?.Success,
+            snapshot?.ServerOnline,
+            snapshot?.PlayerOnline,
+            snapshot?.SessionState,
+            snapshot?.UpdatedAt,
+            snapshot?.ProPlayerTrackingActive,
+            snapshot?.ProPlayerSequence,
+            snapshot?.ProPlayerSync,
+            Local = snapshot?.Player?.Location,
+            ServerEndpoint = snapshot?.Player?.Server,
+            InputMarkerCount = snapshot?.Map?.Markers.Count ?? 0,
+            RenderedMarkerCount = _renderedRemotePlayerMarkers.Count,
+            RenderedMarkers = _renderedRemotePlayerMarkers.Select(marker => new
+            {
+                marker.Key,
+                marker.Label,
+                marker.EntityKind,
+                marker.Category,
+                marker.Point,
+                marker.IsProvisional
+            }).ToArray()
+        };
+
+        try
+        {
+            lock (_diagnosticsGate)
+            {
+                _diagnosticsWriter?.WriteLine(JsonSerializer.Serialize(record));
+            }
+        }
+        catch
+        {
+            // Diagnostics must never interfere with map rendering.
+        }
+    }
+
+    private void DisposeDiagnosticsWriter()
+    {
+        lock (_diagnosticsGate)
+        {
+            _diagnosticsWriter?.Dispose();
+            _diagnosticsWriter = null;
+        }
     }
 
     private void Window_Loaded(object sender, RoutedEventArgs e)
@@ -472,6 +561,7 @@ public partial class MainWindow : Window
 
     private void RenderSnapshot(TelemetrySnapshot snapshot)
     {
+        WriteMapDiagnostic("render-start", snapshot);
         try
         {
             if (snapshot.SessionState == TelemetrySessionState.AuthenticationRequired)
@@ -567,6 +657,7 @@ public partial class MainWindow : Window
         }
         finally
         {
+            WriteMapDiagnostic("render-end", snapshot);
             PublishTeamTelemetry(snapshot);
         }
     }
@@ -1449,6 +1540,7 @@ public partial class MainWindow : Window
 
     private async void Window_Closed(object? sender, EventArgs e)
     {
+        DisposeDiagnosticsWriter();
         SaveOverlayLayout();
         DetachMapNotes();
         _mouseShortcutActivationTimer?.Stop();

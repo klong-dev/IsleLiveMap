@@ -86,6 +86,7 @@ public static class LocalPositionSnapshotMerger
                 remotePlayers,
                 location),
             ProPlayerTrackingActive = remotePlayers is not null,
+            ProPlayerSequence = verifiedLocalFallback?.Sequence,
             ProPlayerSync = verifiedLocalFallback?.PlayerSync,
             SessionState = TelemetrySessionState.Live,
             LiveDataStale = false,

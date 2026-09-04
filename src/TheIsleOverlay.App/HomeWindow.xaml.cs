@@ -37,6 +37,12 @@ public partial class HomeWindow : Window
             App.CurrentApp.EnsureLocalTelemetryWarmup();
         }
 
+        // Resolve the saved Pro entitlement concurrently with the Home
+        // modals/update check. A verified account starts its signed Agent as
+        // soon as possible, preserving one-shot Iris creation packets that
+        // would otherwise be gone by the time the user opens the map.
+        var proAccessTask = EnsureProAccessInitializedAsync();
+
         if (string.Equals(
                 Environment.GetEnvironmentVariable("ISLELIVEMAP_DEV_AUTO_CONNECT"),
                 "1",
@@ -45,7 +51,7 @@ public partial class HomeWindow : Window
             Environment.SetEnvironmentVariable("ISLELIVEMAP_DEV_AUTO_CONNECT", null);
             try
             {
-                _proAccess = await EnsureProAccessInitializedAsync();
+                _proAccess = await proAccessTask;
             }
             catch (OperationCanceledException) when (_shutdown.IsCancellationRequested)
             {
@@ -65,7 +71,7 @@ public partial class HomeWindow : Window
             var overlay = new MainWindow(
                 new LocalPositionTelemetrySession(
                     localSource: App.CurrentApp.TakeLocalTelemetrySource(),
-                    remotePlayerSource: CreateProPlayerSource()),
+                    remotePlayerSource: TakeProPlayerSource()),
                 "DIRECT",
                 ProFeatureAccessGrant.FromSnapshot(_proAccess, DateTimeOffset.UtcNow));
             Application.Current.MainWindow = overlay;
@@ -97,7 +103,7 @@ public partial class HomeWindow : Window
             guideWindow.ShowDialog();
         }
 
-        var access = await EnsureProAccessInitializedAsync();
+        var access = await proAccessTask;
         var proPresentation = HomeProPresentationPolicy.Evaluate(
             access,
             DateTimeOffset.UtcNow);
@@ -227,7 +233,7 @@ public partial class HomeWindow : Window
             var overlay = new MainWindow(
                 source,
                 loginWindow.CookieValue,
-                CreateProPlayerSource(),
+                TakeProPlayerSource(),
                 App.CurrentApp.TakeLocalTelemetrySource(),
                 ProFeatureAccessGrant.FromSnapshot(_proAccess, DateTimeOffset.UtcNow));
             Application.Current.MainWindow = overlay;
@@ -420,11 +426,12 @@ public partial class HomeWindow : Window
 
     private void CloseButton_Click(object sender, RoutedEventArgs e) => Close();
 
-    private void Window_Closed(object? sender, EventArgs e)
+    private async void Window_Closed(object? sender, EventArgs e)
     {
         DetachTeamPanel();
         StopProPresentationMonitoring();
         _shutdown.Cancel();
+        await StopProTelemetryWarmupAsync();
         _proAccessService.Dispose();
         _shutdown.Dispose();
     }

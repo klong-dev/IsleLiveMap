@@ -169,7 +169,7 @@ public partial class HomeWindow
                     session,
                     App.CurrentApp.TakeLocalTelemetrySource(),
                     "ISLEPILOT",
-                    CreateProPlayerSource()),
+                    TakeProPlayerSource()),
                 "ISLEPILOT",
                 ProFeatureAccessGrant.FromSnapshot(_proAccess, DateTimeOffset.UtcNow));
             Application.Current.MainWindow = overlay;
