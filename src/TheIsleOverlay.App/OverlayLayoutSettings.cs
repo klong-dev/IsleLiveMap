@@ -5,8 +5,9 @@ namespace TheIsleOverlay.App;
 
 public sealed record OverlayLayoutSettings
 {
-    public int Version { get; init; } = 2;
+    public int Version { get; init; } = 3;
     public double Scale { get; init; } = OverlayLayoutRules.DefaultScale;
+    public string MapShape { get; init; } = OverlayLayoutRules.SquareMapShape;
     public double? Left { get; init; }
     public double? Top { get; init; }
     public Dictionary<string, OverlayWidgetPosition> Widgets { get; init; } = new(StringComparer.OrdinalIgnoreCase);
@@ -16,6 +17,7 @@ public sealed record OverlayWidgetPosition
 {
     public double Left { get; init; }
     public double Top { get; init; }
+    public double Scale { get; init; } = OverlayLayoutRules.DefaultScale;
 }
 
 public static class OverlayLayoutRules
@@ -25,6 +27,8 @@ public static class OverlayLayoutRules
     public const string TeamWidget = "team";
     public const string PrimeWidget = "prime";
     public const string ControlsWidget = "controls";
+    public const string SquareMapShape = "square";
+    public const string CircleMapShape = "circle";
     public const double BaseWidth = 318d;
     public const double DefaultScale = 1d;
     public const double MinimumScale = 0.65d;
@@ -41,13 +45,15 @@ public static class OverlayLayoutRules
                 pair => new OverlayWidgetPosition
                 {
                     Left = FiniteOrZero(pair.Value.Left),
-                    Top = FiniteOrZero(pair.Value.Top)
+                    Top = FiniteOrZero(pair.Value.Top),
+                    Scale = NormalizeScale(pair.Value.Scale)
                 },
                 StringComparer.OrdinalIgnoreCase);
         return settings with
         {
-            Version = 2,
+            Version = 3,
             Scale = NormalizeScale(settings.Scale),
+            MapShape = NormalizeMapShape(settings.MapShape),
             Left = FiniteOrNull(settings.Left),
             Top = FiniteOrNull(settings.Top),
             Widgets = widgets
@@ -70,7 +76,25 @@ public static class OverlayLayoutRules
     public static double ScaleFromHorizontalDrag(double startingScale, double deltaDip) =>
         NormalizeScale(startingScale + deltaDip / BaseWidth);
 
+    public static double ScaleFromWidgetDrag(
+        double startingScale,
+        double horizontalDeltaDip,
+        double verticalDeltaDip)
+    {
+        var horizontal = double.IsFinite(horizontalDeltaDip) ? horizontalDeltaDip : 0d;
+        var vertical = double.IsFinite(verticalDeltaDip) ? verticalDeltaDip : 0d;
+        var dominantDelta = Math.Abs(horizontal) >= Math.Abs(vertical)
+            ? horizontal
+            : vertical;
+        return NormalizeScale(startingScale + dominantDelta / BaseWidth);
+    }
+
     public static string FormatScale(double scale) => $"{NormalizeScale(scale) * 100d:0}%";
+
+    public static string NormalizeMapShape(string? shape) =>
+        string.Equals(shape, CircleMapShape, StringComparison.OrdinalIgnoreCase)
+            ? CircleMapShape
+            : SquareMapShape;
 
     private static double? FiniteOrNull(double? value) =>
         value is { } number && double.IsFinite(number) ? number : null;

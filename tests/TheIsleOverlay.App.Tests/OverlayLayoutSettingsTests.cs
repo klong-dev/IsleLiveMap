@@ -32,6 +32,35 @@ public sealed class OverlayLayoutSettingsTests
         Assert.Equal("65%", OverlayLayoutRules.FormatScale(0.2d));
     }
 
+    [Theory]
+    [InlineData(1d, 159d, 10d, 1.5d)]
+    [InlineData(1d, 10d, -159d, 0.65d)]
+    [InlineData(1d, double.NaN, double.PositiveInfinity, 1d)]
+    public void WidgetDrag_UsesDominantAxisAndClampsIndependentScale(
+        double startingScale,
+        double horizontalDelta,
+        double verticalDelta,
+        double expected)
+    {
+        Assert.Equal(
+            expected,
+            OverlayLayoutRules.ScaleFromWidgetDrag(
+                startingScale,
+                horizontalDelta,
+                verticalDelta));
+    }
+
+    [Theory]
+    [InlineData(null, OverlayLayoutRules.SquareMapShape)]
+    [InlineData("", OverlayLayoutRules.SquareMapShape)]
+    [InlineData("circle", OverlayLayoutRules.CircleMapShape)]
+    [InlineData("CIRCLE", OverlayLayoutRules.CircleMapShape)]
+    [InlineData("unknown", OverlayLayoutRules.SquareMapShape)]
+    public void MapShape_NormalizesToSquareOrCircle(string? input, string expected)
+    {
+        Assert.Equal(expected, OverlayLayoutRules.NormalizeMapShape(input));
+    }
+
     [Fact]
     public void MapZoom_ExtendsPreviousNineTimesLimitByTwentyFivePercent()
     {
@@ -127,8 +156,9 @@ public sealed class OverlayLayoutSettingsTests
         {
             var store = new OverlayLayoutSettingsStore(path);
             var defaults = store.Load();
-            Assert.Equal(2, defaults.Version);
+            Assert.Equal(3, defaults.Version);
             Assert.Equal(OverlayLayoutRules.DefaultScale, defaults.Scale);
+            Assert.Equal(OverlayLayoutRules.SquareMapShape, defaults.MapShape);
             Assert.Null(defaults.Left);
             Assert.Null(defaults.Top);
             Assert.Empty(defaults.Widgets);
@@ -136,24 +166,27 @@ public sealed class OverlayLayoutSettingsTests
             store.Save(new OverlayLayoutSettings
             {
                 Scale = 1.37d,
+                MapShape = OverlayLayoutRules.CircleMapShape,
                 Left = 120.5d,
                 Top = 80.25d,
                 Widgets = new Dictionary<string, OverlayWidgetPosition>
                 {
-                    [OverlayLayoutRules.MapWidget] = new() { Left = 900d, Top = 70d },
+                    [OverlayLayoutRules.MapWidget] = new() { Left = 900d, Top = 70d, Scale = 1.42d },
                     [OverlayLayoutRules.StatsWidget] = new() { Left = 900d, Top = 382d }
                 }
             });
             var restored = store.Load();
             Assert.Equal(1.37d, restored.Scale);
+            Assert.Equal(OverlayLayoutRules.CircleMapShape, restored.MapShape);
             Assert.Equal(120.5d, restored.Left);
             Assert.Equal(80.25d, restored.Top);
             Assert.Equal(900d, restored.Widgets[OverlayLayoutRules.MapWidget].Left);
+            Assert.Equal(1.42d, restored.Widgets[OverlayLayoutRules.MapWidget].Scale);
             Assert.Equal(382d, restored.Widgets[OverlayLayoutRules.StatsWidget].Top);
 
             File.WriteAllText(path, "{broken");
             var recovered = store.Load();
-            Assert.Equal(2, recovered.Version);
+            Assert.Equal(3, recovered.Version);
             Assert.Equal(OverlayLayoutRules.DefaultScale, recovered.Scale);
             Assert.Null(recovered.Left);
             Assert.Null(recovered.Top);
@@ -169,7 +202,7 @@ public sealed class OverlayLayoutSettingsTests
     }
 
     [Fact]
-    public void Overlay_ExposesUniformScaleControlsOnlyForTheWholeHud()
+    public void Overlay_ExposesWholeHudAndIndependentBlockResizeControls()
     {
         var document = XDocument.Load(Path.Combine(
             AppContext.BaseDirectory,
@@ -206,6 +239,15 @@ public sealed class OverlayLayoutSettingsTests
         Assert.Equal("ResizeGrip_DragDelta", (string?)resizeGrip.Attribute("DragDelta"));
         Assert.Equal("ResizeGrip_DragCompleted", (string?)resizeGrip.Attribute("DragCompleted"));
         Assert.Equal("100%", (string?)Control("OverlayScaleLabel").Attribute("Text"));
+        Assert.Equal("MapShapeButton_Click", (string?)Control("MapShapeButton").Attribute("Click"));
+        foreach (var name in new[] { "MapResizeGrip", "StatsResizeGrip", "TeamResizeGrip", "MissionResizeGrip" })
+        {
+            var widgetGrip = Control(name);
+            Assert.Equal("Thumb", widgetGrip.Name.LocalName);
+            Assert.Equal("WidgetResizeGrip_DragStarted", (string?)widgetGrip.Attribute("DragStarted"));
+            Assert.Equal("WidgetResizeGrip_DragDelta", (string?)widgetGrip.Attribute("DragDelta"));
+            Assert.Equal("WidgetResizeGrip_DragCompleted", (string?)widgetGrip.Attribute("DragCompleted"));
+        }
         Assert.Equal("ResetWidgetLayoutButton_Click", (string?)Control("ResetWidgetLayoutButton").Attribute("Click"));
     }
 }

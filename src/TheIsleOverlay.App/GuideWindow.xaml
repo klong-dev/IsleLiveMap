@@ -132,7 +132,7 @@
                                 <TextBlock Text="CTRL + SHIFT + O" Foreground="#E9F4EE" FontFamily="Bahnschrift" FontSize="12" FontWeight="Bold" />
                             </Border>
                             <TextBlock Grid.Column="1" Text="FREE · CHỈNH OVERLAY" Foreground="#DCEAE4" FontFamily="Bahnschrift SemiCondensed" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" />
-                            <TextBlock Grid.Column="2" Text="Kéo độc lập Map, Status, Team và Prime" Foreground="{StaticResource GuideMuted}" FontSize="11.5" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="2" Text="Kéo vị trí, resize riêng từng block và đổi map Tròn / Vuông" Foreground="{StaticResource GuideMuted}" FontSize="11.5" VerticalAlignment="Center" />
                         </Grid>
                         <Rectangle Height="1" Fill="#304A45" />
                         <Grid Height="52">
@@ -207,7 +207,7 @@
                         <TextBlock Text="01  MAP CỤC BỘ + HƯỚNG QUAY" Foreground="#D8EAE4" FontFamily="Bahnschrift SemiCondensed" FontSize="11.5" FontWeight="SemiBold" Margin="0,0,0,8" />
                         <TextBlock Text="02  HP · STAMINA · HUNGER · WATER" Foreground="#D8EAE4" FontFamily="Bahnschrift SemiCondensed" FontSize="11.5" FontWeight="SemiBold" Margin="0,0,0,8" />
                         <TextBlock Text="03  PING NHÓM · OWNER QUẢN LÝ" Foreground="#FFE18A" FontFamily="Bahnschrift SemiCondensed" FontSize="11.5" FontWeight="SemiBold" Margin="0,0,0,8" />
-                        <TextBlock Text="04  MOVE TỪNG BLOCK + RESIZE HUD" Foreground="#D8EAE4" FontFamily="Bahnschrift SemiCondensed" FontSize="11.5" FontWeight="SemiBold" />
+                        <TextBlock Text="04  MOVE + RESIZE TỪNG BLOCK · MAP TRÒN" Foreground="#D8EAE4" FontFamily="Bahnschrift SemiCondensed" FontSize="11.5" FontWeight="SemiBold" />
                     </StackPanel>
                     <Rectangle Grid.Column="1" Width="1" Fill="#304A45" HorizontalAlignment="Center" />
                     <StackPanel Grid.Column="2">

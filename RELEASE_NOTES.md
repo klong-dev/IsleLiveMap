@@ -1,27 +1,19 @@
-# Isle Live Map 1.4.7
+# Isle Live Map 1.4.8
 
-## Player Tracking Pro nhanh và đầy đủ hơn
+## Tùy biến overlay cho mọi người dùng
 
-- Pro Agent khởi động ngay sau khi tài khoản Pro được xác minh tại Home, giúp giữ lại creation packet trước khi người dùng mở map.
-- Sửa parser Unreal Iris theo destroy-list hiện tại của game; các player batch nằm sau destroy entry không còn bị bỏ sót.
-- Player đã được xác minh và vẫn còn trong replication scope không còn tự biến mất chỉ vì đứng yên lâu.
-- Bổ sung phục hồi late-attach từ ongoing actor data đã kiểm chứng để giảm tình trạng vào server nhưng map trống hoặc tải player chậm.
-- Giữ marker ổn định qua các replication batch thưa, giảm nhấp nháy và rơi chấm tạm thời.
+- Nhấn `Ctrl + Shift + O` để vào chế độ chỉnh sửa như trước.
+- Mỗi block Map, Status, Team và Prime có tay nắm riêng ở góc phải dưới; kéo để thay đổi kích thước độc lập.
+- Kích thước từng block, vị trí và tỷ lệ toàn bộ HUD được lưu cục bộ, giữ nguyên ở lần mở tiếp theo.
+- Nút đặt lại layout nay khôi phục cả vị trí lẫn kích thước từng block.
 
-## Chính xác và an toàn hơn
+## Minimap tròn hoặc vuông
 
-- Packet-only recovery chỉ chấp nhận actor có bằng chứng creation của đúng loài playable; manager, replicated array, AI và local player không thể trở thành Player giả.
-- Xử lý cả packet chỉ chứa destroy event để marker rời tầm nhìn được gỡ đúng thời điểm.
-- Cache phiên mới ghi nhớ destroy barrier, không hồi sinh marker cũ sau restart.
-- Hỗ trợ nâng cấp trực tiếp từ cache của 1.4.6 bằng cửa sổ phục hồi ngắn, tránh vừa cập nhật xong phải chờ dựng lại toàn bộ player.
+- Trong bảng chỉnh layout, chọn `MAP · VUÔNG` hoặc `MAP · TRÒN` theo phong cách HUD mong muốn.
+- Minimap tròn cắt toàn bộ nội dung map, zone, marker và heatmap theo đúng hình tròn; các nút chỉnh sửa vẫn ở ngoài vùng cắt để thao tác dễ dàng.
+- Lựa chọn hình dạng được ghi nhớ và tự áp dụng khi khởi động lại.
 
-## Ổn định
+## Giữ nguyên tracking 1.4.7
 
-- Giữ nguyên toàn bộ tối ưu giảm giật camera/game của 1.4.6.
-- Luồng telemetry và UI tiếp tục dùng snapshot mới nhất; không tích lũy frame cũ.
-- Cải thiện dữ liệu chẩn đoán để có thể đối chiếu packet, tracker và marker khi cần hỗ trợ.
-
-## Phạm vi cập nhật
-
-- Cải thiện Player/AI Tracking chỉ hoạt động với tài khoản Pro hợp lệ.
-- Người dùng Free vẫn nhận các sửa lỗi host và không thể truy cập decoder hoặc telemetry Pro.
+- Bao gồm toàn bộ sửa lỗi Player/AI Tracking Pro, late-attach recovery, destroy barrier và prewarm từ Home của 1.4.7.
+- Không thay đổi quyền truy cập: tùy biến layout và map tròn là Free; decoder Player/AI tiếp tục chỉ chạy khi tài khoản có Pro hợp lệ.

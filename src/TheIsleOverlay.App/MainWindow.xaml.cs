@@ -77,6 +77,11 @@ public partial class MainWindow : Window
     private double _overlayScale = OverlayLayoutRules.DefaultScale;
     private double _resizeStartingScale;
     private Point _resizeStartingScreenPoint;
+    private readonly Dictionary<string, double> _widgetScales = new(StringComparer.OrdinalIgnoreCase);
+    private string _mapShape = OverlayLayoutRules.SquareMapShape;
+    private FrameworkElement? _resizedWidget;
+    private double _widgetResizeStartingScale;
+    private Point _widgetResizeStartingScreenPoint;
     private bool _clickThrough;
     private bool _resizingOverlay;
     private bool _hasMovementHeading;
@@ -202,7 +207,9 @@ public partial class MainWindow : Window
         InitializeComponent();
         InitializeMapNotes();
         _layoutSettings = _layoutSettingsStore.Load();
+        RestoreWidgetPresentationSettings();
         ApplyOverlayScale(_layoutSettings.Scale, persist: false);
+        ApplyMapShape(_layoutSettings.MapShape, persist: false);
         InitializeDiagnosticsWriter();
     }
 
@@ -1142,6 +1149,53 @@ public partial class MainWindow : Window
     private FrameworkElement[] WidgetPanels =>
         [MapPanel, StatsPanel, TeamPanel, MissionPanel, LayoutControls];
 
+    private FrameworkElement[] ResizableWidgetPanels =>
+        [MapPanel, StatsPanel, TeamPanel, MissionPanel];
+
+    private Thumb[] WidgetResizeGrips =>
+        [MapResizeGrip, StatsResizeGrip, TeamResizeGrip, MissionResizeGrip];
+
+    private void RestoreWidgetPresentationSettings()
+    {
+        foreach (var widget in ResizableWidgetPanels)
+        {
+            var id = WidgetId(widget);
+            _widgetScales[id] = _layoutSettings.Widgets.TryGetValue(id, out var saved)
+                ? OverlayLayoutRules.NormalizeScale(saved.Scale)
+                : OverlayLayoutRules.DefaultScale;
+        }
+
+        _mapShape = OverlayLayoutRules.NormalizeMapShape(_layoutSettings.MapShape);
+    }
+
+    private string WidgetId(FrameworkElement widget)
+    {
+        if (ReferenceEquals(widget, MapPanel)) return OverlayLayoutRules.MapWidget;
+        if (ReferenceEquals(widget, StatsPanel)) return OverlayLayoutRules.StatsWidget;
+        if (ReferenceEquals(widget, TeamPanel)) return OverlayLayoutRules.TeamWidget;
+        if (ReferenceEquals(widget, MissionPanel)) return OverlayLayoutRules.PrimeWidget;
+        if (ReferenceEquals(widget, LayoutControls)) return OverlayLayoutRules.ControlsWidget;
+        throw new ArgumentException("Unknown overlay widget.", nameof(widget));
+    }
+
+    private FrameworkElement? WidgetFromId(string? id) =>
+        id?.Trim().ToLowerInvariant() switch
+        {
+            OverlayLayoutRules.MapWidget => MapPanel,
+            OverlayLayoutRules.StatsWidget => StatsPanel,
+            OverlayLayoutRules.TeamWidget => TeamPanel,
+            OverlayLayoutRules.PrimeWidget => MissionPanel,
+            _ => null
+        };
+
+    private double WidgetScale(FrameworkElement widget) =>
+        _widgetScales.TryGetValue(WidgetId(widget), out var scale)
+            ? OverlayLayoutRules.NormalizeScale(scale)
+            : OverlayLayoutRules.DefaultScale;
+
+    private double EffectiveWidgetScale(FrameworkElement widget) =>
+        _overlayScale * WidgetScale(widget);
+
     private void WidgetPanel_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         if (_clickThrough
@@ -1236,6 +1290,97 @@ public partial class MainWindow : Window
         SaveOverlayLayout();
     }
 
+    private void WidgetResizeGrip_DragStarted(object sender, DragStartedEventArgs e)
+    {
+        if (_clickThrough || sender is not Thumb { Tag: string id })
+        {
+            return;
+        }
+
+        var widget = WidgetFromId(id);
+        if (widget is null)
+        {
+            return;
+        }
+
+        _resizedWidget = widget;
+        _widgetResizeStartingScale = WidgetScale(widget);
+        _widgetResizeStartingScreenPoint = PointToScreen(Mouse.GetPosition(this));
+        Panel.SetZIndex(widget, 80);
+        e.Handled = true;
+    }
+
+    private void WidgetResizeGrip_DragDelta(object sender, DragDeltaEventArgs e)
+    {
+        if (_resizedWidget is null)
+        {
+            return;
+        }
+
+        var current = PointToScreen(Mouse.GetPosition(this));
+        var dpi = VisualTreeHelper.GetDpi(this);
+        var horizontalDeltaDip = (current.X - _widgetResizeStartingScreenPoint.X) /
+                                 Math.Max(0.01d, dpi.DpiScaleX);
+        var verticalDeltaDip = (current.Y - _widgetResizeStartingScreenPoint.Y) /
+                               Math.Max(0.01d, dpi.DpiScaleY);
+        ApplyWidgetScale(
+            _resizedWidget,
+            OverlayLayoutRules.ScaleFromWidgetDrag(
+                _widgetResizeStartingScale,
+                horizontalDeltaDip,
+                verticalDeltaDip));
+        e.Handled = true;
+    }
+
+    private void WidgetResizeGrip_DragCompleted(object sender, DragCompletedEventArgs e)
+    {
+        FinishWidgetResize(persist: true);
+        e.Handled = true;
+    }
+
+    private void ApplyWidgetScale(FrameworkElement widget, double scale)
+    {
+        _widgetScales[WidgetId(widget)] = OverlayLayoutRules.NormalizeScale(scale);
+        var effectiveScale = EffectiveWidgetScale(widget);
+        widget.LayoutTransform = new ScaleTransform(effectiveScale, effectiveScale);
+        OverlayScaleRoot.InvalidateMeasure();
+        InvalidateMeasure();
+
+        if (IsLoaded)
+        {
+            UpdateLayout();
+            MoveWidget(
+                widget,
+                FiniteCanvasCoordinate(Canvas.GetLeft(widget)),
+                FiniteCanvasCoordinate(Canvas.GetTop(widget)),
+                snap: false);
+            if (ReferenceEquals(widget, MapPanel))
+            {
+                PositionMap();
+            }
+        }
+    }
+
+    private void FinishWidgetResize(bool persist)
+    {
+        if (_resizedWidget is null)
+        {
+            return;
+        }
+
+        var resized = _resizedWidget;
+        _resizedWidget = null;
+        foreach (var grip in WidgetResizeGrips.Where(grip => grip.IsDragging))
+        {
+            grip.CancelDrag();
+        }
+        Panel.SetZIndex(resized, 0);
+        if (persist)
+        {
+            SaveOverlayLayout();
+        }
+    }
+
     private void FinishOverlayResize()
     {
         if (!_resizingOverlay)
@@ -1256,7 +1401,8 @@ public partial class MainWindow : Window
         _overlayScale = OverlayLayoutRules.NormalizeScale(scale);
         foreach (var widget in WidgetPanels)
         {
-            widget.LayoutTransform = new ScaleTransform(_overlayScale, _overlayScale);
+            var effectiveScale = EffectiveWidgetScale(widget);
+            widget.LayoutTransform = new ScaleTransform(effectiveScale, effectiveScale);
         }
         MissionToast.LayoutTransform = new ScaleTransform(_overlayScale, _overlayScale);
         OverlayScaleLabel.Text = OverlayLayoutRules.FormatScale(_overlayScale);
@@ -1272,6 +1418,57 @@ public partial class MainWindow : Window
             KeepWidgetsVisible();
             PositionMap();
         }
+
+        if (persist)
+        {
+            SaveOverlayLayout();
+        }
+    }
+
+    private void MapShapeButton_Click(object sender, RoutedEventArgs e) =>
+        ApplyMapShape(
+            string.Equals(_mapShape, OverlayLayoutRules.CircleMapShape, StringComparison.Ordinal)
+                ? OverlayLayoutRules.SquareMapShape
+                : OverlayLayoutRules.CircleMapShape,
+            persist: true);
+
+    private void ApplyMapShape(string shape, bool persist)
+    {
+        _mapShape = OverlayLayoutRules.NormalizeMapShape(shape);
+        var isCircle = string.Equals(
+            _mapShape,
+            OverlayLayoutRules.CircleMapShape,
+            StringComparison.Ordinal);
+        MapPanel.CornerRadius = new CornerRadius(4d);
+        MapPanel.Background = isCircle ? Brushes.Transparent : BrushFrom("#0C2020");
+        MapPanel.BorderBrush = isCircle ? Brushes.Transparent : BrushFrom("#783E625B");
+        MapCircleChrome.Visibility = isCircle ? Visibility.Visible : Visibility.Collapsed;
+        MapVisualRoot.Clip = isCircle
+            ? new EllipseGeometry(new Point(152d, 152d), 151d, 151d)
+            : null;
+        MapInfoPanel.HorizontalAlignment = isCircle
+            ? HorizontalAlignment.Center
+            : HorizontalAlignment.Left;
+        MapInfoPanel.Margin = isCircle
+            ? new Thickness(0d, 27d, 0d, 0d)
+            : new Thickness(9d);
+        MapHeadingPanel.HorizontalAlignment = isCircle
+            ? HorizontalAlignment.Center
+            : HorizontalAlignment.Left;
+        MapHeadingPanel.Margin = isCircle
+            ? new Thickness(0d, 0d, 0d, 13d)
+            : new Thickness(9d);
+        MapFocusModeButton.HorizontalAlignment = isCircle
+            ? HorizontalAlignment.Center
+            : HorizontalAlignment.Left;
+        MapFocusModeButton.Margin = isCircle
+            ? new Thickness(0d, 0d, 0d, 39d)
+            : new Thickness(9d, 0d, 0d, 33d);
+        MapShapeButton.Content = isCircle ? "MAP · TRÒN" : "MAP · VUÔNG";
+        MapShapeButton.ToolTip = isCircle
+            ? "Đang dùng minimap tròn · bấm để chuyển sang vuông"
+            : "Đang dùng minimap vuông · bấm để chuyển sang tròn";
+        PositionMap();
 
         if (persist)
         {
@@ -1365,10 +1562,10 @@ public partial class MainWindow : Window
     }
 
     private double ScaledWidth(FrameworkElement widget) =>
-        Math.Max(1d, (double.IsNaN(widget.Width) ? widget.ActualWidth : widget.Width) * _overlayScale);
+        Math.Max(1d, (double.IsNaN(widget.Width) ? widget.ActualWidth : widget.Width) * EffectiveWidgetScale(widget));
 
     private double ScaledHeight(FrameworkElement widget) =>
-        Math.Max(1d, (double.IsNaN(widget.Height) ? widget.ActualHeight : widget.Height) * _overlayScale);
+        Math.Max(1d, (double.IsNaN(widget.Height) ? widget.ActualHeight : widget.Height) * EffectiveWidgetScale(widget));
 
     private static double FiniteCanvasCoordinate(double value) => double.IsFinite(value) ? value : 0d;
 
@@ -1392,6 +1589,7 @@ public partial class MainWindow : Window
         _layoutSettings = OverlayLayoutRules.Normalize(_layoutSettings with
         {
             Scale = _overlayScale,
+            MapShape = _mapShape,
             Left = null,
             Top = null,
             Widgets = new Dictionary<string, OverlayWidgetPosition>(StringComparer.OrdinalIgnoreCase)
@@ -1406,10 +1604,11 @@ public partial class MainWindow : Window
         _layoutSettingsStore.Save(_layoutSettings);
     }
 
-    private static OverlayWidgetPosition PositionOf(FrameworkElement widget) => new()
+    private OverlayWidgetPosition PositionOf(FrameworkElement widget) => new()
     {
         Left = FiniteCanvasCoordinate(Canvas.GetLeft(widget)),
-        Top = FiniteCanvasCoordinate(Canvas.GetTop(widget))
+        Top = FiniteCanvasCoordinate(Canvas.GetTop(widget)),
+        Scale = WidgetScale(widget)
     };
 
     private void ResetWidgetLayoutButton_Click(object sender, RoutedEventArgs e)
@@ -1420,6 +1619,12 @@ public partial class MainWindow : Window
             Top = null,
             Widgets = new Dictionary<string, OverlayWidgetPosition>(StringComparer.OrdinalIgnoreCase)
         };
+        _widgetScales.Clear();
+        foreach (var widget in ResizableWidgetPanels)
+        {
+            _widgetScales[WidgetId(widget)] = OverlayLayoutRules.DefaultScale;
+        }
+        ApplyOverlayScale(_overlayScale, persist: false);
         RestoreWidgetLayout();
         SaveOverlayLayout();
     }
@@ -1438,6 +1643,7 @@ public partial class MainWindow : Window
     {
         if (enabled)
         {
+            FinishWidgetResize(persist: true);
             FinishOverlayResize();
             if (_draggedWidget is not null)
             {
@@ -1459,6 +1665,10 @@ public partial class MainWindow : Window
         MapZoomControls.Visibility = enabled ? Visibility.Collapsed : Visibility.Visible;
         MapLayerControls.Visibility = enabled ? Visibility.Collapsed : Visibility.Visible;
         LayoutControls.Visibility = enabled ? Visibility.Collapsed : Visibility.Visible;
+        foreach (var grip in WidgetResizeGrips)
+        {
+            grip.Visibility = enabled ? Visibility.Collapsed : Visibility.Visible;
+        }
         foreach (var widget in WidgetPanels.Where(widget => widget != LayoutControls))
         {
             widget.Cursor = enabled ? Cursors.Arrow : Cursors.SizeAll;

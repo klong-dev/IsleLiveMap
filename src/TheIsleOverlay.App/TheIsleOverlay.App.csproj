@@ -36,7 +36,7 @@
     <Product>Isle Live Map</Product>
     <Description>Open-source live map overlay for The Isle Evrima.</Description>
     <Authors>klong-dev</Authors>
-    <Version>1.4.6</Version>
+    <Version>1.4.8</Version>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
     <ApplicationIcon>Assets\IsleLiveMap.ico</ApplicationIcon>
   </PropertyGroup>

@@ -7,6 +7,37 @@
         ResizeMode="NoResize" Topmost="True" ShowInTaskbar="True"
         FontFamily="Segoe UI Variable Text" TextOptions.TextFormattingMode="Display"
         Loaded="Window_Loaded" Closed="Window_Closed" StateChanged="Window_StateChanged">
+    <Window.Resources>
+        <Style x:Key="WidgetResizeThumb" TargetType="{x:Type primitives:Thumb}">
+            <Setter Property="Width" Value="27" />
+            <Setter Property="Height" Value="27" />
+            <Setter Property="Cursor" Value="SizeNWSE" />
+            <Setter Property="Visibility" Value="Collapsed" />
+            <Setter Property="AutomationProperties.Name" Value="Kéo để đổi kích thước riêng block" />
+            <Setter Property="ToolTip" Value="Kéo để đổi kích thước riêng block này" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type primitives:Thumb}">
+                        <Border x:Name="WidgetGripChrome" Background="#ED0A211E"
+                                BorderBrush="#8A70B9AA" BorderThickness="1" CornerRadius="2">
+                            <TextBlock Text="↘" Foreground="#8FE3D0" FontFamily="Bahnschrift"
+                                       FontSize="14" FontWeight="Bold" Margin="0,0,3,1"
+                                       HorizontalAlignment="Right" VerticalAlignment="Bottom" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="WidgetGripChrome" Property="Background" Value="#F016403A" />
+                                <Setter TargetName="WidgetGripChrome" Property="BorderBrush" Value="#B78FE3D0" />
+                            </Trigger>
+                            <Trigger Property="IsDragging" Value="True">
+                                <Setter TargetName="WidgetGripChrome" Property="Background" Value="#F0275D54" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
     <Grid x:Name="OverlayScaleRoot">
         <Canvas x:Name="WidgetCanvas">
 
@@ -20,6 +51,9 @@
                 <DropShadowEffect Color="#000000" BlurRadius="14" ShadowDepth="2" Opacity="0.58" />
             </Border.Effect>
             <Grid>
+                <Ellipse x:Name="MapCircleChrome" Fill="#0C2020" Stroke="#783E625B"
+                         StrokeThickness="1" Visibility="Collapsed" IsHitTestVisible="False" />
+                <Grid x:Name="MapVisualRoot">
                 <Canvas x:Name="MapViewport" Background="#102423" SizeChanged="MapViewport_SizeChanged" ClipToBounds="True"
                         AutomationProperties.Name="Minimap Gateway viewport">
                     <Image x:Name="MapImage" Stretch="Fill" Opacity="0.93" />
@@ -44,7 +78,7 @@
                     </Grid>
                 </Canvas>
 
-                <Border HorizontalAlignment="Left" VerticalAlignment="Top" Margin="9" Background="#B5071517" Padding="8,5">
+                <Border x:Name="MapInfoPanel" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="9" Background="#B5071517" Padding="8,5">
                     <StackPanel>
                         <TextBlock Text="GATEWAY / LIVE" Foreground="#DCE8E0" FontFamily="Bahnschrift SemiCondensed" FontSize="11" FontWeight="SemiBold" />
                         <TextBlock x:Name="CoordinateLabel" Text="X —  Y —  Z —" Foreground="#82A49B" FontFamily="Bahnschrift" FontSize="9" Margin="0,2,0,0" />
@@ -63,7 +97,7 @@
                     </StackPanel>
                 </Border>
 
-                <Border HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="9" Background="#92071517" Padding="7,4">
+                <Border x:Name="MapHeadingPanel" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="9" Background="#92071517" Padding="7,4">
                     <TextBlock x:Name="HeadingModeLabel" Text="COURSE · WAITING" Foreground="#7DA89F" FontFamily="Bahnschrift SemiCondensed" FontSize="9" />
                 </Border>
 
@@ -73,6 +107,8 @@
                         FontWeight="SemiBold" Background="#E30A1718" BorderBrush="#8A37D4C6"
                         Foreground="#72E4D8" Click="MapFocusModeButton_Click"
                         ToolTip="Map tự bám theo GPS. ALT + kéo chuột trái để quan sát tự do." />
+                <TextBlock x:Name="MapStateLabel" Text="ĐANG TẢI BẢN ĐỒ" Foreground="#A5BDB5" Background="#C0091718" Padding="10,6" HorizontalAlignment="Center" VerticalAlignment="Center" FontFamily="Bahnschrift SemiCondensed" FontSize="10" />
+                </Grid>
 
                 <StackPanel x:Name="EditToolbar" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,8,8,0">
                     <Border Background="#D7102424" BorderBrush="#4D7B7267" BorderThickness="1" CornerRadius="2" Padding="8,4" Cursor="SizeAll">
@@ -85,7 +121,7 @@
                 </StackPanel>
 
                 <StackPanel x:Name="MapLayerControls" Orientation="Horizontal"
-                            HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,8,41,8">
+                            HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,8,74,8">
                     <ToggleButton x:Name="ZoneLayerToggle" Style="{StaticResource MapLayerToggle}"
                                   Content="ZONE" IsChecked="True" Click="MapLayerToggle_Click"
                                   ToolTip="Ẩn/hiện Migration và Patrol Zones" />
@@ -97,12 +133,17 @@
                                   Click="MapLayerToggle_Click" />
                 </StackPanel>
 
-                <StackPanel x:Name="MapZoomControls" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,8,8,8">
+                <StackPanel x:Name="MapZoomControls" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,8,40,8">
                     <Button Style="{StaticResource ChromeButton}" Content="+" Width="27" Height="25" Padding="0" Click="ZoomInButton_Click" />
                     <Button Style="{StaticResource ChromeButton}" Content="−" Width="27" Height="25" Padding="0" Margin="0,4,0,0" Click="ZoomOutButton_Click" />
                 </StackPanel>
 
-                <TextBlock x:Name="MapStateLabel" Text="ĐANG TẢI BẢN ĐỒ" Foreground="#A5BDB5" Background="#C0091718" Padding="10,6" HorizontalAlignment="Center" VerticalAlignment="Center" FontFamily="Bahnschrift SemiCondensed" FontSize="10" />
+                <primitives:Thumb x:Name="MapResizeGrip" Tag="map" Panel.ZIndex="60"
+                                  Style="{StaticResource WidgetResizeThumb}"
+                                  HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,7,7"
+                                  DragStarted="WidgetResizeGrip_DragStarted"
+                                  DragDelta="WidgetResizeGrip_DragDelta"
+                                  DragCompleted="WidgetResizeGrip_DragCompleted" />
             </Grid>
         </Border>
 
@@ -183,6 +224,12 @@
                     <TextBlock Text="STATUS · MOVE" Foreground="#C9DBD5"
                                FontFamily="Bahnschrift SemiCondensed" FontSize="8" />
                 </Border>
+                <primitives:Thumb x:Name="StatsResizeGrip" Tag="stats" Panel.ZIndex="60"
+                                  Style="{StaticResource WidgetResizeThumb}"
+                                  HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,-6,-5"
+                                  DragStarted="WidgetResizeGrip_DragStarted"
+                                  DragDelta="WidgetResizeGrip_DragDelta"
+                                  DragCompleted="WidgetResizeGrip_DragCompleted" />
             </Grid>
         </Border>
 
@@ -276,6 +323,12 @@
                     <TextBlock Text="TEAM · MOVE" Foreground="#C9DBD5"
                                FontFamily="Bahnschrift SemiCondensed" FontSize="8" />
                 </Border>
+                <primitives:Thumb x:Name="TeamResizeGrip" Tag="team" Panel.ZIndex="60"
+                                  Style="{StaticResource WidgetResizeThumb}"
+                                  HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,-5,-4"
+                                  DragStarted="WidgetResizeGrip_DragStarted"
+                                  DragDelta="WidgetResizeGrip_DragDelta"
+                                  DragCompleted="WidgetResizeGrip_DragCompleted" />
             </Grid>
         </Border>
 
@@ -329,6 +382,12 @@
                     <TextBlock Text="PRIME · MOVE" Foreground="#C9DBD5"
                                FontFamily="Bahnschrift SemiCondensed" FontSize="8" />
                 </Border>
+                <primitives:Thumb x:Name="MissionResizeGrip" Tag="prime" Panel.ZIndex="60"
+                                  Style="{StaticResource WidgetResizeThumb}"
+                                  HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,-5,-4"
+                                  DragStarted="WidgetResizeGrip_DragStarted"
+                                  DragDelta="WidgetResizeGrip_DragDelta"
+                                  DragCompleted="WidgetResizeGrip_DragCompleted" />
             </Grid>
         </Border>
 
@@ -411,8 +470,27 @@
                     </primitives:Thumb.Template>
                 </primitives:Thumb>
             </Grid>
+            <Grid Margin="0,7,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="MAP SHAPE" Foreground="#789A92"
+                           FontFamily="Bahnschrift SemiCondensed" FontSize="8"
+                           VerticalAlignment="Center" Margin="0,0,8,0" />
+                <Button x:Name="MapShapeButton" Grid.Column="1"
+                        Style="{StaticResource ChromeButton}" Content="MAP · VUÔNG"
+                        Height="26" MinWidth="92" Padding="9,0"
+                        AutomationProperties.Name="Đổi minimap giữa hình vuông và hình tròn"
+                        ToolTip="Chuyển minimap giữa hình vuông và hình tròn"
+                        Click="MapShapeButton_Click" />
+                <TextBlock Grid.Column="2" Text="Kéo ↘ để resize riêng"
+                           Foreground="#789A92" FontFamily="Bahnschrift SemiCondensed"
+                           FontSize="8" VerticalAlignment="Center" HorizontalAlignment="Right" />
+            </Grid>
             <Button x:Name="ResetWidgetLayoutButton" Style="{StaticResource ChromeButton}"
-                    Content="ĐẶT LẠI VỊ TRÍ CÁC BLOCK" Height="26" Margin="0,7,0,0"
+                    Content="ĐẶT LẠI VỊ TRÍ &amp; KÍCH THƯỚC BLOCK" Height="26" Margin="0,7,0,0"
                     Foreground="#E7B74E" BorderBrush="#665A5131"
                     AutomationProperties.Name="Đặt lại vị trí các block overlay"
                     Click="ResetWidgetLayoutButton_Click" />

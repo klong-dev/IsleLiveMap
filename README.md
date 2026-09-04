@@ -56,12 +56,12 @@ Nhóm không phải tài khoản cố định: mã, thành viên và telemetry c
 | `Alt + nút chuột giữa` | Ẩn / hiện map |
 | `Alt + N` | Ẩn / hiện danh sách nhiệm vụ Prime |
 | `Alt + P` | Ẩn / hiện toàn bộ HUD |
-| `Ctrl + Shift + O` | Mở / khóa Edit Mode để kéo độc lập từng block hoặc resize HUD |
+| `Ctrl + Shift + O` | Mở / khóa Edit Mode để kéo và resize riêng từng block, chọn map Tròn / Vuông |
 | `Alt + M` | Mở / đóng toàn bản đồ để tạo, đổi loại hoặc xóa mốc |
 
 Các phím tắt hoạt động kể cả khi game hoặc ứng dụng khác đang focus. Low-level mouse hook chỉ nhận tổ hợp có `Alt`, không inject DLL và không đọc memory game.
 
-Để chỉnh bố cục, bấm `Ctrl + Shift + O`, kéo riêng Map, Status, Team hoặc Prime; dùng `− / RESET / +` hay `DRAG ↘` để resize toàn HUD. Bấm `Alt + M` để mở toàn bản đồ, click tạo mốc rồi chọn biểu tượng. Mốc cá nhân được lưu trên máy; ping nhóm chỉ tồn tại trong room relay hiện tại.
+Để chỉnh bố cục, bấm `Ctrl + Shift + O`, kéo riêng Map, Status, Team hoặc Prime; kéo tay nắm `↘` trên từng block để resize độc lập, hoặc dùng `− / RESET / +` và `DRAG ↘` trong bảng Layout để resize toàn HUD. Tại đây cũng có thể chuyển minimap giữa `MAP · VUÔNG` và `MAP · TRÒN`. Bấm `Alt + M` để mở toàn bản đồ, click tạo mốc rồi chọn biểu tượng. Mốc cá nhân được lưu trên máy; ping nhóm chỉ tồn tại trong room relay hiện tại.
 
 ## Đăng nhập và quyền riêng tư
 
