@@ -1,19 +1,19 @@
-# Isle Live Map 1.4.8
+# Isle Live Map 1.4.9
 
-## Tùy biến overlay cho mọi người dùng
+## Thông báo cập nhật hoàn chỉnh
 
-- Nhấn `Ctrl + Shift + O` để vào chế độ chỉnh sửa như trước.
-- Mỗi block Map, Status, Team và Prime có tay nắm riêng ở góc phải dưới; kéo để thay đổi kích thước độc lập.
-- Kích thước từng block, vị trí và tỷ lệ toàn bộ HUD được lưu cục bộ, giữ nguyên ở lần mở tiếp theo.
-- Nút đặt lại layout nay khôi phục cả vị trí lẫn kích thước từng block.
+- Modal **Có gì mới** được thiết kế lại thành 5 trang, giúp người dùng xem đầy đủ những thay đổi đã ra mắt trong 1.4.7 và 1.4.8.
+- Hai trang Pro giải thích Early Tracking, Late-attach Recovery, Sparse Batch Recovery, Destroy Barrier và Ghost Filtering.
+- Hai trang Free hướng dẫn đổi minimap tròn/vuông và resize riêng từng block Map, Status, Team, Prime bằng `Ctrl + Shift + O`.
+- Trang cuối tách rõ quyền Free và Pro; tùy chọn **Không hiển thị lại** chỉ xuất hiện sau khi người dùng đã xem hết nội dung.
+- Người dùng đang có Pro không thấy nút quảng bá gói Pro; người dùng Free có thể mở trang các gói Pro từ trang cuối.
 
-## Minimap tròn hoặc vuông
+## Quyền truy cập không thay đổi
 
-- Trong bảng chỉnh layout, chọn `MAP · VUÔNG` hoặc `MAP · TRÒN` theo phong cách HUD mong muốn.
-- Minimap tròn cắt toàn bộ nội dung map, zone, marker và heatmap theo đúng hình tròn; các nút chỉnh sửa vẫn ở ngoài vùng cắt để thao tác dễ dàng.
-- Lựa chọn hình dạng được ghi nhớ và tự áp dụng khi khởi động lại.
+- **Free:** map tròn/vuông, di chuyển và resize từng block, lưu layout cục bộ.
+- **Pro:** Player/AI Tracking, Early Tracking và các lớp phục hồi state nâng cao của Pro Agent 0.3.21.
 
-## Giữ nguyên tracking 1.4.7
+## Tương thích
 
-- Bao gồm toàn bộ sửa lỗi Player/AI Tracking Pro, late-attach recovery, destroy barrier và prewarm từ Home của 1.4.7.
-- Không thay đổi quyền truy cập: tùy biến layout và map tròn là Free; decoder Player/AI tiếp tục chỉ chạy khi tài khoản có Pro hợp lệ.
+- Không thay đổi decoder, tracking runtime hay quyền Pro so với 1.4.8.
+- Cập nhật này tập trung vào onboarding để người dùng nhận biết và sử dụng đúng các tính năng mới.

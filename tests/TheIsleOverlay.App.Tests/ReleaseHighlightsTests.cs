@@ -28,7 +28,7 @@ public sealed class ReleaseHighlightsTests
     }
 
     [Fact]
-    public void Modal_IsAFourStepFreeAndProBriefingWithFinalOptOut()
+    public void Modal_IsAFiveStep147And148BriefingWithFinalOptOut()
     {
         var document = XDocument.Load(Path.Combine(
             AppContext.BaseDirectory,
@@ -51,36 +51,44 @@ public sealed class ReleaseHighlightsTests
                 (string?)element.Attribute("Content")
             }));
 
-        Assert.Equal("1.4.5", ReleaseHighlightsWindow.ReleaseVersion);
-        Assert.Equal(4, ReleaseHighlightsWindow.PageCount);
-        Assert.Contains("FREE + PRO · PERFORMANCE", allCopy, StringComparison.Ordinal);
-        Assert.Contains("20 HZ UI", allCopy, StringComparison.Ordinal);
-        Assert.Contains("LATEST SNAPSHOT", allCopy, StringComparison.Ordinal);
-        Assert.Contains("zoom tối đa tăng thêm 25%", allCopy, StringComparison.Ordinal);
-        Assert.Contains("PRO · ALT + M", allCopy, StringComparison.Ordinal);
-        Assert.Contains("CLICK HOẶC DÁN XYZ", allCopy, StringComparison.Ordinal);
-        Assert.Contains("CHIA SẺ CHO NHÓM", allCopy, StringComparison.Ordinal);
-        Assert.Contains("PRO · MAP ZONES", allCopy, StringComparison.Ordinal);
-        Assert.Contains("PLAYER ĐƯỢC DỰNG NHANH VÀ ĐỦ HƠN", allCopy, StringComparison.Ordinal);
+        Assert.Equal("1.4.9", ReleaseHighlightsWindow.ReleaseVersion);
+        Assert.Equal(5, ReleaseHighlightsWindow.PageCount);
+        Assert.Contains("PRO · v1.4.7", allCopy, StringComparison.Ordinal);
+        Assert.Contains("MAP BẮT ĐẦU NGHE TRƯỚC KHI BẠN MỞ", allCopy, StringComparison.Ordinal);
+        Assert.Contains("ONGOING ACTOR", allCopy, StringComparison.Ordinal);
+        Assert.Contains("SPARSE BATCH", allCopy, StringComparison.Ordinal);
+        Assert.Contains("DESTROY EVENT", allCopy, StringComparison.Ordinal);
+        Assert.Contains("FREE · v1.4.8", allCopy, StringComparison.Ordinal);
+        Assert.Contains("MAP · TRÒN", allCopy, StringComparison.Ordinal);
+        Assert.Contains("CTRL + SHIFT + O", allCopy, StringComparison.Ordinal);
+        Assert.Contains("4 BLOCK. 4 KÍCH THƯỚC RIÊNG", allCopy, StringComparison.Ordinal);
+        Assert.Contains("Không hiển thị lại thông báo này cho phiên bản 1.4.9", allCopy, StringComparison.Ordinal);
         Assert.Equal(
             "HOÀN TẤT",
             (string?)Control("FinishButton").Attribute("Content"));
-        Assert.NotNull(Control("DoNotShowAgainCheckBox"));
+        for (var step = 1; step <= ReleaseHighlightsWindow.PageCount; step++)
+        {
+            Assert.NotNull(Control($"Page{NumberWord(step)}"));
+            Assert.NotNull(Control($"Step{NumberWord(step)}Marker"));
+        }
+
+        var optOut = Control("DoNotShowAgainCheckBox");
+        Assert.Contains(
+            optOut.Ancestors(),
+            ancestor => string.Equals(
+                (string?)ancestor.Attribute(nameAttribute),
+                "PageFive",
+                StringComparison.Ordinal));
         Assert.Equal("https://isle.klong.dev/", ReleaseHighlightsWindow.ProLandingPageUri.AbsoluteUri);
 
-        var setPointPreview = Assert.Single(
-            document.Descendants(),
-            element => string.Equals(
-                (string?)element.Attribute("Source"),
-                ReleaseHighlightsWindow.SetPointPreviewResourcePath,
-                StringComparison.Ordinal));
-        Assert.Equal("Image", setPointPreview.Name.LocalName);
-        var zonePreview = Assert.Single(
-            document.Descendants(),
-            element => string.Equals(
-                (string?)element.Attribute("Source"),
-                ReleaseHighlightsWindow.MapZonePreviewResourcePath,
-                StringComparison.Ordinal));
-        Assert.Equal("Image", zonePreview.Name.LocalName);
+        static string NumberWord(int value) => value switch
+        {
+            1 => "One",
+            2 => "Two",
+            3 => "Three",
+            4 => "Four",
+            5 => "Five",
+            _ => throw new ArgumentOutOfRangeException(nameof(value))
+        };
     }
 }

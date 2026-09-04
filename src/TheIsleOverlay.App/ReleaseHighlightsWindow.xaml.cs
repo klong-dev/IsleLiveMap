@@ -10,10 +10,8 @@ namespace TheIsleOverlay.App;
 
 public partial class ReleaseHighlightsWindow : Window
 {
-    public const string ReleaseVersion = "1.4.5";
-    public const int PageCount = 4;
-    public const string SetPointPreviewResourcePath = "Assets/SetPointTip.png";
-    public const string MapZonePreviewResourcePath = "Assets/MapZoneTip.png";
+    public const string ReleaseVersion = "1.4.9";
+    public const int PageCount = 5;
 
     private static readonly Brush ActiveMarkerBrush = new SolidColorBrush(Color.FromRgb(0xF1, 0xC7, 0x5B));
     private static readonly Brush ActiveDigitBrush = new SolidColorBrush(Color.FromRgb(0x16, 0x13, 0x04));
@@ -38,8 +36,8 @@ public partial class ReleaseHighlightsWindow : Window
         _preferenceStore = preferenceStore ?? new ReleaseHighlightsPreferenceStore();
         InitializeComponent();
 
-        _pages = [PageOne, PageTwo, PageThree, PageFour];
-        _markers = [StepOneMarker, StepTwoMarker, StepThreeMarker, StepFourMarker];
+        _pages = [PageOne, PageTwo, PageThree, PageFour, PageFive];
+        _markers = [StepOneMarker, StepTwoMarker, StepThreeMarker, StepFourMarker, StepFiveMarker];
         var displayedVersion = string.IsNullOrWhiteSpace(version) ? ReleaseVersion : version.Trim();
         TitleVersionLabel.Text = $"   ISLE LIVE MAP · v{displayedVersion}";
         UpdatePage();
