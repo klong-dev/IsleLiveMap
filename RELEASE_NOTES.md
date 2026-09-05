@@ -1,19 +1,19 @@
-# Isle Live Map 1.4.9
+# Isle Live Map 1.5.0
 
-## Thông báo cập nhật hoàn chỉnh
+## Kích hoạt Pro rõ ràng hơn
 
-- Modal **Có gì mới** được thiết kế lại thành 5 trang, giúp người dùng xem đầy đủ những thay đổi đã ra mắt trong 1.4.7 và 1.4.8.
-- Hai trang Pro giải thích Early Tracking, Late-attach Recovery, Sparse Batch Recovery, Destroy Barrier và Ghost Filtering.
-- Hai trang Free hướng dẫn đổi minimap tròn/vuông và resize riêng từng block Map, Status, Team, Prime bằng `Ctrl + Shift + O`.
-- Trang cuối tách rõ quyền Free và Pro; tùy chọn **Không hiển thị lại** chỉ xuất hiện sau khi người dùng đã xem hết nội dung.
-- Người dùng đang có Pro không thấy nút quảng bá gói Pro; người dùng Free có thể mở trang các gói Pro từ trang cuối.
+- Modal xác minh Steam/Pro được viết lại với điểm nhấn **CHỈ TỪ 28K** ngay ở tiêu đề và khu vực license.
+- Nội dung giải thích ngắn gọn: quyền Pro đi theo SteamID64, không giới hạn thiết bị và không tạo khóa theo máy.
+- Dòng trạng thái trong modal cũng giữ thông tin giá để người dùng luôn thấy lựa chọn nâng cấp trong lúc chờ Steam xác minh.
+- Khu vực Pro trên Home hiển thị rõ **KÍCH HOẠT PRO · CHỈ TỪ 28K** khi tài khoản chưa có quyền; giao diện Gold của tài khoản Pro vẫn giữ nguyên.
 
-## Quyền truy cập không thay đổi
+## Luồng khởi động gọn hơn
 
-- **Free:** map tròn/vuông, di chuyển và resize từng block, lưu layout cục bộ.
-- **Pro:** Player/AI Tracking, Early Tracking và các lớp phục hồi state nâng cao của Pro Agent 0.3.21.
+- Đã bỏ modal donate tự động khi mở ứng dụng.
+- Modal hướng dẫn và modal release highlights 1.4.9 không thay đổi.
+- DonateWindow và tài sản donate vẫn được giữ trong ứng dụng cho các luồng gọi chủ động trong tương lai.
 
-## Tương thích
+## Tương thích và quyền truy cập
 
-- Không thay đổi decoder, tracking runtime hay quyền Pro so với 1.4.8.
-- Cập nhật này tập trung vào onboarding để người dùng nhận biết và sử dụng đúng các tính năng mới.
+- Không thay đổi decoder, tracking, map, layout hoặc phân quyền Free/Pro.
+- Free tiếp tục hoạt động độc lập; Player/AI Tracking Pro chỉ chạy khi entitlement Pro còn hiệu lực.

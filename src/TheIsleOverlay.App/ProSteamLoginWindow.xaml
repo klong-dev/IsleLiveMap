@@ -2,7 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
-        Title="Steam · Isle Live Map Pro" Width="1060" Height="760"
+        Title="Kích hoạt Isle Live Map Pro · chỉ từ 28K" Width="1060" Height="760"
         MinWidth="820" MinHeight="620" WindowStartupLocation="CenterOwner"
         Background="#071716" Foreground="#E9F4EE"
         FontFamily="Segoe UI Variable Text"
@@ -23,18 +23,18 @@
                 </Grid.ColumnDefinitions>
                 <Rectangle Fill="#E7B74E" RadiusX="1" RadiusY="1" Margin="0,13" />
                 <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="14,0,0,0">
-                    <TextBlock Text="XÁC MINH STEAM / PRO ACCESS"
+                    <TextBlock Text="KÍCH HOẠT STEAM / PRO ACCESS"
                                FontFamily="Bahnschrift SemiCondensed" FontSize="18"
-                               FontWeight="SemiBold" />
-                    <TextBlock Text="Quyền sử dụng đi theo SteamID64, không giới hạn thiết bị"
+                               FontWeight="Bold" Foreground="#FFE5A0" />
+                    <TextBlock Text="Một lần mua · dùng theo SteamID64 · không giới hạn thiết bị"
                                Foreground="#9B9A78" FontSize="10.5" Margin="0,3,0,0" />
                 </StackPanel>
                 <StackPanel Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right">
-                    <TextBlock Text="ACCOUNT LICENSE" Foreground="#FFE18A"
-                               FontFamily="Bahnschrift SemiCondensed" FontSize="10"
-                               FontWeight="SemiBold" HorizontalAlignment="Right" />
-                    <TextBlock Text="STEAM OPENID · PKCE" Foreground="#6F806D"
-                               FontFamily="Bahnschrift" FontSize="9" Margin="0,3,0,0"
+                    <TextBlock Text="CHỈ TỪ 28K" Foreground="#F1C75B"
+                               FontFamily="Bahnschrift SemiCondensed" FontSize="17"
+                               FontWeight="Bold" HorizontalAlignment="Right" />
+                    <TextBlock Text="PRO ACCESS · STEAMID64"
+                               Foreground="#FFE18A" FontFamily="Bahnschrift" FontSize="9" Margin="0,3,0,0"
                                HorizontalAlignment="Right" />
                 </StackPanel>
             </Grid>
@@ -63,7 +63,7 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <TextBlock x:Name="LoginStatusLabel"
-                           Text="Chỉ SteamID64 và token mã hóa DPAPI được lưu; không tạo khóa theo thiết bị."
+                           Text="CHỈ TỪ 28K · SteamID64 và token mã hóa DPAPI được lưu; không tạo khóa theo thiết bị."
                            Foreground="#8F9E8A" FontSize="10.5" VerticalAlignment="Center"
                            TextWrapping="Wrap" />
                 <Button Grid.Column="1" Content="THỬ LẠI" Padding="15,7" Margin="10,0,0,0"

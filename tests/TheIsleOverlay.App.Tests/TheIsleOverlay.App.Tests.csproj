@@ -42,6 +42,9 @@
     <Content Include="..\..\src\TheIsleOverlay.App\DonateWindow.xaml"
              Link="TestAssets\DonateWindow.xaml"
              CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\src\TheIsleOverlay.App\ProSteamLoginWindow.xaml"
+             Link="TestAssets\ProSteamLoginWindow.xaml"
+             CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\..\src\TheIsleOverlay.App\GuideWindow.xaml"
              Link="TestAssets\GuideWindow.xaml"
              CopyToOutputDirectory="PreserveNewest" />

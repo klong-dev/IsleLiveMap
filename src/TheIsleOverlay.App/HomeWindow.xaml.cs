@@ -32,7 +32,7 @@ public partial class HomeWindow : Window
         InitializeTeamPanel();
         if (NpcapAvailabilityProbe.Check().IsAvailable)
         {
-            // Begin outbound movement capture before update/donate/help modals
+            // Begin outbound movement capture before update and help modals
             // so direct GPS is ready as soon as the overlay opens.
             App.CurrentApp.EnsureLocalTelemetryWarmup();
         }
@@ -82,17 +82,8 @@ public partial class HomeWindow : Window
 
         // Start the network check before the modal sequence. ShowDialog keeps a
         // dispatcher frame alive, so update I/O continues while the user reads
-        // donate/help content instead of adding another wait afterwards.
+        // the help content instead of adding another wait afterwards.
         var updateCheckTask = CheckForUpdatesAsync();
-
-        if (App.CurrentApp.TryMarkDonatePromptShown())
-        {
-            var donateWindow = new DonateWindow
-            {
-                Owner = this
-            };
-            donateWindow.ShowDialog();
-        }
 
         if (App.CurrentApp.TryMarkGuidePromptShown())
         {

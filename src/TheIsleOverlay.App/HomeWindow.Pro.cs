@@ -365,7 +365,7 @@ public partial class HomeWindow
             : "  OPEN TELEMETRY CLIENT";
         ProSectionHeading.Text = premium
             ? "PRO ACCESS · ĐÃ KÍCH HOẠT"
-            : "KÍCH HOẠT PRO";
+            : "KÍCH HOẠT PRO · CHỈ TỪ 28K";
         ApplyMapLaunchAccent();
     }
 }

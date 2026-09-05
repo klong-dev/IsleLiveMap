@@ -45,9 +45,44 @@ public sealed class HomeSteamLoginTests
             .Where(value => value is not null)
             .ToArray();
         Assert.Contains("KÍCH HOẠT LIVE MAP", text);
-        Assert.Contains("KÍCH HOẠT PRO", text);
+        Assert.Contains("KÍCH HOẠT PRO · CHỈ TỪ 28K", text);
         Assert.Contains("GPS trực tiếp · Dino stats đồng bộ qua IslePilot", text);
         Assert.DoesNotContain("SERVER DÙNG WEBSITE RIÊNG", text);
+    }
+
+    [Fact]
+    public void ProActivationModal_LeadsWithPriceAndSteamIdLicenseTerms()
+    {
+        var document = XDocument.Load(Path.Combine(
+            AppContext.BaseDirectory,
+            "TestAssets",
+            "ProSteamLoginWindow.xaml"));
+
+        var allCopy = string.Join(
+            " ",
+            document.Descendants().SelectMany(element => new[]
+            {
+                (string?)element.Attribute("Text"),
+                (string?)element.Attribute("Content"),
+                (string?)element.Attribute("Title")
+            }));
+
+        Assert.Contains("CHỈ TỪ 28K", allCopy, StringComparison.Ordinal);
+        Assert.Contains("KÍCH HOẠT STEAM / PRO ACCESS", allCopy, StringComparison.Ordinal);
+        Assert.Contains("SteamID64", allCopy, StringComparison.Ordinal);
+        Assert.DoesNotContain("XÁC MINH STEAM / PRO ACCESS", allCopy, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void HomeStartup_DoesNotShowDonateModal()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            AppContext.BaseDirectory,
+            "TestAssets",
+            "HomeWindow.xaml.cs"));
+
+        Assert.DoesNotContain("TryMarkDonatePromptShown", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("new DonateWindow", source, StringComparison.Ordinal);
     }
 
     [Fact]

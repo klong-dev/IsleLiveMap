@@ -371,7 +371,7 @@
 
                     <Rectangle Height="1" Fill="{DynamicResource HomeLine}" Margin="0,0,0,14" />
 
-                    <TextBlock x:Name="ProSectionHeading" Text="KÍCH HOẠT PRO"
+                    <TextBlock x:Name="ProSectionHeading" Text="KÍCH HOẠT PRO · CHỈ TỪ 28K"
                                Foreground="{DynamicResource HomeAccentBright}" FontSize="11.5"
                                FontWeight="SemiBold" Margin="0,0,0,9" />
 
