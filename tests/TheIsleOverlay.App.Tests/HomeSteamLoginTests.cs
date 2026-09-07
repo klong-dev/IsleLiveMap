@@ -83,6 +83,60 @@ public sealed class HomeSteamLoginTests
 
         Assert.DoesNotContain("TryMarkDonatePromptShown", source, StringComparison.Ordinal);
         Assert.DoesNotContain("new DonateWindow", source, StringComparison.Ordinal);
+        Assert.Null(typeof(HomeWindow).Assembly.GetType("TheIsleOverlay.App.DonateWindow"));
+    }
+
+    [Fact]
+    public void HomeStartup_ShowsDedicatedProPromotionOnlyWithoutCurrentAccess()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            AppContext.BaseDirectory,
+            "TestAssets",
+            "HomeWindow.xaml.cs"));
+
+        Assert.Contains("if (proPresentation.ShowPromotion)", source, StringComparison.Ordinal);
+        Assert.Contains("new ProPromotionWindow", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ProPromotion_LeadsWithPriceAndLinksToLandingPage()
+    {
+        var document = XDocument.Load(Path.Combine(
+            AppContext.BaseDirectory,
+            "TestAssets",
+            "ProPromotionWindow.xaml"));
+        XName nameAttribute = "{http://schemas.microsoft.com/winfx/2006/xaml}Name";
+
+        XElement Control(string name) => Assert.Single(
+            document.Descendants(),
+            element => string.Equals(
+                (string?)element.Attribute(nameAttribute),
+                name,
+                StringComparison.Ordinal));
+
+        var allCopy = string.Join(
+            " ",
+            document.Descendants().SelectMany(element => new[]
+            {
+                (string?)element.Attribute("Text"),
+                (string?)element.Attribute("Content")
+            }));
+
+        Assert.Contains("CHỈ TỪ 28K", allCopy, StringComparison.Ordinal);
+        Assert.Contains("FULL TẤT CẢ SERVER", allCopy, StringComparison.Ordinal);
+        Assert.Contains("Không phải hack", allCopy, StringComparison.Ordinal);
+        Assert.Equal(
+            "KÍCH HOẠT PRO NGAY",
+            (string?)Control("ActivateProButton").Attribute("Content"));
+        Assert.Contains(
+            document.Descendants(),
+            element => string.Equals(
+                (string?)element.Attribute("Source"),
+                "Assets/ProMapPreview.png",
+                StringComparison.Ordinal));
+        Assert.Equal(
+            "https://isle.klong.dev/",
+            ProPromotionWindow.ProLandingPageUri.AbsoluteUri);
     }
 
     [Fact]

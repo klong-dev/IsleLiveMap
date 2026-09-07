@@ -5,7 +5,6 @@ namespace TheIsleOverlay.App;
 
 public partial class App : Application
 {
-    private int _donatePromptShown;
     private int _guidePromptShown;
     private readonly object _localTelemetryGate = new();
     private PrewarmedLocalMovementSource? _warmLocalTelemetry;
@@ -20,9 +19,6 @@ public partial class App : Application
     public static App CurrentApp => (App)Current;
 
     public static TeamCoordinator CurrentTeam => ((App)Current).Team;
-
-    public bool TryMarkDonatePromptShown() =>
-        Interlocked.Exchange(ref _donatePromptShown, 1) == 0;
 
     public bool TryMarkGuidePromptShown() =>
         Interlocked.Exchange(ref _guidePromptShown, 1) == 0;

@@ -18,6 +18,7 @@ public sealed class HomeProPresentationPolicyTests
 
         Assert.True(presentation.HasCurrentProAccess);
         Assert.True(presentation.IsVerified);
+        Assert.False(presentation.ShowPromotion);
         Assert.Equal("MỞ MAP PRO", presentation.MapTitle);
         Assert.Equal("MỞ MAP PRO  →", presentation.MapAction);
     }
@@ -33,6 +34,7 @@ public sealed class HomeProPresentationPolicyTests
 
         Assert.True(presentation.HasCurrentProAccess);
         Assert.False(presentation.IsVerified);
+        Assert.False(presentation.ShowPromotion);
         Assert.Equal("MỞ MAP PRO", presentation.MapTitle);
     }
 
@@ -47,8 +49,21 @@ public sealed class HomeProPresentationPolicyTests
 
         Assert.False(presentation.HasCurrentProAccess);
         Assert.False(presentation.IsVerified);
+        Assert.True(presentation.ShowPromotion);
         Assert.Equal("MỞ LIVE MAP", presentation.MapTitle);
         Assert.Equal("MỞ MAP  →", presentation.MapAction);
+    }
+
+    [Fact]
+    public void FreeAccount_ShowsProPromotion()
+    {
+        var access = Snapshot(
+            new ProEntitlement("free", "active", null),
+            agentReady: false);
+
+        var presentation = HomeProPresentationPolicy.Evaluate(access, Now);
+
+        Assert.True(presentation.ShowPromotion);
     }
 
     private static ProAccessSnapshot Snapshot(

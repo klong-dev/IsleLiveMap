@@ -5,6 +5,7 @@ namespace TheIsleOverlay.App;
 internal readonly record struct HomeProPresentationState(
     bool HasCurrentProAccess,
     bool IsVerified,
+    bool ShowPromotion,
     string MapTitle,
     string MapAction);
 
@@ -20,6 +21,7 @@ internal static class HomeProPresentationPolicy
         return new HomeProPresentationState(
             hasCurrentProAccess,
             isVerified,
+            !hasCurrentProAccess,
             hasCurrentProAccess ? "MỞ MAP PRO" : "MỞ LIVE MAP",
             hasCurrentProAccess ? "MỞ MAP PRO  →" : "MỞ MAP  →");
     }

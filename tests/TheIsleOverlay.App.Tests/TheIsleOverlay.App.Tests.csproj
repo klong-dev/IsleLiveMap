@@ -39,11 +39,11 @@
     <Content Include="..\..\src\TheIsleOverlay.App\MapNotesWindow.xaml"
              Link="TestAssets\MapNotesWindow.xaml"
              CopyToOutputDirectory="PreserveNewest" />
-    <Content Include="..\..\src\TheIsleOverlay.App\DonateWindow.xaml"
-             Link="TestAssets\DonateWindow.xaml"
-             CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\..\src\TheIsleOverlay.App\ProSteamLoginWindow.xaml"
              Link="TestAssets\ProSteamLoginWindow.xaml"
+             CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\src\TheIsleOverlay.App\ProPromotionWindow.xaml"
+             Link="TestAssets\ProPromotionWindow.xaml"
              CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\..\src\TheIsleOverlay.App\GuideWindow.xaml"
              Link="TestAssets\GuideWindow.xaml"

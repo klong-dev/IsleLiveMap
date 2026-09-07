@@ -112,6 +112,15 @@ public partial class HomeWindow : Window
             highlightsWindow.ShowDialog();
         }
 
+        if (proPresentation.ShowPromotion)
+        {
+            var proPromotionWindow = new ProPromotionWindow
+            {
+                Owner = this
+            };
+            proPromotionWindow.ShowDialog();
+        }
+
         try
         {
             await updateCheckTask;
