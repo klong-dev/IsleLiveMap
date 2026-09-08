@@ -94,7 +94,7 @@ public sealed class HomeSteamLoginTests
             "TestAssets",
             "HomeWindow.xaml.cs"));
 
-        Assert.Contains("if (proPresentation.ShowPromotion)", source, StringComparison.Ordinal);
+        Assert.Contains("ShowProPromotionIfNeeded", source, StringComparison.Ordinal);
         Assert.Contains("new ProPromotionWindow", source, StringComparison.Ordinal);
     }
 

@@ -10,7 +10,7 @@ namespace TheIsleOverlay.App;
 
 public partial class ReleaseHighlightsWindow : Window
 {
-    public const string ReleaseVersion = "1.4.9";
+    public const string ReleaseVersion = "1.5.2";
     public const int PageCount = 5;
 
     private static readonly Brush ActiveMarkerBrush = new SolidColorBrush(Color.FromRgb(0xF1, 0xC7, 0x5B));

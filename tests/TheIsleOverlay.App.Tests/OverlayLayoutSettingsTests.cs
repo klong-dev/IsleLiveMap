@@ -156,9 +156,10 @@ public sealed class OverlayLayoutSettingsTests
         {
             var store = new OverlayLayoutSettingsStore(path);
             var defaults = store.Load();
-            Assert.Equal(3, defaults.Version);
+            Assert.Equal(4, defaults.Version);
             Assert.Equal(OverlayLayoutRules.DefaultScale, defaults.Scale);
             Assert.Equal(OverlayLayoutRules.SquareMapShape, defaults.MapShape);
+            Assert.True(defaults.MissionsVisible);
             Assert.Null(defaults.Left);
             Assert.Null(defaults.Top);
             Assert.Empty(defaults.Widgets);
@@ -167,6 +168,7 @@ public sealed class OverlayLayoutSettingsTests
             {
                 Scale = 1.37d,
                 MapShape = OverlayLayoutRules.CircleMapShape,
+                MissionsVisible = false,
                 Left = 120.5d,
                 Top = 80.25d,
                 Widgets = new Dictionary<string, OverlayWidgetPosition>
@@ -178,6 +180,7 @@ public sealed class OverlayLayoutSettingsTests
             var restored = store.Load();
             Assert.Equal(1.37d, restored.Scale);
             Assert.Equal(OverlayLayoutRules.CircleMapShape, restored.MapShape);
+            Assert.False(restored.MissionsVisible);
             Assert.Equal(120.5d, restored.Left);
             Assert.Equal(80.25d, restored.Top);
             Assert.Equal(900d, restored.Widgets[OverlayLayoutRules.MapWidget].Left);
@@ -186,7 +189,7 @@ public sealed class OverlayLayoutSettingsTests
 
             File.WriteAllText(path, "{broken");
             var recovered = store.Load();
-            Assert.Equal(3, recovered.Version);
+            Assert.Equal(4, recovered.Version);
             Assert.Equal(OverlayLayoutRules.DefaultScale, recovered.Scale);
             Assert.Null(recovered.Left);
             Assert.Null(recovered.Top);
@@ -199,6 +202,18 @@ public sealed class OverlayLayoutSettingsTests
                 Directory.Delete(directory, recursive: true);
             }
         }
+    }
+
+    [Fact]
+    public void Store_MigratesMissingMissionVisibilityToVisible()
+    {
+        var normalized = OverlayLayoutRules.Normalize(new OverlayLayoutSettings
+        {
+            Version = 3
+        });
+
+        Assert.Equal(4, normalized.Version);
+        Assert.True(normalized.MissionsVisible);
     }
 
     [Fact]
@@ -227,6 +242,12 @@ public sealed class OverlayLayoutSettingsTests
         Assert.NotNull(Control("StatsPanel"));
         Assert.NotNull(Control("TeamPanel"));
         Assert.NotNull(Control("MissionPanel"));
+        Assert.Equal("290", (string?)Control("MapInfoPanel").Attribute("MaxWidth"));
+        Assert.Equal("P 0 · AI 0", (string?)Control("RemotePlayerCountLabel").Attribute("Text"));
+        Assert.Equal("StackPanel", Control("RemoteEntityLegend").Name.LocalName);
+        Assert.Equal(
+            "Collapsed",
+            (string?)Control("RemoteTrackingStatusLabel").Attribute("Visibility"));
         Assert.Equal("MapFocusModeButton_Click", (string?)Control("MapFocusModeButton").Attribute("Click"));
         Assert.Equal("WidgetPanel_MouseLeftButtonDown", (string?)Control("MapPanel").Attribute("PreviewMouseLeftButtonDown"));
         Assert.Equal("WidgetPanel_MouseLeftButtonDown", (string?)Control("StatsPanel").Attribute("PreviewMouseLeftButtonDown"));

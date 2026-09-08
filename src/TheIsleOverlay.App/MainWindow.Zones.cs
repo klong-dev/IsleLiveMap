@@ -321,16 +321,7 @@ public partial class MainWindow
         double imageWidth,
         double imageHeight)
     {
-        foreach (var visual in _mapZoneVisuals.Values)
-        {
-            visual.Label.Visibility = Visibility.Collapsed;
-        }
-
-        foreach (var visual in _foodRegionVisuals.Values)
-        {
-            visual.Label.Visibility = Visibility.Collapsed;
-        }
-
+        var visibleLabels = new HashSet<Border>();
         var occupied = new List<Rect>();
         if (_mapZoom >= ZoneLabelMinimumZoom)
         {
@@ -362,7 +353,7 @@ public partial class MainWindow
                     continue;
                 }
 
-                visual.Label.Visibility = Visibility.Visible;
+                visibleLabels.Add(visual.Label);
                 occupied.Add(Inflated(bounds, 3d));
                 if (occupied.Count >= 6)
                 {
@@ -400,7 +391,7 @@ public partial class MainWindow
                     continue;
                 }
 
-                visual.Label.Visibility = Visibility.Visible;
+                visibleLabels.Add(visual.Label);
                 occupied.Add(Inflated(bounds, 3d));
                 visibleFoodLabels++;
                 if (visibleFoodLabels >= 3)
@@ -408,6 +399,16 @@ public partial class MainWindow
                     break;
                 }
             }
+        }
+
+        // Compute final visibility first. Collapsing and immediately showing
+        // unchanged labels at every GPS step invalidates their layout twice.
+        foreach (var label in _mapZoneVisuals.Values.Select(visual => visual.Label)
+                     .Concat(_foodRegionVisuals.Values.Select(visual => visual.Label)))
+        {
+            var visibility = visibleLabels.Contains(label) ? Visibility.Visible : Visibility.Collapsed;
+            if (label.Visibility != visibility)
+                label.Visibility = visibility;
         }
     }
 

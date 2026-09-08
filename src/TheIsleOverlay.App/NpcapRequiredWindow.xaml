@@ -218,7 +218,7 @@
                         <ProgressBar x:Name="SetupProgressBar" Style="{StaticResource SetupProgress}"
                                      Minimum="0" Maximum="100" Value="0" Margin="0,9,0,0" />
                         <TextBlock x:Name="SetupDetailLabel"
-                                   Text="Windows sẽ hỏi quyền quản trị, sau đó bạn chỉ cần hoàn tất cửa sổ Npcap."
+                                   Text="Windows sẽ hỏi quyền quản trị. Trong Npcap, không chọn “Restrict Npcap driver's access to Administrators only” vì Pro có thể không đọc được Player/AI."
                                    Foreground="#78968E" FontSize="10.5" FontWeight="Medium"
                                    TextWrapping="Wrap" Margin="0,8,0,0" />
                     </StackPanel>

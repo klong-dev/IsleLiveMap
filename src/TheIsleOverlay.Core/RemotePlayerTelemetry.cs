@@ -6,6 +6,40 @@ public interface IRemotePlayerTelemetrySource : IAsyncDisposable
         CancellationToken cancellationToken = default);
 }
 
+public interface IRemotePlayerTelemetryHealthSource
+{
+    RemotePlayerCaptureHealth CaptureHealth { get; }
+}
+
+public enum RemotePlayerCaptureState
+{
+    Starting = 0,
+    WaitingForGame = 1,
+    WaitingForPort = 2,
+    OpeningAdapters = 3,
+    Capturing = 4,
+    Receiving = 5,
+    Faulted = 6
+}
+
+public sealed record RemotePlayerCaptureHealth(
+    RemotePlayerCaptureState State,
+    bool GameProcessFound,
+    int OwnedPortCount,
+    int OpenedAdapterCount,
+    long MatchedGamePackets,
+    DateTimeOffset? LastGamePacketAt,
+    string? Message = null)
+{
+    public static RemotePlayerCaptureHealth Starting { get; } = new(
+        RemotePlayerCaptureState.Starting,
+        false,
+        0,
+        0,
+        0,
+        null);
+}
+
 public sealed record RemotePlayerTelemetryFrame(
     long Sequence,
     DateTimeOffset ObservedAt,

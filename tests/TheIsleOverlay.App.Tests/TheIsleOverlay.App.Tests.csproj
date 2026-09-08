@@ -24,11 +24,17 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Content Include="..\..\src\TheIsleOverlay.App\App.xaml"
+             Link="TestAssets\App.xaml"
+             CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\..\src\TheIsleOverlay.App\HomeWindow.xaml"
              Link="TestAssets\HomeWindow.xaml"
              CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\..\src\TheIsleOverlay.App\HomeWindow.xaml.cs"
              Link="TestAssets\HomeWindow.xaml.cs"
+             CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\src\TheIsleOverlay.App\HomeWindow.Pro.cs"
+             Link="TestAssets\HomeWindow.Pro.cs"
              CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\..\src\TheIsleOverlay.App\HomeWindow.IslePilot.cs"
              Link="TestAssets\HomeWindow.IslePilot.cs"

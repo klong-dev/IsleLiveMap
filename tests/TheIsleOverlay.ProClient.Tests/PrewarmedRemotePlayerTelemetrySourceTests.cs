@@ -44,6 +44,26 @@ public sealed class PrewarmedRemotePlayerTelemetrySourceTests
         Assert.Equal(30, enumerator.Current.Sequence);
     }
 
+    [Fact]
+    public async Task CaptureHealth_ForwardsInnerSourceStateBeforeMapSubscription()
+    {
+        var inner = new FakeRemotePlayerTelemetrySource
+        {
+            CaptureHealth = new RemotePlayerCaptureHealth(
+                RemotePlayerCaptureState.WaitingForPort,
+                true,
+                0,
+                0,
+                0,
+                null,
+                "waiting")
+        };
+        await using var source = new PrewarmedRemotePlayerTelemetrySource(inner);
+
+        Assert.Equal(RemotePlayerCaptureState.WaitingForPort, source.CaptureHealth.State);
+        Assert.True(source.CaptureHealth.GameProcessFound);
+    }
+
     private static RemotePlayerTelemetryFrame Frame(long sequence) => new(
         sequence,
         DateTimeOffset.UtcNow,
@@ -53,11 +73,14 @@ public sealed class PrewarmedRemotePlayerTelemetrySourceTests
         RemoteEntities: []);
 
     private sealed class FakeRemotePlayerTelemetrySource
-        : IRemotePlayerTelemetrySource
+        : IRemotePlayerTelemetrySource, IRemotePlayerTelemetryHealthSource
     {
         private readonly Channel<RemotePlayerTelemetryFrame> _channel =
             Channel.CreateUnbounded<RemotePlayerTelemetryFrame>();
         private int _readCount;
+
+        public RemotePlayerCaptureHealth CaptureHealth { get; set; } =
+            RemotePlayerCaptureHealth.Starting;
 
         public void Publish(RemotePlayerTelemetryFrame frame) =>
             _channel.Writer.TryWrite(frame);
@@ -91,4 +114,5 @@ public sealed class PrewarmedRemotePlayerTelemetrySourceTests
             return ValueTask.CompletedTask;
         }
     }
+
 }

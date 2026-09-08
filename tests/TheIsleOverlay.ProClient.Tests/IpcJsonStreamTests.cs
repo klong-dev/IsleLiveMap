@@ -82,6 +82,34 @@ public sealed class IpcJsonStreamTests
     }
 
     [Fact]
+    public async Task RoundTrip_PreservesCaptureHealthStatus()
+    {
+        await using var memory = new MemoryStream();
+        await using var ipc = new IpcJsonStream(memory);
+        var observedAt = DateTimeOffset.Parse("2026-09-08T07:30:00Z");
+        var expected = new AgentMessage(
+            "capture-status",
+            null,
+            null,
+            null,
+            new AgentCaptureStatus(
+                "receiving",
+                true,
+                2,
+                3,
+                1_024,
+                observedAt,
+                null));
+
+        await ipc.WriteAsync(expected, TestContext.Current.CancellationToken);
+        memory.Position = 0;
+        var actual = await ipc.ReadAsync<AgentMessage>(
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(expected, actual);
+    }
+
+    [Fact]
     public async Task ReadAsync_RejectsOversizedLength()
     {
         await using var memory = new MemoryStream(

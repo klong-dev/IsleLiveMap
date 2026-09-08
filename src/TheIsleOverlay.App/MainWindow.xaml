@@ -47,16 +47,15 @@
                 PreviewMouseMove="WidgetPanel_MouseMove"
                 PreviewMouseLeftButtonUp="WidgetPanel_MouseLeftButtonUp"
                 Background="#0C2020" BorderBrush="#783E625B" BorderThickness="1" CornerRadius="4" ClipToBounds="True">
-            <Border.Effect>
-                <DropShadowEffect Color="#000000" BlurRadius="14" ShadowDepth="2" Opacity="0.58" />
-            </Border.Effect>
             <Grid>
                 <Ellipse x:Name="MapCircleChrome" Fill="#0C2020" Stroke="#783E625B"
                          StrokeThickness="1" Visibility="Collapsed" IsHitTestVisible="False" />
                 <Grid x:Name="MapVisualRoot">
                 <Canvas x:Name="MapViewport" Background="#102423" SizeChanged="MapViewport_SizeChanged" ClipToBounds="True"
                         AutomationProperties.Name="Minimap Gateway viewport">
-                    <Image x:Name="MapImage" Stretch="Fill" Opacity="0.93" />
+                    <Image x:Name="MapImage" Stretch="Fill" Opacity="0.93"
+                           RenderOptions.BitmapScalingMode="Linear"
+                           SnapsToDevicePixels="True" />
                     <Rectangle x:Name="MapShade" Fill="#0D00BBAA" IsHitTestVisible="False" />
                     <Canvas x:Name="MapHeatmapLayer" Panel.ZIndex="1" IsHitTestVisible="False" />
                     <Canvas x:Name="MapZoneLayer" Panel.ZIndex="2" IsHitTestVisible="False" />
@@ -78,22 +77,58 @@
                     </Grid>
                 </Canvas>
 
-                <Border x:Name="MapInfoPanel" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="9" Background="#B5071517" Padding="8,5">
+                <Border x:Name="MapInfoPanel" HorizontalAlignment="Left" VerticalAlignment="Top"
+                        Margin="7" MaxWidth="290" Background="#C0071517" BorderBrush="#503E625B"
+                        BorderThickness="1" CornerRadius="3" Padding="7,4">
                     <StackPanel>
-                        <TextBlock Text="GATEWAY / LIVE" Foreground="#DCE8E0" FontFamily="Bahnschrift SemiCondensed" FontSize="11" FontWeight="SemiBold" />
-                        <TextBlock x:Name="CoordinateLabel" Text="X —  Y —  Z —" Foreground="#82A49B" FontFamily="Bahnschrift" FontSize="9" Margin="0,2,0,0" />
-                        <TextBlock x:Name="MapLayerSummaryLabel" Text="MMZ — · PZ — · FOOD —"
-                                   Foreground="#7F9F96" FontFamily="Bahnschrift SemiCondensed"
-                                   FontSize="7.5" Margin="0,2,0,0" />
-                        <TextBlock x:Name="RemotePlayerCountLabel" Text="PLAYER 0 · AI 0" Visibility="Collapsed"
-                                   Foreground="#BBD1C9" FontFamily="Bahnschrift SemiCondensed" FontSize="9" Margin="0,2,0,0" />
-                        <WrapPanel x:Name="RemoteEntityLegend" Visibility="Collapsed" Margin="0,3,0,0" MaxWidth="230">
-                            <TextBlock Text="● ĂN THỊT" Foreground="#F04444" FontFamily="Bahnschrift SemiCondensed" FontSize="7.5" Margin="0,0,7,1" />
-                            <TextBlock Text="● CÙNG LOÀI" Foreground="#42D66B" FontFamily="Bahnschrift SemiCondensed" FontSize="7.5" Margin="0,0,7,1" />
-                            <TextBlock Text="● ĂN CỎ" Foreground="#3EA6FF" FontFamily="Bahnschrift SemiCondensed" FontSize="7.5" Margin="0,0,7,1" />
-                            <TextBlock Text="● AI" Foreground="#F5C542" FontFamily="Bahnschrift SemiCondensed" FontSize="7.5" Margin="0,0,0,1" />
-                            <TextBlock Text="● CHƯA RÕ" Foreground="#C7D0D4" FontFamily="Bahnschrift SemiCondensed" FontSize="7.5" Margin="7,0,0,1" />
-                        </WrapPanel>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock Text="GATEWAY" Foreground="#DCE8E0"
+                                           FontFamily="Bahnschrift SemiCondensed" FontSize="9.5"
+                                           FontWeight="SemiBold" />
+                                <Ellipse Width="4" Height="4" Fill="#37D4C6"
+                                         Margin="6,0,4,0" VerticalAlignment="Center" />
+                                <TextBlock Text="LIVE" Foreground="#75B9AE"
+                                           FontFamily="Bahnschrift SemiCondensed" FontSize="7.5"
+                                           FontWeight="SemiBold" VerticalAlignment="Center" />
+                            </StackPanel>
+                            <TextBlock x:Name="RemotePlayerCountLabel" Grid.Column="2"
+                                       Text="P 0 · AI 0" Visibility="Collapsed"
+                                       Foreground="#C9DDD6" FontFamily="Bahnschrift SemiCondensed"
+                                       FontSize="8" FontWeight="SemiBold" Margin="10,0,0,0"
+                                       VerticalAlignment="Center" />
+                        </Grid>
+                        <TextBlock x:Name="CoordinateLabel" Text="X —  Y —  Z —"
+                                   Foreground="#82A49B" FontFamily="Bahnschrift" FontSize="8.2"
+                                   Margin="0,1,0,0" />
+                        <Grid Margin="0,1,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock x:Name="MapLayerSummaryLabel" Text="MMZ — · PZ — · FOOD —"
+                                       Foreground="#76968D" FontFamily="Bahnschrift SemiCondensed"
+                                       FontSize="6.8" VerticalAlignment="Center" />
+                            <StackPanel x:Name="RemoteEntityLegend" Grid.Column="1"
+                                        Orientation="Horizontal" HorizontalAlignment="Right"
+                                        Visibility="Collapsed" Margin="9,0,0,0">
+                                <TextBlock Text="● THỊT" Foreground="#F04444" FontFamily="Bahnschrift SemiCondensed" FontSize="6.8" Margin="0,0,5,0" />
+                                <TextBlock Text="● CÙNG" Foreground="#42D66B" FontFamily="Bahnschrift SemiCondensed" FontSize="6.8" Margin="0,0,5,0" />
+                                <TextBlock Text="● CỎ" Foreground="#3EA6FF" FontFamily="Bahnschrift SemiCondensed" FontSize="6.8" Margin="0,0,5,0" />
+                                <TextBlock Text="● AI" Foreground="#F5C542" FontFamily="Bahnschrift SemiCondensed" FontSize="6.8" Margin="0,0,5,0" />
+                                <TextBlock Text="● ?" Foreground="#C7D0D4" FontFamily="Bahnschrift SemiCondensed" FontSize="6.8" />
+                            </StackPanel>
+                        </Grid>
+                        <TextBlock x:Name="RemoteTrackingStatusLabel" Text="PRO · ĐANG KHỞI TẠO"
+                                   Visibility="Collapsed" Foreground="#E7B74E"
+                                   FontFamily="Bahnschrift SemiCondensed" FontSize="7.2"
+                                   FontWeight="SemiBold" Margin="0,2,0,0"
+                                   TextTrimming="CharacterEllipsis" MaxWidth="270" />
                     </StackPanel>
                 </Border>
 
@@ -159,9 +194,6 @@
                     <GradientStop Color="#76071517" Offset="1" />
                 </LinearGradientBrush>
             </Border.Background>
-            <Border.Effect>
-                <DropShadowEffect Color="#000000" BlurRadius="13" ShadowDepth="2" Opacity="0.55" />
-            </Border.Effect>
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />

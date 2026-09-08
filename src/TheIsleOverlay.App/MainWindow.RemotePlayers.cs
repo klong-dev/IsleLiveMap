@@ -1,7 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
-using System.Windows.Media.Effects;
 using System.Windows.Shapes;
 using TheIsleOverlay.Core;
 
@@ -28,6 +27,7 @@ public partial class MainWindow
             {
                 ClearRemotePlayerMarkers();
             }
+            RemoteTrackingStatusLabel.Visibility = Visibility.Collapsed;
             return changed;
         }
 
@@ -40,10 +40,13 @@ public partial class MainWindow
         var aiCount = markers.Count(marker => marker.EntityKind == RemoteEntityKind.Ai);
         var isSynchronizing = snapshot.ProPlayerSync?.IsSynchronizing == true;
         RemotePlayerCountLabel.Text = provisionalCount > 0
-            ? $"PLAYER {playerCount} · ĐANG XÁC MINH {provisionalCount} · AI {aiCount}"
+            ? $"P {playerCount} · CHỜ {provisionalCount} · AI {aiCount}"
             : isSynchronizing
-                ? $"PLAYER {playerCount} · ĐANG ĐỒNG BỘ · AI {aiCount}"
-            : $"PLAYER {playerCount} · AI {aiCount}";
+                ? $"P {playerCount} · SYNC · AI {aiCount}"
+            : $"P {playerCount} · AI {aiCount}";
+        RemotePlayerCountLabel.ToolTip = provisionalCount > 0
+            ? $"Player {playerCount} · Đang xác minh {provisionalCount} · AI {aiCount}"
+            : $"Player {playerCount} · AI {aiCount}";
         RemotePlayerCountLabel.Visibility = snapshot.ProPlayerTrackingActive
             ? Visibility.Visible
             : Visibility.Collapsed;
@@ -72,11 +75,11 @@ public partial class MainWindow
             dot.Point = marker.Point;
             dot.Shape.Tag = marker.Label;
             dot.Label.Text = marker.Label;
-            if (dot.Category != marker.Category)
+            if (dot.Category != marker.Category || dot.IsProvisional != marker.IsProvisional)
             {
                 ApplyPalette(dot, marker.Category);
+                ApplyProvisionalStyle(dot, marker.IsProvisional);
             }
-            ApplyProvisionalStyle(dot, marker.IsProvisional);
         }
 
         foreach (var key in _remotePlayerMapDots.Keys
@@ -152,13 +155,9 @@ public partial class MainWindow
         var palette = PaletteFor(category);
         dot.Shape.Fill = BrushFrom(palette.Fill);
         dot.Shape.Stroke = BrushFrom(palette.Stroke);
-        dot.Shape.Effect = new DropShadowEffect
-        {
-            Color = palette.Glow,
-            BlurRadius = 5d,
-            ShadowDepth = 0d,
-            Opacity = 0.92d
-        };
+        // Avoid a separate blur/effect pass for every moving marker. Keep
+        // category contrast in its solid fill and stroke instead.
+        dot.Shape.Effect = null;
         dot.Label.Foreground = BrushFrom(palette.LabelForeground);
         dot.Label.Background = BrushFrom(palette.LabelBackground);
         dot.Category = category;
@@ -214,6 +213,50 @@ public partial class MainWindow
         _renderedRemotePlayerMarkers = [];
         RemotePlayerCountLabel.Visibility = Visibility.Collapsed;
         RemoteEntityLegend.Visibility = Visibility.Collapsed;
+        RemoteTrackingStatusLabel.Visibility = Visibility.Collapsed;
+    }
+
+    private void UpdateRemoteTrackingStatus(TelemetrySnapshot snapshot)
+    {
+        var health = snapshot.ProPlayerCaptureHealth;
+        if (health is null)
+        {
+            RemoteTrackingStatusLabel.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        if (health.State == RemotePlayerCaptureState.Receiving)
+        {
+            var silence = health.LastGamePacketAt is { } lastPacketAt
+                ? DateTimeOffset.UtcNow - lastPacketAt
+                : TimeSpan.Zero;
+            if (silence <= TimeSpan.FromSeconds(8))
+            {
+                RemoteTrackingStatusLabel.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            RemoteTrackingStatusLabel.Text =
+                $"PRO · MẤT PACKET GAME {Math.Max(1, (int)silence.TotalSeconds)}S";
+            RemoteTrackingStatusLabel.Visibility = Visibility.Visible;
+            return;
+        }
+
+        RemoteTrackingStatusLabel.Text = health.State switch
+        {
+            RemotePlayerCaptureState.WaitingForGame => "PRO · ĐANG CHỜ GAME",
+            RemotePlayerCaptureState.WaitingForPort =>
+                "PRO · ĐÃ THẤY GAME, ĐANG CHỜ SERVER",
+            RemotePlayerCaptureState.OpeningAdapters => "PRO · ĐANG MỞ BỘ QUÉT MẠNG",
+            RemotePlayerCaptureState.Capturing when health.OpenedAdapterCount > 0 =>
+                $"PRO · ĐANG CHỜ PACKET · {health.OpenedAdapterCount} ADAPTER",
+            RemotePlayerCaptureState.Faulted when health.OpenedAdapterCount == 0 =>
+                "PRO · BỘ QUÉT CHƯA SẴN SÀNG",
+            RemotePlayerCaptureState.Faulted => "PRO · BỘ QUÉT ĐÃ DỪNG",
+            _ => "PRO · ĐANG KHỞI TẠO BỘ QUÉT"
+        };
+        RemoteTrackingStatusLabel.ToolTip = health.Message;
+        RemoteTrackingStatusLabel.Visibility = Visibility.Visible;
     }
 
     private sealed class RemotePlayerMapDot(

@@ -29,7 +29,17 @@ internal sealed record AgentMessage(
     string Type,
     AgentHello? Hello,
     ProTelemetryFrame? Telemetry,
-    AgentError? Error);
+    AgentError? Error,
+    AgentCaptureStatus? CaptureStatus = null);
+
+internal sealed record AgentCaptureStatus(
+    string State,
+    bool GameProcessFound,
+    int OwnedPortCount,
+    int OpenedAdapterCount,
+    long MatchedGamePackets,
+    DateTimeOffset? LastGamePacketAt,
+    string? Message);
 
 internal sealed record WorldPosition(double X, double Y, double? Z);
 

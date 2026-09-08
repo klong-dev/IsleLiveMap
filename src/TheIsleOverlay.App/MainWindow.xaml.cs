@@ -1,4 +1,5 @@
 using System.Net.Http;
+using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows;
@@ -10,7 +11,6 @@ using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
-using System.Text.Json;
 using TheIsleOverlay.Core;
 using TheIsleOverlay.LocalTelemetry;
 
@@ -54,9 +54,16 @@ public partial class MainWindow : Window
     private readonly ILocalMovementSource? _providedLocalSource;
     private ProFeatureAccessGrant _proFeatureAccess;
     private readonly OverlayLayoutSettingsStore _layoutSettingsStore = new();
-    private readonly LatestValueBuffer<TelemetrySnapshot> _renderSnapshotBuffer = new();
-    private readonly object _diagnosticsGate = new();
-    private StreamWriter? _diagnosticsWriter;
+    private readonly LatestValueBuffer<QueuedRenderSnapshot> _renderSnapshotBuffer = new();
+    private long _lastDiagnosticTick;
+    private MapDiagnosticWriter? _diagnosticsWriter;
+    private long _snapshotsReceived;
+    private long _snapshotsRendered;
+    private long _previousRenderTick;
+    private long _renderStartedAt;
+    private double _snapshotQueueDelayMs;
+    private double _renderIntervalMs;
+    private sealed record QueuedRenderSnapshot(TelemetrySnapshot Snapshot, long PublishedAt);
     private ITelemetrySession? _telemetrySession;
     private Task? _telemetryWatchTask;
     private OverlayLayoutSettings _layoutSettings = new();
@@ -74,6 +81,7 @@ public partial class MainWindow : Window
     private double _mapPanRawDeltaX;
     private double _mapPanRawDeltaY;
     private double _headingDegrees;
+    private double? _lastAnimatedHeadingTarget;
     private double _overlayScale = OverlayLayoutRules.DefaultScale;
     private double _resizeStartingScale;
     private Point _resizeStartingScreenPoint;
@@ -225,12 +233,9 @@ public partial class MainWindow : Window
         {
             var path = Path.GetFullPath(configuredPath);
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-            _diagnosticsWriter = new StreamWriter(
+            _diagnosticsWriter = new MapDiagnosticWriter(new StreamWriter(
                 new FileStream(path, FileMode.Append, FileAccess.Write, FileShare.ReadWrite),
-                new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false))
-            {
-                AutoFlush = true
-            };
+                new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false)));
             WriteMapDiagnostic("window-created", null);
         }
         catch
@@ -247,10 +252,34 @@ public partial class MainWindow : Window
             return;
         }
 
+        // Sample only completed frames at 4 Hz. Copy UI values here; JSON and
+        // disk writes run on a bounded background queue, not the dispatcher.
+        var diagnosticTick = Environment.TickCount64;
+        var previousDiagnosticTick = Volatile.Read(ref _lastDiagnosticTick);
+        if (!string.Equals(stage, "window-created", StringComparison.Ordinal)
+            && previousDiagnosticTick > 0
+            && diagnosticTick - previousDiagnosticTick < 250)
+        {
+            return;
+        }
+
+        Interlocked.Exchange(ref _lastDiagnosticTick, diagnosticTick);
+
         var record = new
         {
             ReceivedAt = DateTimeOffset.UtcNow,
             stage,
+            EditMode = !_clickThrough,
+            OverlayActive = IsActive,
+            WpfRenderingTier = RenderCapability.Tier >> 16,
+            UiQueueDelayMs = _snapshotQueueDelayMs,
+            UiRenderIntervalMs = _renderIntervalMs,
+            UiWorkDurationMs = _renderStartedAt == 0 ? 0d
+                : Stopwatch.GetElapsedTime(_renderStartedAt).TotalMilliseconds,
+            SnapshotAgeMs = snapshot?.UpdatedAt is { } updatedAt
+                ? (double?)(DateTimeOffset.UtcNow - updatedAt).TotalMilliseconds : null,
+            SnapshotsReceived = Interlocked.Read(ref _snapshotsReceived),
+            SnapshotsRendered = _snapshotsRendered,
             snapshot?.Source,
             snapshot?.Success,
             snapshot?.ServerOnline,
@@ -260,6 +289,7 @@ public partial class MainWindow : Window
             snapshot?.ProPlayerTrackingActive,
             snapshot?.ProPlayerSequence,
             snapshot?.ProPlayerSync,
+            snapshot?.ProPlayerCaptureHealth,
             Local = snapshot?.Player?.Location,
             ServerEndpoint = snapshot?.Player?.Server,
             InputMarkerCount = snapshot?.Map?.Markers.Count ?? 0,
@@ -275,26 +305,15 @@ public partial class MainWindow : Window
             }).ToArray()
         };
 
-        try
-        {
-            lock (_diagnosticsGate)
-            {
-                _diagnosticsWriter?.WriteLine(JsonSerializer.Serialize(record));
-            }
-        }
-        catch
-        {
-            // Diagnostics must never interfere with map rendering.
-        }
+        writer.Publish(record);
     }
 
-    private void DisposeDiagnosticsWriter()
+    private async ValueTask DisposeDiagnosticsWriterAsync()
     {
-        lock (_diagnosticsGate)
-        {
-            _diagnosticsWriter?.Dispose();
-            _diagnosticsWriter = null;
-        }
+        var writer = _diagnosticsWriter;
+        _diagnosticsWriter = null;
+        if (writer is not null)
+            await writer.DisposeAsync();
     }
 
     private void Window_Loaded(object sender, RoutedEventArgs e)
@@ -530,7 +549,8 @@ public partial class MainWindow : Window
 
     private void QueueRenderSnapshot(TelemetrySnapshot snapshot)
     {
-        _renderSnapshotBuffer.Publish(snapshot);
+        Interlocked.Increment(ref _snapshotsReceived);
+        _renderSnapshotBuffer.Publish(new QueuedRenderSnapshot(snapshot, Stopwatch.GetTimestamp()));
     }
 
     private void StartUiRenderTimer()
@@ -540,7 +560,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        _uiRenderTimer = new DispatcherTimer(DispatcherPriority.Render, Dispatcher)
+        _uiRenderTimer = new DispatcherTimer(DispatcherPriority.Normal, Dispatcher)
         {
             Interval = UiRenderInterval
         };
@@ -551,14 +571,20 @@ public partial class MainWindow : Window
     private void UiRenderTimer_Tick(object? sender, EventArgs e)
     {
         if (WindowState == WindowState.Minimized
-            || !_renderSnapshotBuffer.TryTake(out var snapshot))
+            || !_renderSnapshotBuffer.TryTake(out var queued))
         {
             return;
         }
 
         try
         {
-            RenderSnapshot(snapshot);
+            var now = Stopwatch.GetTimestamp();
+            _snapshotQueueDelayMs = Stopwatch.GetElapsedTime(queued.PublishedAt, now).TotalMilliseconds;
+            _renderIntervalMs = _previousRenderTick == 0 ? 0d
+                : Stopwatch.GetElapsedTime(_previousRenderTick, now).TotalMilliseconds;
+            _previousRenderTick = now;
+            _snapshotsRendered++;
+            RenderSnapshot(queued.Snapshot);
         }
         catch
         {
@@ -568,7 +594,7 @@ public partial class MainWindow : Window
 
     private void RenderSnapshot(TelemetrySnapshot snapshot)
     {
-        WriteMapDiagnostic("render-start", snapshot);
+        _renderStartedAt = Stopwatch.GetTimestamp();
         try
         {
             if (snapshot.SessionState == TelemetrySessionState.AuthenticationRequired)
@@ -664,8 +690,12 @@ public partial class MainWindow : Window
         }
         finally
         {
-            WriteMapDiagnostic("render-end", snapshot);
+            // Connecting/failure paths clear markers, but diagnostics must
+            // remain visible even before the first GPS fix.
+            if (HasCurrentProFeatures)
+                UpdateRemoteTrackingStatus(snapshot);
             PublishTeamTelemetry(snapshot);
+            WriteMapDiagnostic("render-end", snapshot);
         }
     }
 
@@ -714,6 +744,12 @@ public partial class MainWindow : Window
     private void AnimateHeadingTo(double targetDegrees, TimeSpan duration)
     {
         var target = MapHeading.Normalize(targetDegrees);
+        if (_hasMovementHeading
+            && !OverlayRenderWorkPolicy.HeadingChanged(_lastAnimatedHeadingTarget, target))
+        {
+            return;
+        }
+        _lastAnimatedHeadingTarget = target;
         if (!_hasMovementHeading)
         {
             PlayerHeadingTransform.BeginAnimation(RotateTransform.AngleProperty, null);
@@ -1157,6 +1193,7 @@ public partial class MainWindow : Window
 
     private void RestoreWidgetPresentationSettings()
     {
+        _missionsVisible = _layoutSettings.MissionsVisible;
         foreach (var widget in ResizableWidgetPanels)
         {
             var id = WidgetId(widget);
@@ -1590,6 +1627,7 @@ public partial class MainWindow : Window
         {
             Scale = _overlayScale,
             MapShape = _mapShape,
+            MissionsVisible = _missionsVisible,
             Left = null,
             Top = null,
             Widgets = new Dictionary<string, OverlayWidgetPosition>(StringComparer.OrdinalIgnoreCase)
@@ -1750,7 +1788,6 @@ public partial class MainWindow : Window
 
     private async void Window_Closed(object? sender, EventArgs e)
     {
-        DisposeDiagnosticsWriter();
         SaveOverlayLayout();
         DetachMapNotes();
         _mouseShortcutActivationTimer?.Stop();
@@ -1801,6 +1838,7 @@ public partial class MainWindow : Window
         _windowSource?.RemoveHook(WindowMessageHook);
         _httpClient.Dispose();
         _shutdown.Dispose();
+        await DisposeDiagnosticsWriterAsync();
     }
 
     [DllImport("user32.dll")]

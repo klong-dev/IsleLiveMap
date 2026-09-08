@@ -6,10 +6,13 @@ namespace TheIsleOverlay.ProClient;
 
 public sealed class ProAgentException(string message) : Exception(message);
 
-public sealed class ProAgentRemotePlayerSource : IRemotePlayerTelemetrySource
+public sealed class ProAgentRemotePlayerSource :
+    IRemotePlayerTelemetrySource,
+    IRemotePlayerTelemetryHealthSource
 {
     private static readonly TimeSpan ConnectionTimeout = TimeSpan.FromSeconds(15);
     private static readonly TimeSpan HandshakeTimeout = TimeSpan.FromSeconds(15);
+    private static readonly TimeSpan MaximumRestartDelay = TimeSpan.FromSeconds(30);
 
     private readonly string _agentExecutablePath;
     private readonly string _hostVersion;
@@ -18,6 +21,10 @@ public sealed class ProAgentRemotePlayerSource : IRemotePlayerTelemetrySource
     private readonly CancellationTokenSource _disposeCancellation = new();
     private int _watchStarted;
     private int _disposed;
+    private RemotePlayerCaptureHealth _captureHealth = RemotePlayerCaptureHealth.Starting;
+
+    public RemotePlayerCaptureHealth CaptureHealth =>
+        Volatile.Read(ref _captureHealth);
 
     public ProAgentRemotePlayerSource(
         string agentExecutablePath,
@@ -52,6 +59,69 @@ public sealed class ProAgentRemotePlayerSource : IRemotePlayerTelemetrySource
         using var linkedCancellation = CancellationTokenSource.CreateLinkedTokenSource(
             cancellationToken,
             _disposeCancellation.Token);
+        var restartAttempt = 0;
+        while (!linkedCancellation.IsCancellationRequested)
+        {
+            await using var session = WatchAgentSessionAsync(linkedCancellation.Token)
+                .GetAsyncEnumerator(linkedCancellation.Token);
+            var restart = false;
+            while (!linkedCancellation.IsCancellationRequested)
+            {
+                RemotePlayerTelemetryFrame? frame = null;
+                try
+                {
+                    if (!await session.MoveNextAsync().ConfigureAwait(false))
+                    {
+                        restart = true;
+                        break;
+                    }
+
+                    frame = session.Current;
+                }
+                catch (OperationCanceledException) when (linkedCancellation.IsCancellationRequested)
+                {
+                    yield break;
+                }
+                catch (Exception exception)
+                {
+                    SetFaultedHealth(UserFacingAgentFailure(exception));
+                    restart = true;
+                    break;
+                }
+
+                restartAttempt = 0;
+                yield return frame;
+            }
+
+            if (!restart || linkedCancellation.IsCancellationRequested)
+            {
+                yield break;
+            }
+
+            var restartDelay = TimeSpan.FromSeconds(Math.Min(
+                MaximumRestartDelay.TotalSeconds,
+                2d * Math.Pow(2d, Math.Min(restartAttempt++, 4))));
+            try
+            {
+                await Task.Delay(restartDelay, linkedCancellation.Token).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (linkedCancellation.IsCancellationRequested)
+            {
+                yield break;
+            }
+
+            Volatile.Write(ref _captureHealth, CaptureHealth with
+            {
+                State = RemotePlayerCaptureState.Starting,
+                Message = "Đang tự khởi động lại Pro Agent."
+            });
+        }
+    }
+
+    private async IAsyncEnumerable<RemotePlayerTelemetryFrame> WatchAgentSessionAsync(
+        [System.Runtime.CompilerServices.EnumeratorCancellation]
+        CancellationToken cancellationToken)
+    {
         var pipeName = ProAgentProtocol.PipePrefix + Guid.NewGuid().ToString("N");
         await using var pipe = new NamedPipeServerStream(
             pipeName,
@@ -62,14 +132,14 @@ public sealed class ProAgentRemotePlayerSource : IRemotePlayerTelemetrySource
         using var process = StartAgent(pipeName);
         try
         {
-            using (var timeout = CancellationTokenSource.CreateLinkedTokenSource(linkedCancellation.Token))
+            using (var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken))
             {
                 timeout.CancelAfter(ConnectionTimeout);
                 try
                 {
                     await pipe.WaitForConnectionAsync(timeout.Token).ConfigureAwait(false);
                 }
-                catch (OperationCanceledException) when (!linkedCancellation.IsCancellationRequested)
+                catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
                 {
                     throw new ProAgentException("The Pro Agent did not connect in time.");
                 }
@@ -81,18 +151,18 @@ public sealed class ProAgentRemotePlayerSource : IRemotePlayerTelemetrySource
                         ProAgentProtocol.IpcApiMajor,
                         _hostVersion,
                         _offlineLicenseToken),
-                    linkedCancellation.Token)
+                    cancellationToken)
                 .ConfigureAwait(false);
 
             AgentMessage response;
-            using (var timeout = CancellationTokenSource.CreateLinkedTokenSource(linkedCancellation.Token))
+            using (var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken))
             {
                 timeout.CancelAfter(HandshakeTimeout);
                 try
                 {
                     response = await ipc.ReadAsync<AgentMessage>(timeout.Token).ConfigureAwait(false);
                 }
-                catch (OperationCanceledException) when (!linkedCancellation.IsCancellationRequested)
+                catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
                 {
                     throw new ProAgentException("The Pro Agent handshake timed out.");
                 }
@@ -100,12 +170,20 @@ public sealed class ProAgentRemotePlayerSource : IRemotePlayerTelemetrySource
 
             ValidateHandshake(response);
             long lastSequence = 0;
-            while (!linkedCancellation.IsCancellationRequested)
+            var hasCaptureStatus = false;
+            while (!cancellationToken.IsCancellationRequested)
             {
-                var message = await ipc.ReadAsync<AgentMessage>(linkedCancellation.Token).ConfigureAwait(false);
+                var message = await ipc.ReadAsync<AgentMessage>(cancellationToken).ConfigureAwait(false);
                 if (message.Error is { Fatal: true } error)
                 {
+                    SetFaultedHealth(error.Message);
                     throw new ProAgentException($"Pro Agent stopped: {error.Code}.");
+                }
+
+                if (message.CaptureStatus is { } captureStatus)
+                {
+                    hasCaptureStatus = true;
+                    Volatile.Write(ref _captureHealth, MapCaptureHealth(captureStatus));
                 }
 
                 if (message.Telemetry is not { } telemetry || telemetry.Sequence <= lastSequence)
@@ -114,6 +192,16 @@ public sealed class ProAgentRemotePlayerSource : IRemotePlayerTelemetrySource
                 }
 
                 lastSequence = telemetry.Sequence;
+                if (!hasCaptureStatus)
+                {
+                    Volatile.Write(ref _captureHealth, CaptureHealth with
+                    {
+                        State = RemotePlayerCaptureState.Receiving,
+                        GameProcessFound = true,
+                        LastGamePacketAt = DateTimeOffset.UtcNow,
+                        Message = null
+                    });
+                }
                 yield return MapFrame(telemetry);
             }
         }
@@ -231,6 +319,56 @@ public sealed class ProAgentRemotePlayerSource : IRemotePlayerTelemetrySource
                     frame.PlayerSync.QueueDroppedPackets,
                     frame.PlayerSync.QueueDepth));
     }
+
+    private static string UserFacingAgentFailure(Exception exception) => exception switch
+    {
+        ProAgentException when exception.Message.Contains(
+            "unavailable",
+            StringComparison.OrdinalIgnoreCase) =>
+            "Không tìm thấy Pro Agent đã cài đặt.",
+        ProAgentException when exception.Message.Contains(
+            "connect",
+            StringComparison.OrdinalIgnoreCase) =>
+            "Pro Agent không kết nối được với Live Map.",
+        _ => "Pro Agent đã dừng; hệ thống sẽ tự thử lại."
+    };
+
+    private static RemotePlayerCaptureHealth MapCaptureHealth(AgentCaptureStatus status) => new(
+        ParseCaptureState(status.State),
+        status.GameProcessFound,
+        Math.Max(0, status.OwnedPortCount),
+        Math.Max(0, status.OpenedAdapterCount),
+        Math.Max(0, status.MatchedGamePackets),
+        status.LastGamePacketAt,
+        string.IsNullOrWhiteSpace(status.Message) ? null : status.Message.Trim());
+
+    private static RemotePlayerCaptureState ParseCaptureState(string? state) =>
+        state?.Trim().ToLowerInvariant() switch
+        {
+            "waiting-game" => RemotePlayerCaptureState.WaitingForGame,
+            "waiting-port" => RemotePlayerCaptureState.WaitingForPort,
+            "opening-adapters" => RemotePlayerCaptureState.OpeningAdapters,
+            "capturing" => RemotePlayerCaptureState.Capturing,
+            "receiving" => RemotePlayerCaptureState.Receiving,
+            "faulted" => RemotePlayerCaptureState.Faulted,
+            _ => RemotePlayerCaptureState.Starting
+        };
+
+    private void SetFaultedHealth(string? message) =>
+        Volatile.Write(ref _captureHealth, FaultedHealth(CaptureHealth, message));
+
+    private static RemotePlayerCaptureHealth FaultedHealth(
+        RemotePlayerCaptureHealth current,
+        string? message) => current with
+    {
+        State = RemotePlayerCaptureState.Faulted,
+        Message = current.State == RemotePlayerCaptureState.Faulted
+                  && !string.IsNullOrWhiteSpace(current.Message)
+            ? current.Message
+            : string.IsNullOrWhiteSpace(message)
+                ? "Pro Agent đã dừng."
+                : message.Trim()
+    };
 
     private static bool IsValidEntity(VerifiedMapEntity entity) =>
         entity.TrackId > 0

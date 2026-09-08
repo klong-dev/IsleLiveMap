@@ -18,6 +18,7 @@ public sealed record TelemetrySnapshot
     // as a gameplay timestamp.
     public long? ProPlayerSequence { get; init; }
     public RemotePlayerSyncState? ProPlayerSync { get; init; }
+    public RemotePlayerCaptureHealth? ProPlayerCaptureHealth { get; init; }
 }
 
 public sealed record PlayerTelemetry

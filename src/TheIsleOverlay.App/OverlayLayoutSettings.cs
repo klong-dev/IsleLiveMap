@@ -5,9 +5,10 @@ namespace TheIsleOverlay.App;
 
 public sealed record OverlayLayoutSettings
 {
-    public int Version { get; init; } = 3;
+    public int Version { get; init; } = 4;
     public double Scale { get; init; } = OverlayLayoutRules.DefaultScale;
     public string MapShape { get; init; } = OverlayLayoutRules.SquareMapShape;
+    public bool MissionsVisible { get; init; } = true;
     public double? Left { get; init; }
     public double? Top { get; init; }
     public Dictionary<string, OverlayWidgetPosition> Widgets { get; init; } = new(StringComparer.OrdinalIgnoreCase);
@@ -51,7 +52,7 @@ public static class OverlayLayoutRules
                 StringComparer.OrdinalIgnoreCase);
         return settings with
         {
-            Version = 3,
+            Version = 4,
             Scale = NormalizeScale(settings.Scale),
             MapShape = NormalizeMapShape(settings.MapShape),
             Left = FiniteOrNull(settings.Left),

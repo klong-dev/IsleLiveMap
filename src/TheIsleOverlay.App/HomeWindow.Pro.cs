@@ -307,6 +307,7 @@ public partial class HomeWindow
         ApplyProAccessState(_proAccess);
         RefreshMapLaunchControls();
         SourceStatusLabel.Text = "Quyền Pro đã hết hạn. Home đã tự chuyển về giao diện Free.";
+        ShowProPromotionIfNeeded();
     }
 
     private void ApplyHomePresentationTheme(bool premium)

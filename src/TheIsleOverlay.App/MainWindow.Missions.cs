@@ -8,6 +8,7 @@ namespace TheIsleOverlay.App;
 public partial class MainWindow
 {
     private readonly PrimeQuestCompletionTracker _primeQuestCompletionTracker = new();
+    private readonly MissionListRenderCache _missionListRenderCache = new();
     private readonly Queue<string> _missionToastQueue = new();
     private bool _missionsVisible = true;
     private bool _hasMissions;
@@ -21,15 +22,18 @@ public partial class MainWindow
 
         _hasMissions = quests.Length > 0;
         RefreshOptionalWidgetVisibility();
-        MissionList.ItemsSource = quests
-            .Select(quest => new MissionRowViewModel
-            {
-                Name = PrimeQuestVietnamese.Translate(quest.Name),
-                StateGlyph = quest.Done == true ? "✓" : "◇",
-                StateBrush = quest.Done == true ? OnlineBrush : WaitingBrush,
-                TextBrush = quest.Done == true ? BrushFrom("#8FA8A0") : BrushFrom("#E3EEE9")
-            })
-            .ToArray();
+        if (_missionListRenderCache.Update(quests))
+        {
+            MissionList.ItemsSource = quests
+                .Select(quest => new MissionRowViewModel
+                {
+                    Name = PrimeQuestVietnamese.Translate(quest.Name),
+                    StateGlyph = quest.Done == true ? "✓" : "◇",
+                    StateBrush = quest.Done == true ? OnlineBrush : WaitingBrush,
+                    TextBrush = quest.Done == true ? BrushFrom("#8FA8A0") : BrushFrom("#E3EEE9")
+                })
+                .ToArray();
+        }
 
         var done = prime?.Done ?? quests.Count(quest => quest.Done == true);
         var required = prime?.Required ?? quests.Length;
@@ -46,6 +50,7 @@ public partial class MainWindow
         _hasMissions = false;
         RefreshOptionalWidgetVisibility();
         MissionList.ItemsSource = null;
+        _missionListRenderCache.Reset();
         MissionProgressLabel.Text = "0 / 0";
         _primeQuestCompletionTracker.Reset();
     }
@@ -53,6 +58,7 @@ public partial class MainWindow
     private void ToggleMissions()
     {
         _missionsVisible = !_missionsVisible;
+        SaveOverlayLayout();
         RefreshOptionalWidgetVisibility();
         RefreshWindowSizeToContent();
         KeepOverlayVisible();

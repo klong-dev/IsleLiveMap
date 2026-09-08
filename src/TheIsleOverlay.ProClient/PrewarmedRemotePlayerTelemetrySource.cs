@@ -10,7 +10,9 @@ namespace TheIsleOverlay.ProClient;
 /// window opens permanently loses bootstrap evidence for already-rendered
 /// players.
 /// </summary>
-public sealed class PrewarmedRemotePlayerTelemetrySource : IRemotePlayerTelemetrySource
+public sealed class PrewarmedRemotePlayerTelemetrySource :
+    IRemotePlayerTelemetrySource,
+    IRemotePlayerTelemetryHealthSource
 {
     private readonly IRemotePlayerTelemetrySource _inner;
     private readonly CancellationTokenSource _shutdown = new();
@@ -28,6 +30,12 @@ public sealed class PrewarmedRemotePlayerTelemetrySource : IRemotePlayerTelemetr
     private int _started;
     private int _watchStarted;
     private int _disposed;
+    private RemotePlayerCaptureHealth? _terminalHealth;
+
+    public RemotePlayerCaptureHealth CaptureHealth =>
+        Volatile.Read(ref _terminalHealth)
+        ?? (_inner as IRemotePlayerTelemetryHealthSource)?.CaptureHealth
+        ?? RemotePlayerCaptureHealth.Starting;
 
     public PrewarmedRemotePlayerTelemetrySource(
         IRemotePlayerTelemetrySource inner)
@@ -130,7 +138,20 @@ public sealed class PrewarmedRemotePlayerTelemetrySource : IRemotePlayerTelemetr
         }
         catch (Exception exception)
         {
+            Volatile.Write(ref _terminalHealth, new RemotePlayerCaptureHealth(
+                RemotePlayerCaptureState.Faulted,
+                CaptureHealth.GameProcessFound,
+                CaptureHealth.OwnedPortCount,
+                CaptureHealth.OpenedAdapterCount,
+                CaptureHealth.MatchedGamePackets,
+                CaptureHealth.LastGamePacketAt,
+                UserFacingFailure(exception)));
             _updates.Writer.TryComplete(exception);
         }
     }
+
+    private static string UserFacingFailure(Exception exception) =>
+        exception is ProAgentException && !string.IsNullOrWhiteSpace(exception.Message)
+            ? exception.Message
+            : "Pro Agent đã dừng; hãy mở lại Live Map để thử lại.";
 }

@@ -94,17 +94,16 @@ public partial class HomeWindow : Window
             guideWindow.ShowDialog();
         }
 
-        var access = await proAccessTask;
-        var proPresentation = HomeProPresentationPolicy.Evaluate(
-            access,
-            DateTimeOffset.UtcNow);
+        await proAccessTask;
         var highlightsStore = new ReleaseHighlightsPreferenceStore();
         if (highlightsStore.ShouldShow(ReleaseHighlightsWindow.ReleaseVersion))
         {
             var currentVersion = CurrentVersion();
             var highlightsWindow = new ReleaseHighlightsWindow(
                 currentVersion,
-                proPresentation.HasCurrentProAccess,
+                HomeProPresentationPolicy.Evaluate(
+                    _proAccess,
+                    DateTimeOffset.UtcNow).HasCurrentProAccess,
                 highlightsStore)
             {
                 Owner = this
@@ -112,14 +111,7 @@ public partial class HomeWindow : Window
             highlightsWindow.ShowDialog();
         }
 
-        if (proPresentation.ShowPromotion)
-        {
-            var proPromotionWindow = new ProPromotionWindow
-            {
-                Owner = this
-            };
-            proPromotionWindow.ShowDialog();
-        }
+        ShowProPromotionIfNeeded();
 
         try
         {
@@ -342,6 +334,26 @@ public partial class HomeWindow : Window
         MapLaunchStateDetail.Text = detail;
         ApplyMapLaunchAccent();
         RefreshMapLaunchControls();
+    }
+
+    private void ShowProPromotionIfNeeded()
+    {
+        // Re-evaluate at the moment of display. The entitlement can expire
+        // while the update/release modal is open, and old sessions may be
+        // restored as signed-out after a refresh-token failure.
+        var presentation = HomeProPresentationPolicy.Evaluate(
+            _proAccess,
+            DateTimeOffset.UtcNow);
+        if (!presentation.ShowPromotion || !IsVisible)
+        {
+            return;
+        }
+
+        var promotionWindow = new ProPromotionWindow
+        {
+            Owner = this
+        };
+        promotionWindow.ShowDialog();
     }
 
     private void ApplyMapLaunchAccent()

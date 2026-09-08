@@ -25,10 +25,32 @@ public sealed class ReleaseHighlightsTests
             "new ReleaseHighlightsWindow(",
             source,
             StringComparison.Ordinal);
+        Assert.Contains(
+            "ShowProPromotionIfNeeded();",
+            source,
+            StringComparison.Ordinal);
     }
 
     [Fact]
-    public void Modal_IsAFiveStep147And148BriefingWithFinalOptOut()
+    public void ExpiringProSession_ReturnsToFreeAndShowsPromotionAgain()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            AppContext.BaseDirectory,
+            "TestAssets",
+            "HomeWindow.Pro.cs"));
+        var expiryHandler = source[source.IndexOf(
+            "private async void ProExpiryTimer_Tick",
+            StringComparison.Ordinal)..];
+
+        Assert.Contains("ApplyProAccessState(_proAccess);", expiryHandler, StringComparison.Ordinal);
+        Assert.Contains("ShowProPromotionIfNeeded();", expiryHandler, StringComparison.Ordinal);
+        Assert.True(
+            expiryHandler.IndexOf("ApplyProAccessState(_proAccess);", StringComparison.Ordinal)
+            < expiryHandler.IndexOf("ShowProPromotionIfNeeded();", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Modal_IsAFiveStep152BriefingWithFinalOptOut()
     {
         var document = XDocument.Load(Path.Combine(
             AppContext.BaseDirectory,
@@ -51,18 +73,17 @@ public sealed class ReleaseHighlightsTests
                 (string?)element.Attribute("Content")
             }));
 
-        Assert.Equal("1.4.9", ReleaseHighlightsWindow.ReleaseVersion);
+        Assert.Equal("1.5.2", ReleaseHighlightsWindow.ReleaseVersion);
         Assert.Equal(5, ReleaseHighlightsWindow.PageCount);
-        Assert.Contains("PRO · v1.4.7", allCopy, StringComparison.Ordinal);
-        Assert.Contains("MAP BẮT ĐẦU NGHE TRƯỚC KHI BẠN MỞ", allCopy, StringComparison.Ordinal);
-        Assert.Contains("ONGOING ACTOR", allCopy, StringComparison.Ordinal);
-        Assert.Contains("SPARSE BATCH", allCopy, StringComparison.Ordinal);
-        Assert.Contains("DESTROY EVENT", allCopy, StringComparison.Ordinal);
-        Assert.Contains("FREE · v1.4.8", allCopy, StringComparison.Ordinal);
-        Assert.Contains("MAP · TRÒN", allCopy, StringComparison.Ordinal);
+        Assert.Contains("PRO BIẾT MÌNH ĐANG HOẠT ĐỘNG", allCopy, StringComparison.Ordinal);
+        Assert.Contains("CAPTURE HEALTH", allCopy, StringComparison.Ordinal);
+        Assert.Contains("MARKER ÍT NHẤP NHÁY HƠN", allCopy, StringComparison.Ordinal);
+        Assert.Contains("BẢN ĐỒ GỌN HƠN", allCopy, StringComparison.Ordinal);
+        Assert.Contains("FREE · 1.5.2", allCopy, StringComparison.Ordinal);
+        Assert.Contains("MAP TỰ NHỚ CÁCH BẠN DÙNG", allCopy, StringComparison.Ordinal);
         Assert.Contains("CTRL + SHIFT + O", allCopy, StringComparison.Ordinal);
-        Assert.Contains("4 BLOCK. 4 KÍCH THƯỚC RIÊNG", allCopy, StringComparison.Ordinal);
-        Assert.Contains("Không hiển thị lại thông báo này cho phiên bản 1.4.9", allCopy, StringComparison.Ordinal);
+        Assert.Contains("ÍT CÔNG VIỆC THỪA TRÊN MỖI FRAME", allCopy, StringComparison.Ordinal);
+        Assert.Contains("Không hiển thị lại thông báo này cho phiên bản 1.5.2", allCopy, StringComparison.Ordinal);
         Assert.Equal(
             "HOÀN TẤT",
             (string?)Control("FinishButton").Attribute("Content"));

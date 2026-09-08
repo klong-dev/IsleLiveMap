@@ -63,6 +63,8 @@ public sealed class LocalPositionTelemetrySession : ITelemetrySession
         TelemetrySnapshot? remote = null;
         LocalMovementObservation? local = null;
         RemotePlayerTelemetryFrame? remotePlayerFrame = null;
+        RemotePlayerCaptureHealth? remotePlayerHealth =
+            (_remotePlayerSource as IRemotePlayerTelemetryHealthSource)?.CaptureHealth;
         string? localError = null;
         try
         {
@@ -86,9 +88,25 @@ public sealed class LocalPositionTelemetrySession : ITelemetrySession
                     case RemotePlayersEvent remotePlayersEvent:
                         remotePlayerFrame = remotePlayersEvent.Frame;
                         break;
-                    case RemotePlayersFailureEvent:
+                    case RemotePlayersFailureEvent failureEvent:
                         remotePlayerFrame = null;
+                        remotePlayerHealth = new RemotePlayerCaptureHealth(
+                            RemotePlayerCaptureState.Faulted,
+                            remotePlayerHealth?.GameProcessFound == true,
+                            remotePlayerHealth?.OwnedPortCount ?? 0,
+                            remotePlayerHealth?.OpenedAdapterCount ?? 0,
+                            remotePlayerHealth?.MatchedGamePackets ?? 0,
+                            remotePlayerHealth?.LastGamePacketAt,
+                            failureEvent.Message);
                         break;
+                }
+
+                var currentSourceHealth =
+                    (_remotePlayerSource as IRemotePlayerTelemetryHealthSource)?.CaptureHealth;
+                if (item is not RemotePlayersFailureEvent
+                    || currentSourceHealth?.State == RemotePlayerCaptureState.Faulted)
+                {
+                    remotePlayerHealth = currentSourceHealth ?? remotePlayerHealth;
                 }
 
                 var now = DateTimeOffset.UtcNow;
@@ -124,6 +142,14 @@ public sealed class LocalPositionTelemetrySession : ITelemetrySession
                     && !string.IsNullOrWhiteSpace(localError))
                 {
                     merged = LocalPositionSnapshotMerger.Waiting(_sourceName, localError);
+                }
+
+                if (_remotePlayerSource is not null)
+                {
+                    merged = merged with
+                    {
+                        ProPlayerCaptureHealth = remotePlayerHealth
+                    };
                 }
 
                 yield return merged;
@@ -268,9 +294,16 @@ public sealed class LocalPositionTelemetrySession : ITelemetrySession
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
         }
-        catch (Exception)
+        catch (Exception exception)
         {
-            writer.TryWrite(RemotePlayersFailureEvent.Instance);
+            writer.TryWrite(new RemotePlayersFailureEvent(
+                string.Equals(
+                    exception.GetType().Name,
+                    "ProAgentException",
+                    StringComparison.Ordinal)
+                && !string.IsNullOrWhiteSpace(exception.Message)
+                    ? exception.Message
+                    : "Pro Agent đã dừng; hãy mở lại Live Map để thử lại."));
         }
     }
 
@@ -279,10 +312,7 @@ public sealed class LocalPositionTelemetrySession : ITelemetrySession
     private sealed record LocalMovementEvent(LocalMovementObservation Observation) : SessionEvent;
     private sealed record LocalFailureEvent(string Message) : SessionEvent;
     private sealed record RemotePlayersEvent(RemotePlayerTelemetryFrame Frame) : SessionEvent;
-    private sealed record RemotePlayersFailureEvent : SessionEvent
-    {
-        public static RemotePlayersFailureEvent Instance { get; } = new();
-    }
+    private sealed record RemotePlayersFailureEvent(string Message) : SessionEvent;
     private sealed record TickEvent : SessionEvent
     {
         public static TickEvent Instance { get; } = new();
