@@ -114,13 +114,16 @@ public partial class HomeWindow : Window
             highlightsWindow.ShowDialog();
         }
 
-        if (App.CurrentApp.TryMarkServicesAdShown() && IsVisible)
+        var zaloInvitePreferences = new ZaloChannelInvitePreferenceStore();
+        if (IsVisible
+            && zaloInvitePreferences.ShouldShow()
+            && App.CurrentApp.TryMarkZaloChannelInviteShown())
         {
-            var servicesAdWindow = new KLongServicesAdWindow
+            var zaloInviteWindow = new KLongServicesAdWindow(zaloInvitePreferences)
             {
                 Owner = this
             };
-            servicesAdWindow.ShowDialog();
+            zaloInviteWindow.ShowDialog();
         }
 
         ShowProPromotionIfNeeded();

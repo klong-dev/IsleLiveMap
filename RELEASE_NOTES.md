@@ -1,3 +1,13 @@
+# Isle Live Map 2.1.2
+
+## Kênh thông báo Zalo chính thức
+
+- Thay modal quảng cáo dịch vụ bằng lời mời tham gia kênh thông báo Isle Live Map trên Zalo dành cho cả Free và Pro.
+- QR được tích hợp trực tiếp trong ứng dụng để người dùng quét, nhận thông báo sớm, góp ý tính năng và báo lỗi trực tiếp cho Long.
+- Giữ thời gian đọc tối thiểu 5 giây; sau đó người dùng có thể chọn **Đóng** hoặc **Không hiển thị lại nữa**.
+- Lựa chọn không hiển thị lại được lưu bền vững trên máy; chỉ bấm Đóng thì lời mời vẫn xuất hiện ở lần mở app sau.
+- Loại bỏ video YouTube, quảng cáo dịch vụ và các icon game khỏi modal cũ để giao diện tập trung vào cộng đồng hỗ trợ Live Map.
+
 # Isle Live Map 2.1.1
 
 ## Hotfix khôi phục stats ổn định

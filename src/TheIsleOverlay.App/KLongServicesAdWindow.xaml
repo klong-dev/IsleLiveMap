@@ -1,51 +1,51 @@
 <Window x:Class="TheIsleOverlay.App.KLongServicesAdWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
-        Title="KLong.dev" Width="960" Height="640"
-        WindowStyle="None" ResizeMode="NoResize" Background="#050907"
+        Title="Isle Live Map · Kênh thông báo Zalo"
+        Width="920" Height="650"
+        WindowStyle="None" ResizeMode="NoResize" Background="#05090D"
         WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
         Loaded="Window_Loaded" Closing="Window_Closing" Closed="Window_Closed"
         PreviewKeyDown="Window_PreviewKeyDown" FontFamily="Segoe UI"
         TextOptions.TextFormattingMode="Display" UseLayoutRounding="True" SnapsToDevicePixels="True">
     <Window.Resources>
-        <SolidColorBrush x:Key="AdInk" Color="#050907" />
-        <SolidColorBrush x:Key="AdBone" Color="#F0F4EC" />
-        <SolidColorBrush x:Key="AdMuted" Color="#94A69F" />
-        <SolidColorBrush x:Key="AdSubtle" Color="#647A72" />
-        <SolidColorBrush x:Key="AdLine" Color="#29443C" />
-        <SolidColorBrush x:Key="AdTeal" Color="#63E1CA" />
-        <SolidColorBrush x:Key="AdGold" Color="#EAC25B" />
+        <SolidColorBrush x:Key="InviteInk" Color="#05090D" />
+        <SolidColorBrush x:Key="InviteBone" Color="#F3F8FA" />
+        <SolidColorBrush x:Key="InviteMuted" Color="#98AEB8" />
+        <SolidColorBrush x:Key="InviteSubtle" Color="#68808B" />
+        <SolidColorBrush x:Key="InviteLine" Color="#1D3F50" />
+        <SolidColorBrush x:Key="InviteBlue" Color="#58B7F4" />
+        <SolidColorBrush x:Key="ZaloBlue" Color="#0868FF" />
 
-        <Style x:Key="AdPrimaryButton" TargetType="Button">
-            <Setter Property="Foreground" Value="#171203" />
-            <Setter Property="Background" Value="{StaticResource AdGold}" />
-            <Setter Property="BorderBrush" Value="{StaticResource AdGold}" />
+        <Style x:Key="InvitePrimaryButton" TargetType="Button">
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="Background" Value="{StaticResource ZaloBlue}" />
+            <Setter Property="BorderBrush" Value="#428DFF" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="FontFamily" Value="Bahnschrift SemiCondensed" />
             <Setter Property="FontSize" Value="12" />
             <Setter Property="FontWeight" Value="Bold" />
-            <Setter Property="Padding" Value="18,10" />
+            <Setter Property="Padding" Value="19,11" />
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
                         <Border x:Name="Chrome" Background="{TemplateBinding Background}"
                                 BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="2" Padding="{TemplateBinding Padding}">
+                                CornerRadius="3" Padding="{TemplateBinding Padding}">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Chrome" Property="Background" Value="#F6D777" />
+                                <Setter TargetName="Chrome" Property="Background" Value="#267EFF" />
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="Chrome" Property="Background" Value="#CFA540" />
+                                <Setter TargetName="Chrome" Property="Background" Value="#0752CC" />
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
-                                <Setter TargetName="Chrome" Property="Background" Value="#26302C" />
-                                <Setter TargetName="Chrome" Property="BorderBrush" Value="#3A4B44" />
-                                <Setter Property="Foreground" Value="#75877F" />
+                                <Setter TargetName="Chrome" Property="Background" Value="#172832" />
+                                <Setter TargetName="Chrome" Property="BorderBrush" Value="#28414D" />
+                                <Setter Property="Foreground" Value="#6F8791" />
                                 <Setter Property="Cursor" Value="Arrow" />
                             </Trigger>
                         </ControlTemplate.Triggers>
@@ -53,145 +53,117 @@
                 </Setter.Value>
             </Setter>
         </Style>
-        <Style x:Key="AdQuietButton" TargetType="Button" BasedOn="{StaticResource AdPrimaryButton}">
-            <Setter Property="Foreground" Value="{StaticResource AdBone}" />
-            <Setter Property="Background" Value="#111F1B" />
-            <Setter Property="BorderBrush" Value="{StaticResource AdLine}" />
+        <Style x:Key="InviteQuietButton" TargetType="Button" BasedOn="{StaticResource InvitePrimaryButton}">
+            <Setter Property="Foreground" Value="{StaticResource InviteBone}" />
+            <Setter Property="Background" Value="#0C1820" />
+            <Setter Property="BorderBrush" Value="{StaticResource InviteLine}" />
         </Style>
     </Window.Resources>
 
-    <Border BorderBrush="#49645B" BorderThickness="1" Background="{StaticResource AdInk}">
+    <Border BorderBrush="#315668" BorderThickness="1" Background="{StaticResource InviteInk}">
         <Grid x:Name="AdContent" Opacity="0">
-            <Grid.RenderTransform><TranslateTransform x:Name="AdEntranceTransform" Y="10" /></Grid.RenderTransform>
+            <Grid.RenderTransform><TranslateTransform x:Name="AdEntranceTransform" Y="12" /></Grid.RenderTransform>
             <Grid.RowDefinitions>
-                <RowDefinition Height="45" />
+                <RowDefinition Height="48" />
                 <RowDefinition Height="*" />
-                <RowDefinition Height="66" />
+                <RowDefinition Height="80" />
             </Grid.RowDefinitions>
 
-            <Border Grid.Row="0" BorderBrush="{StaticResource AdLine}" BorderThickness="0,0,0,1"
+            <Border Grid.Row="0" BorderBrush="{StaticResource InviteLine}" BorderThickness="0,0,0,1"
                     MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
-                <Grid Margin="20,0">
+                <Grid Margin="22,0">
                     <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-                    <Ellipse Width="8" Height="8" Fill="{StaticResource AdTeal}" VerticalAlignment="Center" />
-                    <TextBlock Grid.Column="1" Text="KLONG.DEV  /  DỊCH VỤ PHÁT TRIỂN"
-                               Foreground="{StaticResource AdBone}" FontFamily="Bahnschrift" FontSize="10.5"
-                               FontWeight="SemiBold" VerticalAlignment="Center" Margin="10,0,0,0" />
-                    <TextBlock Grid.Column="2" Text="SPONSORED · 05s" Foreground="{StaticResource AdSubtle}"
-                               FontFamily="Bahnschrift" FontSize="9.5" VerticalAlignment="Center" />
+                    <Ellipse Width="9" Height="9" Fill="{StaticResource ZaloBlue}" VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="1" Text="ISLE LIVE MAP  /  CỘNG ĐỒNG"
+                               Foreground="{StaticResource InviteBone}" FontFamily="Bahnschrift" FontSize="10.5"
+                               FontWeight="SemiBold" VerticalAlignment="Center" Margin="11,0,0,0" />
+                    <TextBlock Grid.Column="2" Text="KÊNH THÔNG BÁO CHÍNH THỨC · 05s"
+                               Foreground="{StaticResource InviteSubtle}" FontFamily="Bahnschrift" FontSize="9.5" VerticalAlignment="Center" />
                 </Grid>
             </Border>
 
-            <Grid Grid.Row="1" Margin="30,28,30,24">
-                <Grid.ColumnDefinitions><ColumnDefinition Width="0.92*" /><ColumnDefinition Width="34" /><ColumnDefinition Width="1.08*" /></Grid.ColumnDefinitions>
+            <Grid Grid.Row="1" Margin="38,30,38,26">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="1.02*" /><ColumnDefinition Width="42" /><ColumnDefinition Width="0.98*" /></Grid.ColumnDefinitions>
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" />
                         <RowDefinition Height="*" /><RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
-                    <TextBlock Text="HOÀNG KIM LONG" Foreground="{StaticResource AdGold}"
-                               FontFamily="Bahnschrift SemiCondensed" FontSize="14" FontWeight="Bold" />
-                    <TextBlock Grid.Row="1" Text="BẠN CÓ Ý TƯỞNG.&#x0a;LONG BIẾN NÓ THÀNH&#x0a;SẢN PHẨM CHẠY ĐƯỢC."
-                               Foreground="{StaticResource AdBone}" FontFamily="Bahnschrift SemiCondensed"
-                               FontSize="31" FontWeight="Bold" LineHeight="33" Margin="0,12,0,0" />
-                    <Border Grid.Row="2" Background="#18271F" BorderBrush="{StaticResource AdGold}" BorderThickness="1"
-                            CornerRadius="3" Padding="11,9" Margin="0,15,0,0">
-                        <StackPanel>
-                            <TextBlock Text="NHẬN DỰ ÁN GAME &amp; WEB" Foreground="{StaticResource AdTeal}"
-                                       FontFamily="Bahnschrift" FontSize="9.5" FontWeight="Bold" />
-                            <TextBlock Text="Thiết kế website · mod game · tool/app · bot tự động"
-                                       Foreground="{StaticResource AdGold}" FontFamily="Bahnschrift SemiCondensed"
-                                       FontSize="16" FontWeight="Bold" TextWrapping="Wrap" LineHeight="19" Margin="0,4,0,0" />
-                            <TextBlock Text="Theo yêu cầu — từ ý tưởng đến sản phẩm chạy được."
-                                       Foreground="{StaticResource AdMuted}" FontSize="10.5" FontWeight="SemiBold"
-                                       TextWrapping="Wrap" Margin="0,4,0,0" />
-                        </StackPanel>
-                    </Border>
-                    <StackPanel Grid.Row="3" VerticalAlignment="Center" Margin="0,16,0,10">
-                        <TextBlock Text="ĐÃ ĐỒNG HÀNH CÙNG CÁC GAME BẠN ĐANG CHƠI" Foreground="{StaticResource AdSubtle}"
-                                   FontFamily="Bahnschrift" FontSize="9.5" FontWeight="Bold" Margin="0,0,0,9" />
-                        <UniformGrid Columns="5">
-                            <Border Height="67" Margin="0,0,5,0" Background="#111D1A" BorderBrush="{StaticResource AdLine}" BorderThickness="1" CornerRadius="7" ClipToBounds="True">
-                                <Grid>
-                                    <Image Source="Assets/Advertising/tft.png" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality" />
-                                    <Border VerticalAlignment="Bottom" Background="#C9000000" Padding="3,3"><TextBlock Text="TFT" Foreground="{StaticResource AdBone}" FontFamily="Bahnschrift" FontSize="9" FontWeight="Bold" HorizontalAlignment="Center" /></Border>
-                                </Grid>
+                    <TextBlock Text="THAM GIA KÊNH&#x0a;THÔNG BÁO" Foreground="{StaticResource InviteBone}"
+                               FontFamily="Bahnschrift SemiCondensed" FontSize="40" FontWeight="Bold" LineHeight="42" />
+                    <Border Grid.Row="1" Width="74" Height="4" HorizontalAlignment="Left"
+                            Background="{StaticResource InviteBlue}" Margin="0,18,0,0" />
+                    <TextBlock Grid.Row="2" Text="ĐÓNG GÓP Ý KIẾN CÁ NHÂN&#x0a;&amp; BÁO LỖI TRỰC TIẾP CHO LONG"
+                               Foreground="{StaticResource InviteBlue}" FontFamily="Bahnschrift SemiCondensed"
+                               FontSize="18" FontWeight="Bold" LineHeight="22" Margin="0,17,0,0" />
+
+                    <StackPanel Grid.Row="3" VerticalAlignment="Center" Margin="0,18,18,8">
+                        <Grid Margin="0,0,0,14">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="34" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <Border Width="24" Height="24" Background="#102940" BorderBrush="#2A6FA4" BorderThickness="1" CornerRadius="12">
+                                <TextBlock Text="01" Foreground="{StaticResource InviteBlue}" FontFamily="Bahnschrift" FontSize="9" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" />
                             </Border>
-                            <Border Height="67" Margin="0,0,5,0" Background="#111D1A" BorderBrush="{StaticResource AdLine}" BorderThickness="1" CornerRadius="7" ClipToBounds="True">
-                                <Grid>
-                                    <Image Source="Assets/Advertising/fco4.jpg" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality" />
-                                    <Border VerticalAlignment="Bottom" Background="#C9000000" Padding="3,3"><TextBlock Text="FC 4" Foreground="{StaticResource AdBone}" FontFamily="Bahnschrift" FontSize="9" FontWeight="Bold" HorizontalAlignment="Center" /></Border>
-                                </Grid>
+                            <StackPanel Grid.Column="1">
+                                <TextBlock Text="NHẬN THÔNG BÁO SỚM" Foreground="{StaticResource InviteBone}" FontFamily="Bahnschrift" FontSize="11" FontWeight="Bold" />
+                                <TextBlock Text="Cập nhật, bảo trì và hướng dẫn sử dụng Live Map." Foreground="{StaticResource InviteMuted}" FontSize="10.5" Margin="0,3,0,0" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Grid>
+                        <Grid Margin="0,0,0,14">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="34" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <Border Width="24" Height="24" Background="#102940" BorderBrush="#2A6FA4" BorderThickness="1" CornerRadius="12">
+                                <TextBlock Text="02" Foreground="{StaticResource InviteBlue}" FontFamily="Bahnschrift" FontSize="9" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" />
                             </Border>
-                            <Border Height="67" Margin="0,0,5,0" Background="#111D1A" BorderBrush="{StaticResource AdLine}" BorderThickness="1" CornerRadius="7" ClipToBounds="True">
-                                <Grid>
-                                    <Image Source="Assets/Advertising/nro.jpg" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality" />
-                                    <Border VerticalAlignment="Bottom" Background="#C9000000" Padding="3,3"><TextBlock Text="NRO" Foreground="{StaticResource AdBone}" FontFamily="Bahnschrift" FontSize="9" FontWeight="Bold" HorizontalAlignment="Center" /></Border>
-                                </Grid>
+                            <StackPanel Grid.Column="1">
+                                <TextBlock Text="GÓP Ý TÍNH NĂNG" Foreground="{StaticResource InviteBone}" FontFamily="Bahnschrift" FontSize="11" FontWeight="Bold" />
+                                <TextBlock Text="Đề xuất trải nghiệm bạn muốn có trong bản tiếp theo." Foreground="{StaticResource InviteMuted}" FontSize="10.5" Margin="0,3,0,0" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Grid>
+                        <Grid>
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="34" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <Border Width="24" Height="24" Background="#102940" BorderBrush="#2A6FA4" BorderThickness="1" CornerRadius="12">
+                                <TextBlock Text="03" Foreground="{StaticResource InviteBlue}" FontFamily="Bahnschrift" FontSize="9" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" />
                             </Border>
-                            <Border Height="67" Margin="0,0,5,0" Background="#111D1A" BorderBrush="{StaticResource AdLine}" BorderThickness="1" CornerRadius="7" ClipToBounds="True">
-                                <Grid>
-                                    <Image Source="Assets/Advertising/hso.jpg" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality" />
-                                    <Border VerticalAlignment="Bottom" Background="#C9000000" Padding="3,3"><TextBlock Text="HSO" Foreground="{StaticResource AdBone}" FontFamily="Bahnschrift" FontSize="9" FontWeight="Bold" HorizontalAlignment="Center" /></Border>
-                                </Grid>
-                            </Border>
-                            <Border Height="67" Background="#111D1A" BorderBrush="{StaticResource AdLine}" BorderThickness="1" CornerRadius="7" ClipToBounds="True">
-                                <Grid>
-                                    <Image Source="Assets/Advertising/vltn.webp" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality" />
-                                    <Border VerticalAlignment="Bottom" Background="#C9000000" Padding="3,3"><TextBlock Text="VLTN" Foreground="{StaticResource AdBone}" FontFamily="Bahnschrift" FontSize="9" FontWeight="Bold" HorizontalAlignment="Center" /></Border>
-                                </Grid>
-                            </Border>
-                        </UniformGrid>
-                    </StackPanel>
-                    <StackPanel Grid.Row="4">
-                        <Button Style="{StaticResource AdPrimaryButton}" Content="TRAO ĐỔI QUA FACEBOOK  ↗"
-                                HorizontalAlignment="Stretch" Click="FacebookButton_Click" />
-                        <Grid Margin="0,12,0,0">
-                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-                            <TextBlock Text="ZALO / PHONE" Foreground="{StaticResource AdSubtle}" FontFamily="Bahnschrift" FontSize="9.5" VerticalAlignment="Center" />
-                            <Button Grid.Column="1" Style="{StaticResource AdQuietButton}" Content="0705 878 781  ·  SAO CHÉP"
-                                    Padding="12,7" FontSize="10.5" Click="CopyPhoneButton_Click" />
+                            <StackPanel Grid.Column="1">
+                                <TextBlock Text="BÁO LỖI NHANH CHO LONG" Foreground="{StaticResource InviteBone}" FontFamily="Bahnschrift" FontSize="11" FontWeight="Bold" />
+                                <TextBlock Text="Gửi tình trạng thực tế để lỗi được xác minh và xử lý sớm." Foreground="{StaticResource InviteMuted}" FontSize="10.5" Margin="0,3,0,0" TextWrapping="Wrap" />
+                            </StackPanel>
                         </Grid>
                     </StackPanel>
+                    <TextBlock Grid.Row="4" Text="Nhóm dành cho người dùng Free và Pro."
+                               Foreground="{StaticResource InviteSubtle}" FontSize="10" FontStyle="Italic" />
                 </Grid>
 
+                <Border Grid.Column="1" Width="1" HorizontalAlignment="Center" Background="{StaticResource InviteLine}" />
                 <Grid Grid.Column="2">
                     <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
-                    <TextBlock Text="XEM CÁCH LONG BIẾN Ý TƯỞNG THÀNH SẢN PHẨM"
-                               Foreground="{StaticResource AdBone}" FontFamily="Bahnschrift SemiCondensed"
-                               FontSize="13" FontWeight="Bold" Margin="0,0,0,10" />
-                    <Border Grid.Row="1" Background="#020403" BorderBrush="#38564D" BorderThickness="1">
-                        <Grid>
-                            <StackPanel x:Name="VideoFallbackPanel" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="24">
-                                <TextBlock Text="VIDEO SHOWCASE" Foreground="{StaticResource AdGold}"
-                                           FontFamily="Bahnschrift SemiCondensed" FontSize="20" FontWeight="Bold" HorizontalAlignment="Center" />
-                                <TextBlock x:Name="VideoFallbackDetail" Text="Đang chuẩn bị video…"
-                                           Foreground="{StaticResource AdMuted}" FontSize="11" TextWrapping="Wrap"
-                                           TextAlignment="Center" Margin="0,8,0,16" />
-                                <Button Style="{StaticResource AdQuietButton}" Content="MỞ TRÊN YOUTUBE  ↗" Click="YouTubeButton_Click" />
-                            </StackPanel>
-                            <wv2:WebView2 x:Name="VideoBrowser" Visibility="Collapsed" />
-                        </Grid>
+                    <TextBlock Text="QUÉT QR BẰNG ZALO ĐỂ THAM GIA" Foreground="{StaticResource InviteBone}"
+                               FontFamily="Bahnschrift SemiCondensed" FontSize="15" FontWeight="Bold" HorizontalAlignment="Center" />
+                    <Border Grid.Row="1" Width="286" Height="378" Margin="0,14,0,12" Background="#F5FAFF"
+                            BorderBrush="#4A98D7" BorderThickness="1" CornerRadius="8" Padding="6">
+                        <Image Source="Assets/ZaloChannelInvite.jpg" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality" />
                     </Border>
-                    <Grid Grid.Row="2" Margin="0,10,0,0">
-                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-                        <TextBlock Text="Không tự phát âm thanh · Video tải khi cửa sổ mở" Foreground="{StaticResource AdSubtle}" FontSize="9.5" />
-                        <TextBlock Grid.Column="1" Text="YOUTUBE" Foreground="{StaticResource AdTeal}" FontFamily="Bahnschrift" FontSize="9.5" FontWeight="Bold" />
-                    </Grid>
+                    <TextBlock Grid.Row="2" Text="Mở Zalo  →  Quét mã QR  →  Tham gia nhóm"
+                               Foreground="{StaticResource InviteMuted}" FontSize="10.5" FontWeight="SemiBold" HorizontalAlignment="Center" />
                 </Grid>
             </Grid>
 
-            <Border Grid.Row="2" BorderBrush="{StaticResource AdLine}" BorderThickness="0,1,0,0">
-                <Grid Margin="20,0">
-                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="22" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+            <Border Grid.Row="2" BorderBrush="{StaticResource InviteLine}" BorderThickness="0,1,0,0">
+                <Grid Margin="22,0">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="20" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                     <StackPanel VerticalAlignment="Center">
-                        <TextBlock x:Name="CountdownLabel" Text="CÓ THỂ ĐÓNG SAU 5 GIÂY" Foreground="{StaticResource AdMuted}"
+                        <TextBlock x:Name="CountdownLabel" Text="CÓ THỂ ĐÓNG SAU 5 GIÂY" Foreground="{StaticResource InviteMuted}"
                                    FontFamily="Bahnschrift" FontSize="10" FontWeight="SemiBold" />
-                        <ProgressBar x:Name="CountdownProgress" Minimum="0" Maximum="100" Value="0" Height="3" Margin="0,8,0,0"
-                                     Foreground="{StaticResource AdTeal}" Background="#16241F" BorderThickness="0" />
+                        <ProgressBar x:Name="CountdownProgress" Minimum="0" Maximum="100" Value="0" Height="3" Margin="0,9,0,0"
+                                     Foreground="{StaticResource InviteBlue}" Background="#142630" BorderThickness="0" />
                     </StackPanel>
-                    <Button x:Name="CloseButton" Grid.Column="2" Style="{StaticResource AdPrimaryButton}"
-                            Content="ĐÓNG SAU 5 GIÂY" MinWidth="154" IsEnabled="False" Click="CloseButton_Click" />
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                        <Button x:Name="NeverShowAgainButton" Style="{StaticResource InviteQuietButton}"
+                                Content="KHÔNG HIỂN THỊ LẠI NỮA" MinWidth="196" IsEnabled="False"
+                                Click="NeverShowAgainButton_Click" />
+                        <Button x:Name="CloseButton" Style="{StaticResource InvitePrimaryButton}"
+                                Content="ĐÓNG SAU 5 GIÂY" MinWidth="158" Margin="10,0,0,0"
+                                IsEnabled="False" Click="CloseButton_Click" />
+                    </StackPanel>
                 </Grid>
             </Border>
         </Grid>
