@@ -1,3 +1,14 @@
+# Isle Live Map 2.2.1
+
+## Hotfix nhóm sinh tồn ngang quyền
+
+- Xác nhận nhóm không có leader đặc quyền: mọi thành viên đều nhận cùng snapshot, stats, minimap marker và team ping của tất cả thành viên còn lại.
+- Sửa trường hợp máy thành viên chưa đọc được endpoint local: marker đồng đội vẫn hiển thị với trạng thái `CHỜ SERVER`; chỉ ẩn khi có bằng chứng chắc chắn hai người đang ở khác server.
+- Freshness của stats/marker dùng thời điểm client nhận telemetry thay vì timestamp từ đồng hồ Windows của máy khác, tránh máy lệch giờ coi toàn bộ đồng đội là stale.
+- Telemetry không đổi nhưng nguồn vẫn đang hoạt động sẽ được refresh tối đa một lần mỗi 5 giây; không còn trường hợp người đứng yên/AFK biến mất khỏi máy người mới vào nhóm.
+- Heartbeat không làm mới giả telemetry đã dừng; nếu nguồn thực sự im lặng quá 10 giây thì dữ liệu vẫn hết hạn đúng sau TTL.
+- Bổ sung regression ba thành viên: từ góc nhìn của từng người đều phải thấy đủ hai peer, stats và marker như nhau; bài test 3 client production cũng xác nhận relay broadcast đối xứng.
+
 # Isle Live Map 2.2.0
 
 ## Bản đồ offline và điều khiển layer

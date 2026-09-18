@@ -12,10 +12,11 @@ public sealed class TeamCoordinator : IAsyncDisposable
     private readonly object _telemetryGate = new();
     private readonly Task _publishTask;
 
-    private LatestTelemetry _latestTelemetry = new(null, null);
+    private LatestTelemetry _latestTelemetry = new(null, null, default);
     private long _telemetryVersion;
     private long _publishedVersion = -1;
     private long _sequence;
+    private DateTimeOffset _lastPublishedAt;
     private Guid? _activeTeamId;
     private TeamRelayConnectionState _lastConnectionState;
     private bool _disposed;
@@ -61,7 +62,10 @@ public sealed class TeamCoordinator : IAsyncDisposable
         ArgumentNullException.ThrowIfNull(snapshot);
         lock (_telemetryGate)
         {
-            _latestTelemetry = new LatestTelemetry(snapshot, fallbackHeadingDegrees);
+            _latestTelemetry = new LatestTelemetry(
+                snapshot,
+                fallbackHeadingDegrees,
+                DateTimeOffset.UtcNow);
             _telemetryVersion++;
         }
     }
@@ -70,7 +74,7 @@ public sealed class TeamCoordinator : IAsyncDisposable
     {
         lock (_telemetryGate)
         {
-            _latestTelemetry = new LatestTelemetry(null, null);
+            _latestTelemetry = new LatestTelemetry(null, null, DateTimeOffset.UtcNow);
             _telemetryVersion++;
         }
     }
@@ -121,12 +125,18 @@ public sealed class TeamCoordinator : IAsyncDisposable
             lock (_telemetryGate)
             {
                 version = _telemetryVersion;
-                if (version == _publishedVersion)
+                var now = DateTimeOffset.UtcNow;
+                latest = _latestTelemetry;
+                if (!TeamTelemetryPublishPolicy.ShouldPublish(
+                        latest.Snapshot is not null,
+                        version,
+                        _publishedVersion,
+                        latest.ReceivedAt,
+                        _lastPublishedAt,
+                        now))
                 {
                     continue;
                 }
-
-                latest = _latestTelemetry;
             }
 
             var update = TeamTelemetryMapper.Create(
@@ -145,6 +155,7 @@ public sealed class TeamCoordinator : IAsyncDisposable
                 if (_telemetryVersion == version)
                 {
                     _publishedVersion = version;
+                    _lastPublishedAt = DateTimeOffset.UtcNow;
                 }
             }
         }
@@ -160,6 +171,7 @@ public sealed class TeamCoordinator : IAsyncDisposable
                 _activeTeamId = teamId;
                 _sequence = 0;
                 _publishedVersion = -1;
+                _lastPublishedAt = default;
             }
             else if (state.ConnectionState == TeamRelayConnectionState.Live
                      && _lastConnectionState != TeamRelayConnectionState.Live)
@@ -175,5 +187,6 @@ public sealed class TeamCoordinator : IAsyncDisposable
 
     private sealed record LatestTelemetry(
         TelemetrySnapshot? Snapshot,
-        double? FallbackHeadingDegrees);
+        double? FallbackHeadingDegrees,
+        DateTimeOffset ReceivedAt);
 }

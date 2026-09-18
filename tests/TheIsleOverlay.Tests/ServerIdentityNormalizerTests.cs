@@ -48,4 +48,23 @@ public sealed class ServerIdentityNormalizerTests
             legacyServerKey,
             "Another display name"));
     }
+
+    [Fact]
+    public void Compare_IsUnknownUntilServerIdentityCanBeProven()
+    {
+        Assert.Equal(
+            ServerIdentityNormalizer.MatchResult.Unknown,
+            ServerIdentityNormalizer.Compare(
+                null,
+                null,
+                "115.72.226.156:7777",
+                "Gateway"));
+        Assert.Equal(
+            ServerIdentityNormalizer.MatchResult.Different,
+            ServerIdentityNormalizer.Compare(
+                "115.72.226.157:7777",
+                "Gateway",
+                "115.72.226.156:7777",
+                "Gateway"));
+    }
 }

@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using TheIsleOverlay.Core;
+using TheIsleOverlay.TeamRelay;
 
 namespace TheIsleOverlay.App.Tests;
 
@@ -40,6 +41,7 @@ public sealed class MapNotesWindowLifecycleTests
 
                 Assert.Empty(application.Windows.OfType<MapNotesWindow>());
                 VerifyLayerInspectorAndPersistence();
+                VerifyPeerSymmetry();
                 completed.TrySetResult();
             }
             catch (Exception error)
@@ -121,6 +123,81 @@ public sealed class MapNotesWindowLifecycleTests
         restored.Close();
     }
 
+    private static void VerifyPeerSymmetry()
+    {
+        var teamId = Guid.NewGuid();
+        var memberIds = new[] { Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid() };
+        var members = memberIds.Select((memberId, index) => new TeamMemberSnapshot(
+            memberId,
+            $"Member {index + 1}",
+            true,
+            DateTimeOffset.UtcNow - TimeSpan.FromMinutes(15),
+            new TeamMemberTelemetry
+            {
+                Sequence = 3,
+                ServerKey = "115.72.226.156:7777",
+                ServerEndpoint = "115.72.226.156:7777",
+                ServerName = "Gateway Matrix",
+                MapId = "gateway",
+                Species = "Triceratops",
+                HealthPercent = 95,
+                HungerPercent = 72,
+                ThirstPercent = 81,
+                MapLeft = 0.42d + index * 0.08d,
+                MapTop = 0.44d + index * 0.06d,
+                UpdatedAt = DateTimeOffset.UtcNow - TimeSpan.FromMinutes(15)
+            })
+        {
+            StateRevision = 20,
+            ClientTelemetryObservedAt = DateTimeOffset.UtcNow
+        }).ToArray();
+
+        for (var viewer = 0; viewer < memberIds.Length; viewer++)
+        {
+            using var session = new SilentTelemetrySession();
+            var window = new MainWindow(session, $"Viewer {viewer + 1}");
+            var state = new TeamRelayState
+            {
+                ConnectionState = TeamRelayConnectionState.Live,
+                Session = new TeamSession(
+                    teamId,
+                    memberIds[viewer],
+                    "ABC123",
+                    "test-token",
+                    10,
+                    5),
+                Members = members,
+                StateRevision = 20
+            };
+            var waitingForLocalServer = viewer == 1;
+            SetField(
+                window,
+                "_localServerEndpoint",
+                waitingForLocalServer ? null : "115.72.226.156:7777");
+            SetField(
+                window,
+                "_localServerName",
+                waitingForLocalServer ? null : "Gateway Matrix");
+            SetField(window, "_pendingTeamState", state);
+            Invoke(window, "RenderTeamState", state);
+
+            var rows = Assert.IsType<MainWindow.TeamMemberRowViewModel[]>(
+                Element<ItemsControl>(window, "TeamMembersList").ItemsSource);
+            Assert.Equal(2, rows.Length);
+            Assert.All(rows, row =>
+            {
+                Assert.StartsWith(
+                    waitingForLocalServer ? "CHỜ SERVER" : "CÙNG SERVER",
+                    row.DetailText,
+                    StringComparison.Ordinal);
+                Assert.NotEqual("—", row.HealthText);
+                Assert.Equal(waitingForLocalServer ? 0.68d : 1d, row.Opacity);
+            });
+            Assert.Equal(2, Element<Canvas>(window, "TeamMarkerLayer").Children.Count);
+            window.Close();
+        }
+    }
+
     private static void AssertGroupDelta(MainWindow window, string toggleName, int expectedDelta)
     {
         var before = VisibleChildren(window, "MapZoneLayer");
@@ -172,6 +249,10 @@ public sealed class MapNotesWindowLifecycleTests
     private static void Invoke(object instance, string name, params object[] arguments) =>
         instance.GetType().GetMethod(name, BindingFlags.Instance | BindingFlags.NonPublic)!
             .Invoke(instance, arguments);
+
+    private static void SetField(object instance, string name, object? value) =>
+        instance.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)!
+            .SetValue(instance, value);
 
     private static T Element<T>(FrameworkElement root, string name) where T : FrameworkElement =>
         Assert.IsType<T>(root.FindName(name));

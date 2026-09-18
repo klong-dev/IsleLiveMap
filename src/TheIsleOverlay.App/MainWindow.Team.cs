@@ -127,9 +127,9 @@ public partial class MainWindow
     {
         var telemetry = member.Telemetry;
         var telemetryFresh = TeamOverlayFreshnessPolicy.IsFresh(
-            telemetry?.UpdatedAt,
+            member.ClientTelemetryObservedAt,
             DateTimeOffset.UtcNow);
-        var sameServer = IsSameServer(
+        var serverMatch = ServerIdentityNormalizer.Compare(
             _localServerEndpoint,
             _localServerName,
             telemetry?.ServerEndpoint ?? telemetry?.ServerKey,
@@ -138,9 +138,9 @@ public partial class MainWindow
             ? "MẤT TÍN HIỆU"
             : telemetry is null || string.IsNullOrWhiteSpace(telemetry.ServerEndpoint ?? telemetry.ServerKey ?? telemetry.ServerName)
                 ? "CHỜ DINO"
-                : string.IsNullOrWhiteSpace(_localServerEndpoint ?? _localServerName)
+                : serverMatch == ServerIdentityNormalizer.MatchResult.Unknown
                     ? "CHỜ SERVER"
-                    : sameServer
+                    : serverMatch == ServerIdentityNormalizer.MatchResult.Same
                         ? "CÙNG SERVER"
                         : "KHÁC SERVER";
         var species = string.IsNullOrWhiteSpace(telemetry?.Species)
@@ -164,7 +164,7 @@ public partial class MainWindow
                 ? 0.48d
                 : _pendingTeamState.ConnectionState == TeamRelayConnectionState.Reconnecting
                     ? 0.62d
-                    : sameServer ? 1d : 0.68d
+                    : serverMatch == ServerIdentityNormalizer.MatchResult.Same ? 1d : 0.68d
         };
     }
 
@@ -207,12 +207,15 @@ public partial class MainWindow
     {
         var telemetry = member.Telemetry;
         if (telemetry is null
-            || !TeamOverlayFreshnessPolicy.IsFresh(telemetry.UpdatedAt, DateTimeOffset.UtcNow)
-            || !IsSameServer(
-                _localServerEndpoint,
-                _localServerName,
-                telemetry.ServerEndpoint ?? telemetry.ServerKey,
-                telemetry.ServerName)
+            || !TeamOverlayFreshnessPolicy.IsFresh(
+                member.ClientTelemetryObservedAt,
+                DateTimeOffset.UtcNow)
+            || ServerIdentityNormalizer.Compare(
+                    _localServerEndpoint,
+                    _localServerName,
+                    telemetry.ServerEndpoint ?? telemetry.ServerKey,
+                    telemetry.ServerName)
+                == ServerIdentityNormalizer.MatchResult.Different
             || telemetry.MapId is { Length: > 0 } mapId
                 && !string.Equals(mapId, "gateway", StringComparison.OrdinalIgnoreCase))
         {
@@ -354,13 +357,6 @@ public partial class MainWindow
         TeamMarkerLayer.Children.Clear();
         _teamMapMarkers.Clear();
     }
-
-    private static bool IsSameServer(
-        string? localEndpoint,
-        string? localName,
-        string? remoteEndpoint,
-        string? remoteName) =>
-        ServerIdentityNormalizer.AreSame(localEndpoint, localName, remoteEndpoint, remoteName);
 
     private static string FormatTeamPercent(double? value) => value is { } percent
         ? $"{Math.Clamp(percent, 0d, 100d):0}%"

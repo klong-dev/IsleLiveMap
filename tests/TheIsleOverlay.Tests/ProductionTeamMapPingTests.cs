@@ -6,6 +6,71 @@ public sealed class ProductionTeamMapPingTests
 {
     [Fact]
     [Trait("Category", "ProductionIntegration")]
+    public async Task EveryMemberReceivesEveryOtherMembersTelemetry()
+    {
+        if (!string.Equals(
+                Environment.GetEnvironmentVariable("ISLELIVEMAP_RUN_PRODUCTION_RELAY_TESTS"),
+                "1",
+                StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        await using var alpha = new TeamRelayClient();
+        await using var bravo = new TeamRelayClient();
+        await using var charlie = new TeamRelayClient();
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(40));
+        var alphaSession = await alpha.CreateAsync("Matrix Alpha", timeout.Token);
+        var bravoSession = await bravo.JoinAsync(alphaSession.InviteCode, "Matrix Bravo", timeout.Token);
+        var charlieSession = await charlie.JoinAsync(alphaSession.InviteCode, "Matrix Charlie", timeout.Token);
+        var clients = new[] { alpha, bravo, charlie };
+        var sessions = new[] { alphaSession, bravoSession, charlieSession };
+
+        for (var index = 0; index < clients.Length; index++)
+        {
+            var accepted = await clients[index].PublishTelemetryAsync(new TeamTelemetryUpdate
+            {
+                Sequence = 1,
+                Source = "matrix-test",
+                ServerKey = "115.72.226.156:7777",
+                ServerEndpoint = "115.72.226.156:7777",
+                ServerName = "Matrix Gateway",
+                MapId = "gateway",
+                Species = $"Species {index + 1}",
+                HealthPercent = 90 - index,
+                HungerPercent = 60 - index,
+                ThirstPercent = 70 - index,
+                MapLeft = 0.4 + index * 0.05,
+                MapTop = 0.5 + index * 0.05,
+                WorldX = 10_000 + index,
+                WorldY = -20_000 - index,
+                HeadingDegrees = index * 45
+            }, timeout.Token);
+            Assert.True(accepted);
+        }
+
+        for (var viewer = 0; viewer < clients.Length; viewer++)
+        {
+            var expectedPeers = sessions
+                .Where(session => session.MemberId != sessions[viewer].MemberId)
+                .Select(session => session.MemberId)
+                .ToHashSet();
+            var state = await WaitForStateAsync(
+                clients[viewer],
+                candidate => expectedPeers.All(memberId =>
+                    candidate.Members.Any(member =>
+                        member.MemberId == memberId
+                        && member.Telemetry?.Sequence == 1)),
+                timeout.Token);
+            Assert.Equal(3, state.Members.Count);
+            Assert.All(expectedPeers, memberId => Assert.Contains(
+                state.Members,
+                member => member.MemberId == memberId && member.Telemetry is not null));
+        }
+    }
+
+    [Fact]
+    [Trait("Category", "ProductionIntegration")]
     public async Task TwoClientsSharePingWhileRelayEnforcesOwnerOnlyMutation()
     {
         if (!string.Equals(

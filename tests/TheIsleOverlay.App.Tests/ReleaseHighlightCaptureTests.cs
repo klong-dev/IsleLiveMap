@@ -159,7 +159,10 @@ public sealed class ReleaseHighlightCaptureTests
                 HeadingDegrees = left * 360d,
                 UpdatedAt = now
             })
-        { StateRevision = 42 };
+        {
+            StateRevision = 42,
+            ClientTelemetryObservedAt = DateTimeOffset.UtcNow
+        };
 
     private static void AddTrackingDots(Canvas layer)
     {

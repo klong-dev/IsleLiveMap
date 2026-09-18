@@ -93,6 +93,28 @@ public sealed class TeamRelayRevisionTests
         Assert.Equal(12, client.CurrentState.StateRevision);
     }
 
+    [Fact]
+    public void TelemetryObservationUsesClientReceiptTimeAndHeartbeatDoesNotRefreshIt()
+    {
+        var memberId = Guid.NewGuid();
+        var receivedAt = DateTimeOffset.UtcNow;
+        var original = Member(memberId, revision: 5, sequence: 2, receivedAt - TimeSpan.FromHours(3));
+
+        var first = TeamRelayClient.ObserveTelemetry(original, null, receivedAt);
+        var heartbeat = TeamRelayClient.ObserveTelemetry(
+            Member(memberId, revision: 6, sequence: 2, receivedAt + TimeSpan.FromHours(4)),
+            first,
+            receivedAt + TimeSpan.FromSeconds(5));
+        var changed = TeamRelayClient.ObserveTelemetry(
+            Member(memberId, revision: 7, sequence: 3, receivedAt + TimeSpan.FromHours(4)),
+            heartbeat,
+            receivedAt + TimeSpan.FromSeconds(6));
+
+        Assert.Equal(receivedAt, first.ClientTelemetryObservedAt);
+        Assert.Equal(receivedAt, heartbeat.ClientTelemetryObservedAt);
+        Assert.Equal(receivedAt + TimeSpan.FromSeconds(6), changed.ClientTelemetryObservedAt);
+    }
+
     private static TeamMemberSnapshot Member(Guid id, long revision, long sequence, DateTimeOffset at) =>
         new(id, id.ToString("N"), true, at, new TeamMemberTelemetry
         {

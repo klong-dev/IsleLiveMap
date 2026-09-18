@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace TheIsleOverlay.TeamRelay;
 
 public sealed record CreateTeamRequest(string DisplayName);
@@ -59,6 +61,8 @@ public sealed record TeamMemberSnapshot(
     TeamMemberTelemetry? Telemetry)
 {
     public long StateRevision { get; init; }
+    [JsonIgnore]
+    public DateTimeOffset ClientTelemetryObservedAt { get; init; }
 }
 
 public sealed record TeamSnapshot(

@@ -5,6 +5,13 @@ namespace TheIsleOverlay.TeamRelay;
 /// <summary>Compares endpoint identity before falling back to display names.</summary>
 public static class ServerIdentityNormalizer
 {
+    public enum MatchResult
+    {
+        Unknown,
+        Same,
+        Different
+    }
+
     public static string? Normalize(string? endpoint, string? serverName = null)
     {
         var normalizedEndpoint = NormalizeEndpoint(endpoint);
@@ -12,13 +19,28 @@ public static class ServerIdentityNormalizer
     }
 
     public static bool AreSame(string? leftEndpoint, string? leftName, string? rightEndpoint, string? rightName)
+        => Compare(leftEndpoint, leftName, rightEndpoint, rightName) == MatchResult.Same;
+
+    public static MatchResult Compare(
+        string? leftEndpoint,
+        string? leftName,
+        string? rightEndpoint,
+        string? rightName)
     {
         var left = NormalizeEndpoint(leftEndpoint);
         var right = NormalizeEndpoint(rightEndpoint);
         if (!string.IsNullOrWhiteSpace(left) && !string.IsNullOrWhiteSpace(right))
-            return string.Equals(left, right, StringComparison.OrdinalIgnoreCase);
-        return string.Equals(NormalizeName(leftName ?? leftEndpoint), NormalizeName(rightName ?? rightEndpoint), StringComparison.OrdinalIgnoreCase)
-               && !string.IsNullOrWhiteSpace(NormalizeName(leftName ?? leftEndpoint));
+            return string.Equals(left, right, StringComparison.OrdinalIgnoreCase)
+                ? MatchResult.Same
+                : MatchResult.Different;
+        var normalizedLeftName = NormalizeName(leftName);
+        var normalizedRightName = NormalizeName(rightName);
+        if (string.IsNullOrWhiteSpace(normalizedLeftName)
+            || string.IsNullOrWhiteSpace(normalizedRightName))
+            return MatchResult.Unknown;
+        return string.Equals(normalizedLeftName, normalizedRightName, StringComparison.OrdinalIgnoreCase)
+            ? MatchResult.Same
+            : MatchResult.Different;
     }
 
     public static string? NormalizeEndpoint(string? value)

@@ -21,4 +21,5 @@ public sealed class TeamOverlayFreshnessPolicyTests
         Assert.False(TeamOverlayFreshnessPolicy.IsFresh(default(DateTimeOffset), Now));
         Assert.False(TeamOverlayFreshnessPolicy.IsFresh(Now + TimeSpan.FromMilliseconds(1), Now));
     }
+
 }

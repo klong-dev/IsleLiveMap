@@ -566,9 +566,13 @@ public sealed class TeamRelayClient : IAsyncDisposable
             _memberRemovalRevisions.Clear();
             foreach (var member in snapshot.Members)
             {
-                _members[member.MemberId] = member;
-                _memberRevisions[member.MemberId] = member.StateRevision;
-                _memberSequences[member.MemberId] = member.Telemetry?.Sequence ?? -1;
+                var observed = ObserveTelemetry(
+                    member,
+                    _state.Members.FirstOrDefault(previous => previous.MemberId == member.MemberId),
+                    DateTimeOffset.UtcNow);
+                _members[observed.MemberId] = observed;
+                _memberRevisions[observed.MemberId] = observed.StateRevision;
+                _memberSequences[observed.MemberId] = observed.Telemetry?.Sequence ?? -1;
             }
             _mapPings.Clear();
             foreach (var ping in snapshot.MapPings ?? [])
@@ -608,7 +612,8 @@ public sealed class TeamRelayClient : IAsyncDisposable
                 && member.LastSeenAt < previousMember.LastSeenAt)
                 return;
             _stateRevision = Math.Max(_stateRevision, revision);
-            _members[member.MemberId] = member;
+            var observed = ObserveTelemetry(member, previousMember, DateTimeOffset.UtcNow);
+            _members[member.MemberId] = observed;
             _memberRevisions[member.MemberId] = revision;
             _memberSequences[member.MemberId] = sequence;
             _memberRemovalRevisions.Remove(member.MemberId);
@@ -625,6 +630,19 @@ public sealed class TeamRelayClient : IAsyncDisposable
         SetState(CurrentState.ConnectionState is TeamRelayConnectionState.Reconnecting
             ? TeamRelayConnectionState.Reconnecting
             : TeamRelayConnectionState.Live);
+    }
+
+    internal static TeamMemberSnapshot ObserveTelemetry(
+        TeamMemberSnapshot member,
+        TeamMemberSnapshot? previous,
+        DateTimeOffset now)
+    {
+        if (member.Telemetry is null)
+            return member with { ClientTelemetryObservedAt = default };
+        if (previous?.Telemetry?.Sequence == member.Telemetry.Sequence
+            && previous.ClientTelemetryObservedAt != default)
+            return member with { ClientTelemetryObservedAt = previous.ClientTelemetryObservedAt };
+        return member with { ClientTelemetryObservedAt = now };
     }
 
     internal void MemberRemoved(Guid memberId)
