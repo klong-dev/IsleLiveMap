@@ -46,5 +46,6 @@ public sealed record MapPointOfInterestTelemetry
 public enum MapZoneKind
 {
     Migration = 1,
-    Patrol = 2
+    Patrol = 2,
+    Sanctuary = 3
 }

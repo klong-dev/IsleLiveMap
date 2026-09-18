@@ -229,7 +229,8 @@ public static class ShortcutSettingsManager
 
     public static IReadOnlyList<string> Validate(
         OverlayShortcutSettings? settings,
-        bool includeMapNotes = true)
+        bool includeMapNotes = true,
+        bool checkDuplicates = true)
     {
         settings ??= OverlayShortcutSettings.Defaults;
         var errors = new List<string>();
@@ -242,9 +243,9 @@ public static class ShortcutSettingsManager
                 continue;
             }
 
-            var duplicate = parsed.FirstOrDefault(pair =>
+            var duplicate = checkDuplicates ? parsed.FirstOrDefault(pair =>
                 pair.Value.Modifiers == binding.Modifiers
-                && pair.Value.VirtualKey == binding.VirtualKey);
+                && pair.Value.VirtualKey == binding.VirtualKey) : default;
             if (!duplicate.Equals(default(KeyValuePair<OverlayShortcutAction, ShortcutBinding>)))
             {
                 errors.Add($"{definition.Label} trùng với {Label(duplicate.Key)}.");

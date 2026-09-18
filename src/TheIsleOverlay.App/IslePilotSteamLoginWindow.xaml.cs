@@ -131,7 +131,8 @@ public partial class IslePilotSteamLoginWindow : Window
         catch
         {
             // The overlay token remains valid if the optional tenant cookie
-            // cannot be read. Only server-specific heatmap will be unavailable.
+            // cannot be read. Static map layers remain available from the
+            // bundled offline snapshot; only optional provider metadata is unavailable.
         }
 
         Credentials = credentials with { PlayerCookie = playerCookie };

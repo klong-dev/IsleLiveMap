@@ -15,6 +15,9 @@ public partial class MapNotesWindow : Window
     private static readonly Uri GatewayMapResourceUri = new(
         "pack://application:,,,/IsleLiveMap;component/Assets/GatewayMap.jpg",
         UriKind.Absolute);
+    private static readonly Lazy<BitmapSource> GatewayMapImage = new(
+        LoadGatewayMapImage,
+        LazyThreadSafetyMode.ExecutionAndPublication);
     private readonly MapNoteStore _store;
     private readonly CancellationTokenSource _shutdown = new();
     private Guid? _selectedNoteId;
@@ -25,6 +28,13 @@ public partial class MapNotesWindow : Window
     private bool _noteCreationBusy;
     private string? _durableSelectionFeedback;
     private bool _durableSelectionFeedbackIsError;
+    private readonly Dictionary<Guid, NoteVisual> _noteVisuals = [];
+    private readonly Dictionary<string, StaticLayerVisual> _staticLayerVisuals = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, BitmapImage> _mapIconCache = new(StringComparer.OrdinalIgnoreCase);
+    private GatewayStaticMapLayers _staticLayers = GatewayStaticMapLayers.Empty;
+    private MapLayerPreferences _layerPreferences = new();
+    private FrameworkElement? _playerMarker;
+    private RotateTransform? _playerHeadingTransform;
 
     public MapNotesWindow(
         MapNoteStore store,
@@ -40,6 +50,7 @@ public partial class MapNotesWindow : Window
         CloseShortcutLabel.Text =
             $"{new ShortcutSettingsStore().Load().MapNotes.ToUpperInvariant()} / ESC ĐỂ ĐÓNG";
         LoadMap();
+        LoadStaticLayers();
         BuildPalette();
         _store.Changed += Store_Changed;
     }
@@ -50,7 +61,7 @@ public partial class MapNotesWindow : Window
         _playerHeading = heading;
         if (IsLoaded)
         {
-            RenderMap();
+            UpdateDynamicVisuals();
         }
     }
 
@@ -63,6 +74,16 @@ public partial class MapNotesWindow : Window
         }
     }
 
+    internal void UpdateLayerPreferences(MapLayerPreferences preferences)
+    {
+        _layerPreferences = preferences ?? throw new ArgumentNullException(nameof(preferences));
+        if (IsLoaded)
+        {
+            BuildStaticLayerVisuals();
+            RenderMap();
+        }
+    }
+
     private void Window_Loaded(object sender, RoutedEventArgs e)
     {
         var workArea = SystemParameters.WorkArea;
@@ -71,7 +92,7 @@ public partial class MapNotesWindow : Window
         MapFrame.Width = mapWidth;
         MapFrame.Height = mapHeight;
         Width = mapWidth + 44d;
-        Height = mapHeight + 118d;
+        Height = mapHeight + 184d;
         Left = workArea.Left + (workArea.Width - Width) / 2d;
         Top = workArea.Top + (workArea.Height - Height) / 2d;
         RenderMap();
@@ -79,7 +100,9 @@ public partial class MapNotesWindow : Window
         Focus();
     }
 
-    private void LoadMap()
+    private void LoadMap() => MapImage.Source = GatewayMapImage.Value;
+
+    private static BitmapSource LoadGatewayMapImage()
     {
         var resource = Application.GetResourceStream(GatewayMapResourceUri)
             ?? throw new InvalidOperationException("Bundled Gateway map resource was not found.");
@@ -90,8 +113,190 @@ public partial class MapNotesWindow : Window
         image.StreamSource = stream;
         image.EndInit();
         image.Freeze();
-        MapImage.Source = image;
+        return image;
     }
+
+    private void LoadStaticLayers()
+    {
+        try
+        {
+            _staticLayers = GatewayStaticMapLayerCatalog.LoadBundled();
+            _layerPreferences = new MapLayerPreferencesStore().Load(_staticLayers.Defaults);
+            BuildStaticLayerVisuals();
+        }
+        catch (Exception)
+        {
+            _staticLayers = GatewayStaticMapLayers.Empty;
+            _staticLayerVisuals.Clear();
+            StaticLayer.Children.Clear();
+        }
+    }
+
+    private void BuildStaticLayerVisuals()
+    {
+        StaticLayer.Children.Clear();
+        _staticLayerVisuals.Clear();
+        foreach (var zone in _staticLayers.Zones)
+        {
+            var group = MapLayerGroupFor(zone.Kind);
+            if (!_layerPreferences.IsEnabled(group)) continue;
+            var polygon = new Polygon
+            {
+                Fill = zone.Kind switch
+                {
+                    MapZoneKind.Migration => BrushFrom("#20F0A423"),
+                    MapZoneKind.Patrol => BrushFrom("#1EA78BFA"),
+                    _ => BrushFrom("#253BDBFF")
+                },
+                Stroke = zone.Kind switch
+                {
+                    MapZoneKind.Migration => BrushFrom("#D6FFB84D"),
+                    MapZoneKind.Patrol => BrushFrom("#CDBDA9FF"),
+                    _ => BrushFrom("#B86EAAFF")
+                },
+                StrokeThickness = 1d,
+                IsHitTestVisible = false
+            };
+            var label = CreateStaticLabel(zone.Name, "#D6E7DFFF");
+            _staticLayerVisuals[zone.Id] = new StaticLayerVisual(
+                zone.Id, group, polygon, label, zone.Points, Centroid(zone.Points));
+            StaticLayer.Children.Add(polygon);
+            StaticLayer.Children.Add(label);
+        }
+
+        if (_layerPreferences.AiSpawnZones)
+        {
+            foreach (var zone in _staticLayers.AiSpawnZones)
+            {
+                FrameworkElement shape = zone.Points.Count == 1
+                    ? new Ellipse
+                    {
+                        Width = 14d, Height = 14d, Fill = BrushFrom("#16F5C542"),
+                        Stroke = BrushFrom("#B8F5C542"), StrokeThickness = 1d,
+                        IsHitTestVisible = false
+                    }
+                    : new Polygon
+                    {
+                        Fill = BrushFrom("#16F5C542"), Stroke = BrushFrom("#B8F5C542"),
+                        StrokeThickness = 1d, StrokeDashArray = [3d, 2d],
+                        IsHitTestVisible = false
+                    };
+                var label = CreateStaticLabel($"AI · {zone.Name}", "#C8F5C542");
+                _staticLayerVisuals[zone.Id] = new StaticLayerVisual(
+                    zone.Id, MapLayerGroup.AiSpawnZones, shape, label, zone.Points, Centroid(zone.Points));
+                StaticLayer.Children.Add(shape);
+                StaticLayer.Children.Add(label);
+            }
+        }
+
+        if (_layerPreferences.Roads)
+        {
+            foreach (var route in _staticLayers.Routes)
+            {
+                var line = new Polyline
+                {
+                    Stroke = BrushFrom("#9A78A79A"), StrokeThickness = 1d,
+                    StrokeLineJoin = PenLineJoin.Round, IsHitTestVisible = false
+                };
+                _staticLayerVisuals[route.Id] = new StaticLayerVisual(
+                    route.Id, MapLayerGroup.Roads, line, null, route.Points,
+                    route.Points[route.Points.Count / 2]);
+                StaticLayer.Children.Add(line);
+            }
+        }
+
+        if (_layerPreferences.Water)
+        {
+            foreach (var water in _staticLayers.WaterLabels)
+            {
+                var label = CreateStaticLabel($"💧 {water.Name}", "#C878C8FF");
+                _staticLayerVisuals[water.Id] = new StaticLayerVisual(
+                    water.Id, MapLayerGroup.Water, label, label, [water.Point], water.Point);
+                StaticLayer.Children.Add(label);
+            }
+        }
+
+        foreach (var resource in _staticLayers.Resources)
+        {
+            var group = ResourceGroup(resource.Category);
+            if (!_layerPreferences.IsEnabled(group)
+                || !_layerPreferences.ResourceKeys.Contains(resource.Key))
+                continue;
+            FrameworkElement icon = !string.IsNullOrWhiteSpace(resource.IconKey)
+                && TryLoadMapIcon(resource.IconKey!, out var bitmap)
+                ? new Image
+                {
+                    Source = bitmap, Width = 12d, Height = 12d,
+                    Stretch = Stretch.Uniform, IsHitTestVisible = false
+                }
+                : new Ellipse
+                {
+                    Width = 5d, Height = 5d, Fill = ResourceBrush(resource.Category),
+                    IsHitTestVisible = false
+                };
+            _staticLayerVisuals[resource.Id] = new StaticLayerVisual(
+                resource.Id, group, icon, null, [resource.Point], resource.Point, resource.Key);
+            StaticLayer.Children.Add(icon);
+        }
+    }
+
+    private static MapLayerGroup MapLayerGroupFor(MapZoneKind kind) => kind switch
+    {
+        MapZoneKind.Migration => MapLayerGroup.Migration,
+        MapZoneKind.Patrol => MapLayerGroup.Patrol,
+        MapZoneKind.Sanctuary => MapLayerGroup.Sanctuary,
+        _ => MapLayerGroup.Migration
+    };
+
+    private static MapLayerGroup ResourceGroup(string category) => category.ToLowerInvariant() switch
+    {
+        "animals" => MapLayerGroup.Animals,
+        "plants" => MapLayerGroup.Plants,
+        _ => MapLayerGroup.Earth
+    };
+
+    private static TextBlock CreateStaticLabel(string text, string color) => new()
+    {
+        Text = text.ToUpperInvariant(),
+        Foreground = BrushFrom(color),
+        Background = BrushFrom("#C80A1517"),
+        FontFamily = new FontFamily("Bahnschrift SemiCondensed"),
+        FontSize = 7d,
+        FontWeight = FontWeights.SemiBold,
+        TextTrimming = TextTrimming.CharacterEllipsis,
+        MaxWidth = 150d,
+        Padding = new Thickness(3d, 1d, 3d, 1d),
+        IsHitTestVisible = false
+    };
+
+    private static Brush ResourceBrush(string category) => BrushFrom(category.ToLowerInvariant() switch
+    {
+        "animals" => "#F5C542",
+        "plants" => "#57D77D",
+        _ => "#D69E58"
+    });
+
+    private bool TryLoadMapIcon(string key, out BitmapImage bitmap)
+    {
+        if (_mapIconCache.TryGetValue(key, out bitmap!)) return true;
+        try
+        {
+            bitmap = new BitmapImage(new Uri(
+                $"pack://application:,,,/IsleLiveMap;component/Assets/MapLayers/Icons/png/{key}.png",
+                UriKind.Absolute));
+            bitmap.Freeze();
+            _mapIconCache[key] = bitmap;
+            return true;
+        }
+        catch
+        {
+            bitmap = null!;
+            return false;
+        }
+    }
+
+    private static MapPoint Centroid(IReadOnlyList<MapPoint> points) =>
+        new(points.Average(point => point.Left), points.Average(point => point.Top));
 
     private void BuildPalette()
     {
@@ -475,48 +680,117 @@ public partial class MapNotesWindow : Window
             return;
         }
 
-        NoteLineLayer.Children.Clear();
-        NoteMarkerLayer.Children.Clear();
-        PlayerLayer.Children.Clear();
         NoteLineLayer.Width = NoteMarkerLayer.Width = PlayerLayer.Width = width;
         NoteLineLayer.Height = NoteMarkerLayer.Height = PlayerLayer.Height = height;
+        StaticLayer.Width = width;
+        StaticLayer.Height = height;
+        foreach (var visual in _staticLayerVisuals.Values)
+        {
+            if (visual.Shape is Polygon polygon)
+            {
+                polygon.Points = new PointCollection(
+                    visual.Points.Select(point => new Point(point.Left * width, point.Top * height)));
+            }
+            else if (visual.Shape is Polyline line)
+            {
+                line.Points = new PointCollection(
+                    visual.Points.Select(point => new Point(point.Left * width, point.Top * height)));
+            }
+            else
+            {
+                var elementWidth = visual.Shape.Width > 0d ? visual.Shape.Width : 12d;
+                var elementHeight = visual.Shape.Height > 0d ? visual.Shape.Height : 12d;
+                Canvas.SetLeft(visual.Shape, visual.Anchor.Left * width - elementWidth / 2d);
+                Canvas.SetTop(visual.Shape, visual.Anchor.Top * height - elementHeight / 2d);
+            }
+
+            if (visual.Label is not null)
+            {
+                visual.Label.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+                Canvas.SetLeft(
+                    visual.Label,
+                    visual.Anchor.Left * width - visual.Label.DesiredSize.Width / 2d);
+                Canvas.SetTop(
+                    visual.Label,
+                    visual.Anchor.Top * height - visual.Label.DesiredSize.Height / 2d);
+            }
+        }
 
         var playerPoint = _playerLocation is null
             ? (MapPoint?)null
             : GatewayMapProjection.Project(_playerLocation);
         var notes = VisibleNotes();
+        var visibleIds = notes.Select(note => note.Id).ToHashSet();
+        foreach (var removedId in _noteVisuals.Keys.Where(id => !visibleIds.Contains(id)).ToArray())
+        {
+            var removed = _noteVisuals[removedId];
+            NoteLineLayer.Children.Remove(removed.Line);
+            NoteMarkerLayer.Children.Remove(removed.Button);
+            _noteVisuals.Remove(removedId);
+        }
+
         foreach (var note in notes)
         {
             var item = MapNoteIconCatalog.For(note.Kind);
             var target = new Point(note.U * width, note.V * height);
-            if (playerPoint is { } player)
+            if (!_noteVisuals.TryGetValue(note.Id, out var visual)
+                || visual.Kind != note.Kind
+                || visual.IsTeamPing != note.IsTeamPing
+                || visual.CanEdit != note.CanEdit
+                || visual.Revision != note.Revision)
             {
-                var brush = BrushFrom(item.Color);
-                NoteLineLayer.Children.Add(new Line
+                if (visual is not null)
                 {
-                    X1 = player.Left * width,
-                    Y1 = player.Top * height,
-                    X2 = target.X,
-                    Y2 = target.Y,
-                    Stroke = brush,
-                    StrokeThickness = _selectedNoteId == note.Id ? 2.2d : 1.25d,
+                    NoteLineLayer.Children.Remove(visual.Line);
+                    NoteMarkerLayer.Children.Remove(visual.Button);
+                }
+
+                var line = new Line
+                {
+                    Stroke = BrushFrom(item.Color),
                     StrokeDashArray = [5d, 4d],
-                    Opacity = _selectedNoteId == note.Id ? 0.92d : (notes.Count >= 4 ? 0.34d : 0.52d)
-                });
+                    IsHitTestVisible = false
+                };
+                var button = CreateNoteButton(note, item);
+                visual = new NoteVisual(
+                    line,
+                    button,
+                    note.Kind,
+                    note.IsTeamPing,
+                    note.CanEdit,
+                    note.Revision);
+                _noteVisuals[note.Id] = visual;
+                NoteLineLayer.Children.Add(line);
+                NoteMarkerLayer.Children.Add(button);
             }
 
-            var marker = CreateNoteButton(note, item);
-            Canvas.SetLeft(marker, target.X - marker.Width / 2d);
-            Canvas.SetTop(marker, target.Y - marker.Height / 2d);
-            NoteMarkerLayer.Children.Add(marker);
+            var selected = _selectedNoteId == note.Id;
+            visual.Line.Visibility = playerPoint is null ? Visibility.Collapsed : Visibility.Visible;
+            visual.Line.StrokeThickness = selected ? 2.2d : 1.25d;
+            visual.Line.Opacity = selected ? 0.92d : (notes.Count >= 4 ? 0.34d : 0.52d);
+            if (playerPoint is { } player)
+            {
+                visual.Line.X1 = player.Left * width;
+                visual.Line.Y1 = player.Top * height;
+                visual.Line.X2 = target.X;
+                visual.Line.Y2 = target.Y;
+            }
+            SetSelectedChrome(visual.Button, selected);
+            Canvas.SetLeft(visual.Button, target.X - visual.Button.Width / 2d);
+            Canvas.SetTop(visual.Button, target.Y - visual.Button.Height / 2d);
         }
 
         if (playerPoint is { } location)
         {
-            var marker = CreatePlayerMarker();
-            Canvas.SetLeft(marker, location.Left * width - marker.Width / 2d);
-            Canvas.SetTop(marker, location.Top * height - marker.Height / 2d);
-            PlayerLayer.Children.Add(marker);
+            EnsurePlayerMarker();
+            _playerMarker!.Visibility = Visibility.Visible;
+            _playerHeadingTransform!.Angle = _playerHeading;
+            Canvas.SetLeft(_playerMarker, location.Left * width - _playerMarker.Width / 2d);
+            Canvas.SetTop(_playerMarker, location.Top * height - _playerMarker.Height / 2d);
+        }
+        else if (_playerMarker is not null)
+        {
+            _playerMarker.Visibility = Visibility.Collapsed;
         }
 
         var teamPingCount = notes.Count(note => note.IsTeamPing);
@@ -524,6 +798,55 @@ public partial class MapNotesWindow : Window
             ? $"{notes.Count} MỐC"
             : $"{notes.Count} MỐC · {teamPingCount} NHÓM";
         UpdateSelectionDetail();
+    }
+
+    private void UpdateDynamicVisuals()
+    {
+        var width = MapSurface.ActualWidth;
+        var height = MapSurface.ActualHeight;
+        if (width <= 0d || height <= 0d) return;
+
+        var playerPoint = _playerLocation is null
+            ? (MapPoint?)null
+            : GatewayMapProjection.Project(_playerLocation);
+        foreach (var note in VisibleNotes())
+        {
+            if (!_noteVisuals.TryGetValue(note.Id, out var visual))
+            {
+                RenderMap();
+                return;
+            }
+
+            visual.Line.Visibility = playerPoint is null ? Visibility.Collapsed : Visibility.Visible;
+            if (playerPoint is not { } player) continue;
+            visual.Line.X1 = player.Left * width;
+            visual.Line.Y1 = player.Top * height;
+            visual.Line.X2 = note.U * width;
+            visual.Line.Y2 = note.V * height;
+        }
+
+        if (playerPoint is { } current)
+        {
+            EnsurePlayerMarker();
+            _playerMarker!.Visibility = Visibility.Visible;
+            _playerHeadingTransform!.Angle = _playerHeading;
+            Canvas.SetLeft(_playerMarker, current.Left * width - _playerMarker.Width / 2d);
+            Canvas.SetTop(_playerMarker, current.Top * height - _playerMarker.Height / 2d);
+        }
+        else if (_playerMarker is not null)
+        {
+            _playerMarker.Visibility = Visibility.Collapsed;
+        }
+
+        UpdateSelectionDetail();
+    }
+
+    private static void SetSelectedChrome(Button button, bool selected)
+    {
+        if (button.Content is Border chrome)
+        {
+            chrome.BorderThickness = new Thickness(selected ? 2d : 1d);
+        }
     }
 
     private Button CreateNoteButton(MapNotePresentation note, MapNotePaletteItem item)
@@ -580,12 +903,13 @@ public partial class MapNotesWindow : Window
             Stretch = Stretch.Uniform,
             Margin = new Thickness(5d)
         };
+        _playerHeadingTransform = new RotateTransform(_playerHeading);
         var marker = new Grid
         {
             Width = 32d,
             Height = 32d,
             RenderTransformOrigin = new Point(0.5d, 0.5d),
-            RenderTransform = new RotateTransform(_playerHeading)
+            RenderTransform = _playerHeadingTransform
         };
         marker.Children.Add(new Ellipse
         {
@@ -594,6 +918,13 @@ public partial class MapNotesWindow : Window
         });
         marker.Children.Add(path);
         return marker;
+    }
+
+    private void EnsurePlayerMarker()
+    {
+        if (_playerMarker is not null) return;
+        _playerMarker = CreatePlayerMarker();
+        PlayerLayer.Children.Add(_playerMarker);
     }
 
     private void UpdateSelectionDetail()
@@ -750,4 +1081,21 @@ public partial class MapNotesWindow : Window
         brush.Freeze();
         return brush;
     }
+
+    private sealed record NoteVisual(
+        Line Line,
+        Button Button,
+        MapNoteKind Kind,
+        bool IsTeamPing,
+        bool CanEdit,
+        long Revision);
+
+    private sealed record StaticLayerVisual(
+        string Id,
+        MapLayerGroup Group,
+        FrameworkElement Shape,
+        FrameworkElement? Label,
+        IReadOnlyList<MapPoint> Points,
+        MapPoint Anchor,
+        string? ResourceKey = null);
 }

@@ -38,7 +38,8 @@ public static class TeamTelemetryMapper
         {
             Sequence = sequence,
             Source = Trim(snapshot.Source, 32),
-            ServerKey = Trim(player.Server, 128),
+            ServerKey = Trim(player.ServerEndpoint ?? player.Server, 128),
+            ServerEndpoint = Trim(player.ServerEndpoint, 128),
             ServerName = Trim(player.Server, 128),
             MapId = player.Location is not null || player.MapLocation is not null ? "gateway" : null,
             Species = Trim(player.Class, 64),

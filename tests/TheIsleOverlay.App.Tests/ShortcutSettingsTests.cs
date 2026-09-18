@@ -122,6 +122,26 @@ public sealed class ShortcutSettingsTests
         Assert.Contains(native.Active.Values, binding => binding.VirtualKey == 0x50);
     }
 
+    [Fact]
+    public void MutationGuideCollision_DoesNotBlockAltMMapNotes()
+    {
+        var native = new FakeNativeApi { FailKey = 0x55 }; // U
+        using var manager = new ShortcutRegistrationManager((IntPtr)42, true, native);
+
+        var result = manager.RegisterInitial(OverlayShortcutSettings.Defaults);
+
+        Assert.False(result.Success);
+        Assert.Contains(result.Statuses, status =>
+            status.Action == OverlayShortcutAction.MapNotes
+            && status.Registered
+            && status.Binding == "Alt+M");
+        Assert.Contains(native.Active, pair =>
+            pair.Key == ShortcutSettingsManager.MapNotesHotkeyId
+            && pair.Value.VirtualKey == 0x4D);
+        Assert.Contains(result.Failures, failure =>
+            failure.Action == OverlayShortcutAction.MutationGuide);
+    }
+
     private static string TemporaryPath() => Path.Combine(
         Path.GetTempPath(),
         "IsleLiveMap.Tests",

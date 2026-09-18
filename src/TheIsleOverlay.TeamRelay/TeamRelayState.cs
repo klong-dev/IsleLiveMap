@@ -16,6 +16,7 @@ public sealed record TeamRelayState
     public TeamSession? Session { get; init; }
     public IReadOnlyList<TeamMemberSnapshot> Members { get; init; } = [];
     public IReadOnlyList<TeamMapPingSnapshot> MapPings { get; init; } = [];
+    public long StateRevision { get; init; }
     public string? Message { get; init; }
 
     public bool HasActiveSession => Session is not null

@@ -20,13 +20,16 @@ public partial class MainWindow
     private readonly Dictionary<Guid, TeamMapMarker> _teamMapMarkers = [];
     private TeamRelayState _pendingTeamState = new();
     private DispatcherTimer? _teamRenderTimer;
-    private string? _localServerKey;
+    private string? _localServerEndpoint;
+    private string? _localServerName;
     private volatile bool _teamStateDirty;
+    private DateTimeOffset _lastTeamAgingRender;
 
     private void InitializeTeamOverlay()
     {
         App.CurrentTeam.StateChanged += TeamCoordinator_StateChanged;
         _pendingTeamState = App.CurrentTeam.CurrentState;
+        App.CurrentTeam.ForceRepublish();
         _teamStateDirty = true;
         _teamRenderTimer = new DispatcherTimer(
             TimeSpan.FromMilliseconds(100),
@@ -52,20 +55,30 @@ public partial class MainWindow
 
     private void TeamRenderTimer_Tick(object? sender, EventArgs e)
     {
-        if (!_teamStateDirty)
+        if (!_teamStateDirty
+            && (!_pendingTeamState.HasActiveSession
+                || DateTimeOffset.UtcNow - _lastTeamAgingRender < TimeSpan.FromSeconds(1)))
         {
             return;
         }
 
         _teamStateDirty = false;
+        _lastTeamAgingRender = DateTimeOffset.UtcNow;
         RenderTeamState(_pendingTeamState);
     }
 
     private void PublishTeamTelemetry(TelemetrySnapshot snapshot)
     {
-        _localServerKey = snapshot is { PlayerOnline: true, Player: { } player }
-            ? player.Server
-            : null;
+        if (snapshot is { PlayerOnline: true, Player: { } player })
+        {
+            _localServerEndpoint = player.ServerEndpoint;
+            _localServerName = player.Server;
+        }
+        else
+        {
+            _localServerEndpoint = null;
+            _localServerName = null;
+        }
         App.CurrentTeam.UpdateTelemetry(
             snapshot,
             _hasMovementHeading ? _headingDegrees : null);
@@ -105,7 +118,7 @@ public partial class MainWindow
             .Select(CreateTeamMemberRow)
             .ToArray();
 
-        SyncTeamMarkers(peers);
+        SyncTeamMarkers(peers, state.ConnectionState);
         KeepWidgetsVisible();
         PositionMap();
     }
@@ -113,12 +126,19 @@ public partial class MainWindow
     private TeamMemberRowViewModel CreateTeamMemberRow(TeamMemberSnapshot member)
     {
         var telemetry = member.Telemetry;
-        var sameServer = IsSameServer(_localServerKey, telemetry?.ServerKey);
-        var status = !member.IsOnline
+        var telemetryFresh = TeamOverlayFreshnessPolicy.IsFresh(
+            telemetry?.UpdatedAt,
+            DateTimeOffset.UtcNow);
+        var sameServer = IsSameServer(
+            _localServerEndpoint,
+            _localServerName,
+            telemetry?.ServerEndpoint ?? telemetry?.ServerKey,
+            telemetry?.ServerName);
+        var status = !telemetryFresh
             ? "MẤT TÍN HIỆU"
-            : telemetry is null || string.IsNullOrWhiteSpace(telemetry.ServerKey)
+            : telemetry is null || string.IsNullOrWhiteSpace(telemetry.ServerEndpoint ?? telemetry.ServerKey ?? telemetry.ServerName)
                 ? "CHỜ DINO"
-                : string.IsNullOrWhiteSpace(_localServerKey)
+                : string.IsNullOrWhiteSpace(_localServerEndpoint ?? _localServerName)
                     ? "CHỜ SERVER"
                     : sameServer
                         ? "CÙNG SERVER"
@@ -136,15 +156,21 @@ public partial class MainWindow
                 : status == "MẤT TÍN HIỆU"
                     ? ErrorBrush
                     : WaitingBrush,
-            HealthText = FormatTeamPercent(telemetry?.HealthPercent),
-            HungerText = FormatTeamPercent(telemetry?.HungerPercent),
-            ThirstText = FormatTeamPercent(telemetry?.ThirstPercent),
+            HealthText = telemetryFresh ? FormatTeamPercent(telemetry?.HealthPercent) : "—",
+            HungerText = telemetryFresh ? FormatTeamPercent(telemetry?.HungerPercent) : "—",
+            ThirstText = telemetryFresh ? FormatTeamPercent(telemetry?.ThirstPercent) : "—",
             AccentBrush = AccentBrush(member.MemberId),
-            Opacity = !member.IsOnline ? 0.48d : sameServer ? 1d : 0.68d
+            Opacity = !telemetryFresh
+                ? 0.48d
+                : _pendingTeamState.ConnectionState == TeamRelayConnectionState.Reconnecting
+                    ? 0.62d
+                    : sameServer ? 1d : 0.68d
         };
     }
 
-    private void SyncTeamMarkers(IReadOnlyList<TeamMemberSnapshot> peers)
+    private void SyncTeamMarkers(
+        IReadOnlyList<TeamMemberSnapshot> peers,
+        TeamRelayConnectionState connectionState)
     {
         var visibleIds = new HashSet<Guid>();
         foreach (var member in peers)
@@ -163,7 +189,9 @@ public partial class MainWindow
             }
 
             marker.Point = point;
-            marker.Root.Opacity = member.IsOnline ? 1d : 0.45d;
+            marker.Root.Opacity = connectionState == TeamRelayConnectionState.Reconnecting
+                ? 0.55d
+                : 1d;
             marker.NameLabel.Text = member.DisplayName;
             UpdateTeamHeading(marker, member.Telemetry?.HeadingDegrees);
         }
@@ -178,9 +206,13 @@ public partial class MainWindow
     private bool TryGetMapPoint(TeamMemberSnapshot member, out MapPoint point)
     {
         var telemetry = member.Telemetry;
-        if (!member.IsOnline
-            || telemetry is null
-            || !IsSameServer(_localServerKey, telemetry.ServerKey)
+        if (telemetry is null
+            || !TeamOverlayFreshnessPolicy.IsFresh(telemetry.UpdatedAt, DateTimeOffset.UtcNow)
+            || !IsSameServer(
+                _localServerEndpoint,
+                _localServerName,
+                telemetry.ServerEndpoint ?? telemetry.ServerKey,
+                telemetry.ServerName)
             || telemetry.MapId is { Length: > 0 } mapId
                 && !string.Equals(mapId, "gateway", StringComparison.OrdinalIgnoreCase))
         {
@@ -323,10 +355,12 @@ public partial class MainWindow
         _teamMapMarkers.Clear();
     }
 
-    private static bool IsSameServer(string? localServer, string? remoteServer) =>
-        !string.IsNullOrWhiteSpace(localServer)
-        && !string.IsNullOrWhiteSpace(remoteServer)
-        && string.Equals(localServer.Trim(), remoteServer.Trim(), StringComparison.OrdinalIgnoreCase);
+    private static bool IsSameServer(
+        string? localEndpoint,
+        string? localName,
+        string? remoteEndpoint,
+        string? remoteName) =>
+        ServerIdentityNormalizer.AreSame(localEndpoint, localName, remoteEndpoint, remoteName);
 
     private static string FormatTeamPercent(double? value) => value is { } percent
         ? $"{Math.Clamp(percent, 0d, 100d):0}%"

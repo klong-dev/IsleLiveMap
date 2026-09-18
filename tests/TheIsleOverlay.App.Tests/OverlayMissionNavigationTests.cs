@@ -61,6 +61,14 @@ public sealed class OverlayMissionNavigationTests
         Assert.Contains(document.Descendants(), element =>
             (string?)element.Attribute(nameAttribute) == "DeleteSelectedButton"
             && (string?)element.Attribute("Click") == "DeleteSelectedButton_Click");
+        var coordinatePanel = Assert.Single(document.Descendants(), element =>
+            (string?)element.Attribute(nameAttribute) == "CoordinateEntryPanel");
+        var mapSurface = Assert.Single(document.Descendants(), element =>
+            (string?)element.Attribute(nameAttribute) == "MapSurface");
+        Assert.DoesNotContain(coordinatePanel, mapSurface.Ancestors());
+        Assert.Contains(document.Descendants(), element =>
+            (string?)element.Attribute(nameAttribute) == "NoteMarkerLayer"
+            && !string.Equals((string?)element.Attribute("IsHitTestVisible"), "False", StringComparison.OrdinalIgnoreCase));
         Assert.Equal(
             "Window_PreviewKeyDown",
             (string?)document.Root!.Attribute("PreviewKeyDown"));

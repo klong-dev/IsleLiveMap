@@ -75,6 +75,15 @@ public sealed class TeamCoordinator : IAsyncDisposable
         }
     }
 
+    public void ForceRepublish()
+    {
+        lock (_telemetryGate)
+        {
+            _publishedVersion = -1;
+            _telemetryVersion++;
+        }
+    }
+
     public async ValueTask DisposeAsync()
     {
         if (_disposed)

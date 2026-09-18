@@ -156,7 +156,7 @@ public sealed class IslePilotRealtimeSessionTests
     }
 
     [Fact]
-    public async Task Bootstrap_MergesOptionalTenantHeatmapIntoMapSnapshot()
+    public async Task Bootstrap_DoesNotCallDynamicTenantHeatmap()
     {
         var api = new FakeApiClient
         {
@@ -180,10 +180,9 @@ public sealed class IslePilotRealtimeSessionTests
             value => value.SessionState == TelemetrySessionState.Live,
             timeout.Token);
 
-        Assert.Equal("IslePilot Server", api.HeatmapServerName);
-        Assert.True(snapshot.Map?.PlayerHeatmapEnabled);
-        Assert.Equal(0.03, snapshot.Map?.PlayerHeatmapRadius);
-        Assert.Single(snapshot.Map?.PlayerHeatmapCells ?? []);
+        Assert.Null(api.HeatmapServerName);
+        Assert.False(snapshot.Map?.PlayerHeatmapEnabled);
+        Assert.Empty(snapshot.Map?.PlayerHeatmapCells ?? []);
     }
 
     private static IslePilotRealtimeSession CreateSession(

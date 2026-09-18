@@ -17,6 +17,7 @@ public sealed record TeamTelemetryUpdate
     public long Sequence { get; init; }
     public string? Source { get; init; }
     public string? ServerKey { get; init; }
+    public string? ServerEndpoint { get; init; }
     public string? ServerName { get; init; }
     public string? MapId { get; init; }
     public string? Species { get; init; }
@@ -35,6 +36,7 @@ public sealed record TeamMemberTelemetry
     public long Sequence { get; init; }
     public string? Source { get; init; }
     public string? ServerKey { get; init; }
+    public string? ServerEndpoint { get; init; }
     public string? ServerName { get; init; }
     public string? MapId { get; init; }
     public string? Species { get; init; }
@@ -54,13 +56,23 @@ public sealed record TeamMemberSnapshot(
     string DisplayName,
     bool IsOnline,
     DateTimeOffset LastSeenAt,
-    TeamMemberTelemetry? Telemetry);
+    TeamMemberTelemetry? Telemetry)
+{
+    public long StateRevision { get; init; }
+}
 
 public sealed record TeamSnapshot(
     Guid TeamId,
     string InviteCode,
     IReadOnlyList<TeamMemberSnapshot> Members,
-    IReadOnlyList<TeamMapPingSnapshot>? MapPings = null);
+    IReadOnlyList<TeamMapPingSnapshot>? MapPings = null,
+    long StateRevision = 0);
+
+public sealed record TeamMemberRemoval(Guid MemberId, long StateRevision);
+
+public sealed record TeamMapPingBatch(
+    IReadOnlyList<TeamMapPingSnapshot> MapPings,
+    long StateRevision);
 
 public sealed record TeamMapPingMutation
 {

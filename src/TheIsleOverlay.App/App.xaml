@@ -91,5 +91,13 @@
                 </Setter.Value>
             </Setter>
         </Style>
+
+        <Style x:Key="LayerInspectorCheckBox" TargetType="CheckBox">
+            <Setter Property="Foreground" Value="#B9CCC5" />
+            <Setter Property="FontFamily" Value="Bahnschrift SemiCondensed" />
+            <Setter Property="FontSize" Value="8" />
+            <Setter Property="Margin" Value="0,1,0,1" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
     </Application.Resources>
 </Application>

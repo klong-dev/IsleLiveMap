@@ -1,550 +1,430 @@
 using System.IO;
-using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
 using TheIsleOverlay.Core;
 
 namespace TheIsleOverlay.App;
 
+/// <summary>Offline map-layer renderer. Telemetry never invalidates static geometry.</summary>
 public partial class MainWindow
 {
-    private const double ZoneLabelMinimumZoom = 2.25d;
-    private const double FoodLabelMinimumZoom = 2.75d;
-
-    private readonly Dictionary<string, MapZoneVisual> _mapZoneVisuals =
-        new(StringComparer.Ordinal);
-    private readonly Dictionary<string, FoodRegionVisual> _foodRegionVisuals =
-        new(StringComparer.Ordinal);
-    private readonly List<PlayerHeatVisual> _playerHeatVisuals = [];
+    private const double StaticLabelMinimumZoom = 1.45d;
+    private readonly Dictionary<string, StaticMapVisual> _staticMapVisuals = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, GatewayMapResource> _resourcesById = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, BitmapImage> _mapIconCache = new(StringComparer.OrdinalIgnoreCase);
+    private readonly MapLayerPreferencesStore _mapLayerPreferencesStore = new();
+    private MapLayerPreferences _mapLayerPreferences = new();
     private GatewayStaticMapLayers _staticMapLayers = GatewayStaticMapLayers.Empty;
-    private PlayerHeatmapRenderData _renderedPlayerHeatmap = PlayerHeatmapRenderData.Empty;
     private double _positionedLayerImageWidth = double.NaN;
     private double _positionedLayerImageHeight = double.NaN;
     private bool _mapLayersInitialized;
     private bool _mapLayerGeometryDirty;
-    private bool _playerHeatmapAvailable;
 
     private void InitializeMapLayers()
     {
-        if (_mapLayersInitialized)
-        {
-            return;
-        }
-
+        if (_mapLayersInitialized) return;
         _mapLayersInitialized = true;
-        if (!HasCurrentProFeatures)
-        {
-            DisableProMapLayers();
-            return;
-        }
-
         try
         {
             _staticMapLayers = GatewayStaticMapLayerCatalog.LoadBundled();
-            foreach (var zone in _staticMapLayers.Zones)
-            {
-                var visual = CreateMapZoneVisual(zone);
-                _mapZoneVisuals.Add(zone.Id, visual);
-                MapZoneLayer.Children.Add(visual.Polygon);
-                MapZoneLayer.Children.Add(visual.Label);
-            }
-
-            foreach (var region in _staticMapLayers.FoodRegions)
-            {
-                var visual = CreateFoodRegionVisual(region);
-                _foodRegionVisuals.Add(region.Id, visual);
-                MapFoodLayer.Children.Add(visual.Shape);
-                MapFoodLayer.Children.Add(visual.Label);
-            }
-
+            _mapLayerPreferences = _mapLayerPreferencesStore.Load(_staticMapLayers.Defaults);
+            BuildStaticMapVisuals();
+            BuildResourceLayerControls();
             _mapLayerGeometryDirty = true;
             UpdateMapLayerControls();
         }
-        catch (Exception exception) when (exception is InvalidDataException
-                                          or IOException
-                                          or JsonException)
+        catch (Exception exception) when (exception is InvalidDataException or IOException or System.Text.Json.JsonException)
         {
             _staticMapLayers = GatewayStaticMapLayers.Empty;
-            ZoneLayerToggle.IsEnabled = false;
-            FoodLayerToggle.IsEnabled = false;
             MapLayerSummaryLabel.Text = "LAYER DATA ERROR";
             MapLayerSummaryLabel.Foreground = BrushFrom("#E98778");
         }
     }
 
-    private void DisableProMapLayers()
+    private void BuildStaticMapVisuals()
     {
-        _staticMapLayers = GatewayStaticMapLayers.Empty;
-        _mapZoneVisuals.Clear();
-        _foodRegionVisuals.Clear();
         MapZoneLayer.Children.Clear();
         MapFoodLayer.Children.Clear();
-        ClearPlayerHeatmap();
-        ZoneLayerToggle.IsChecked = false;
-        FoodLayerToggle.IsChecked = false;
-        HeatLayerToggle.IsChecked = false;
-        ZoneLayerToggle.IsEnabled = false;
-        FoodLayerToggle.IsEnabled = false;
-        HeatLayerToggle.IsEnabled = false;
-        MapZoneLayer.Visibility = Visibility.Collapsed;
-        MapFoodLayer.Visibility = Visibility.Collapsed;
-        MapHeatmapLayer.Visibility = Visibility.Collapsed;
-        MapLayerSummaryLabel.Text = "PRO MAP LAYERS";
-        MapLayerSummaryLabel.Foreground = BrushFrom("#84785A");
-    }
+        _staticMapVisuals.Clear();
+        _resourcesById.Clear();
 
-    private bool SyncPlayerHeatmap(MapTelemetry? map)
-    {
-        var heatmap = PlayerHeatmapResolver.Resolve(map);
-        if (_renderedPlayerHeatmap.ContentEquals(heatmap))
+        foreach (var zone in _staticMapLayers.Zones)
         {
-            return false;
+            var polygon = new Polygon
+            {
+                Points = new PointCollection(),
+                StrokeThickness = zone.Kind == MapZoneKind.Sanctuary ? 1d : 1.15d,
+                StrokeLineJoin = PenLineJoin.Round,
+                IsHitTestVisible = false
+            };
+            ApplyZonePalette(polygon, zone.Kind);
+            var label = CreateLabel(zone.Name, zone.Kind == MapZoneKind.Migration ? "#D6FFB84D" : "#CDBDA9FF");
+            var visual = new StaticMapVisual(zone.Id, MapLayerGroupFor(zone.Kind), polygon, label,
+                zone.Points, Centroid(zone.Points), IsPolygon: true);
+            _staticMapVisuals.Add(zone.Id, visual);
+            MapZoneLayer.Children.Add(polygon);
+            MapZoneLayer.Children.Add(label);
         }
 
-        var points = heatmap.Points;
-        if (points.Count == 0)
+        foreach (var zone in _staticMapLayers.AiSpawnZones)
         {
-            ClearPlayerHeatmap();
-            UpdateMapLayerControls();
+            FrameworkElement polygon = zone.Points.Count == 1
+                ? new Ellipse { Width = 16d, Height = 16d, IsHitTestVisible = false }
+                : new Polygon { IsHitTestVisible = false };
+            if (polygon is Polygon polygonShape)
+            {
+                polygonShape.Points = new PointCollection();
+                polygonShape.StrokeThickness = 0.8d;
+                polygonShape.StrokeDashArray = new DoubleCollection { 3d, 2d };
+                polygonShape.StrokeLineJoin = PenLineJoin.Round;
+            }
+            if (polygon is Shape shape)
+            {
+                shape.Fill = BrushFrom("#16F5C542");
+                shape.Stroke = BrushFrom("#B8F5C542");
+            }
+            var label = CreateLabel($"AI · {zone.Name}", "#C8F5C542");
+            var visual = new StaticMapVisual(zone.Id, MapLayerGroup.AiSpawnZones, polygon, label,
+                zone.Points, Centroid(zone.Points), true);
+            _staticMapVisuals.Add(zone.Id, visual);
+            MapZoneLayer.Children.Add(polygon);
+            MapZoneLayer.Children.Add(label);
+        }
+
+        foreach (var route in _staticMapLayers.Routes)
+        {
+            var line = new Polyline
+            {
+                Stroke = BrushFrom("#B878A79A"), StrokeThickness = 1.1d,
+                StrokeLineJoin = PenLineJoin.Round, IsHitTestVisible = false
+            };
+            var visual = new StaticMapVisual(route.Id, MapLayerGroup.Roads, line, null,
+                route.Points, route.Points[route.Points.Count / 2], true);
+            _staticMapVisuals.Add(route.Id, visual);
+            MapZoneLayer.Children.Add(line);
+        }
+
+        foreach (var water in _staticMapLayers.WaterLabels)
+        {
+            var label = CreateLabel($"💧 {water.Name}", "#C878C8FF");
+            var visual = new StaticMapVisual(water.Id, MapLayerGroup.Water, label, label,
+                [water.Point], water.Point, false);
+            _staticMapVisuals.Add(water.Id, visual);
+            MapZoneLayer.Children.Add(label);
+        }
+
+        foreach (var resource in _staticMapLayers.Resources)
+        {
+            _resourcesById[resource.Id] = resource;
+            FrameworkElement icon;
+            if (!string.IsNullOrWhiteSpace(resource.IconKey)
+                && TryLoadMapIcon(resource.IconKey!, out var bitmap))
+            {
+                icon = new Image { Source = bitmap, Width = 13d, Height = 13d, Stretch = Stretch.Uniform, IsHitTestVisible = false };
+            }
+            else
+            {
+                icon = new Ellipse { Width = 5d, Height = 5d, Fill = ResourceBrush(resource.Category), IsHitTestVisible = false };
+            }
+            var visual = new StaticMapVisual(resource.Id, ResourceGroup(resource.Category), icon, null,
+                [resource.Point], resource.Point, false);
+            _staticMapVisuals.Add(resource.Id, visual);
+            MapFoodLayer.Children.Add(icon);
+        }
+    }
+
+    private void BuildResourceLayerControls()
+    {
+        if (ResourceLayerChildrenPanel is null) return;
+        ResourceLayerChildrenPanel.Children.Clear();
+        var keys = _staticMapLayers.Resources
+            .Where(resource => resource.Category is "animals" or "plants" or "earth")
+            .Select(resource => (resource.Category, resource.Key, resource.Name))
+            .Distinct()
+            .OrderBy(item => item.Category, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(item => item.Name, StringComparer.CurrentCultureIgnoreCase)
+            .ToArray();
+        string? currentCategory = null;
+        foreach (var (category, key, name) in keys)
+        {
+            if (!string.Equals(currentCategory, category, StringComparison.OrdinalIgnoreCase))
+            {
+                currentCategory = category;
+                ResourceLayerChildrenPanel.Children.Add(new TextBlock
+                {
+                    Text = category switch
+                    {
+                        "animals" => "ĐỘNG VẬT",
+                        "plants" => "THỰC VẬT & NẤM",
+                        _ => "ĐẤT & KHOÁNG"
+                    },
+                    Foreground = BrushFrom("#789A92"),
+                    FontFamily = new FontFamily("Bahnschrift SemiCondensed"),
+                    FontSize = 7.5d,
+                    Margin = new Thickness(0d, 7d, 0d, 2d)
+                });
+            }
+            var toggle = new CheckBox
+            {
+                Content = name,
+                Tag = key,
+                IsChecked = _mapLayerPreferences.ResourceKeys.Contains(key),
+                Style = (Style)FindResource("LayerInspectorCheckBox"),
+                ToolTip = "Bật/tắt riêng loại tài nguyên này"
+            };
+            toggle.Click += ResourceLayerToggle_Click;
+            ResourceLayerChildrenPanel.Children.Add(toggle);
+        }
+    }
+
+    private static MapLayerGroup MapLayerGroupFor(MapZoneKind kind) => kind switch
+    {
+        MapZoneKind.Migration => MapLayerGroup.Migration,
+        MapZoneKind.Patrol => MapLayerGroup.Patrol,
+        MapZoneKind.Sanctuary => MapLayerGroup.Sanctuary,
+        _ => MapLayerGroup.Migration
+    };
+
+    private static MapLayerGroup ResourceGroup(string category) => category.ToLowerInvariant() switch
+    {
+        "animals" => MapLayerGroup.Animals,
+        "plants" => MapLayerGroup.Plants,
+        _ => MapLayerGroup.Earth
+    };
+
+    private static TextBlock CreateLabel(string text, string color) => new()
+    {
+        Text = text.ToUpperInvariant(), Foreground = BrushFrom(color),
+        Background = BrushFrom("#C80A1517"), FontFamily = new FontFamily("Bahnschrift SemiCondensed"),
+        FontSize = 7d, FontWeight = FontWeights.SemiBold, TextTrimming = TextTrimming.CharacterEllipsis,
+        MaxWidth = 132d, Padding = new Thickness(3d, 1d, 3d, 1d), IsHitTestVisible = false
+    };
+
+    private static void ApplyZonePalette(Polygon polygon, MapZoneKind kind)
+    {
+        var (fill, stroke) = kind switch
+        {
+            MapZoneKind.Migration => ("#2CF0A423", "#D6FFB84D"),
+            MapZoneKind.Patrol => ("#28A78BFA", "#CDBDA9FF"),
+            _ => ("#243BDBFF", "#B86EAAFF")
+        };
+        polygon.Fill = BrushFrom(fill);
+        polygon.Stroke = BrushFrom(stroke);
+    }
+
+    private static Brush ResourceBrush(string category) => BrushFrom(category.ToLowerInvariant() switch
+    {
+        "animals" => "#F5C542",
+        "plants" => "#57D77D",
+        _ => "#D69E58"
+    });
+
+    private bool TryLoadMapIcon(string key, out BitmapImage bitmap)
+    {
+        if (_mapIconCache.TryGetValue(key, out bitmap!)) return true;
+        try
+        {
+            var uri = new Uri(
+                $"pack://application:,,,/IsleLiveMap;component/Assets/MapLayers/Icons/png/{key}.png",
+                UriKind.Absolute);
+            bitmap = new BitmapImage(uri);
+            bitmap.Freeze();
+            _mapIconCache[key] = bitmap;
             return true;
         }
-
-        _renderedPlayerHeatmap = heatmap;
-        _playerHeatmapAvailable = true;
-
-        while (_playerHeatVisuals.Count < points.Count)
+        catch
         {
-            var visual = CreatePlayerHeatVisual();
-            _playerHeatVisuals.Add(visual);
-            MapHeatmapLayer.Children.Add(visual.Shape);
+            bitmap = null!;
+            return false;
         }
-
-        while (_playerHeatVisuals.Count > points.Count)
-        {
-            var last = _playerHeatVisuals[^1];
-            MapHeatmapLayer.Children.Remove(last.Shape);
-            _playerHeatVisuals.RemoveAt(_playerHeatVisuals.Count - 1);
-        }
-
-        for (var index = 0; index < points.Count; index++)
-        {
-            var point = points[index];
-            var visual = _playerHeatVisuals[index];
-            visual.Point = point.Point;
-            visual.Intensity = point.Intensity;
-            visual.Radius = heatmap.Radius;
-            visual.Shape.Opacity = 0.42d + 0.42d * point.Intensity;
-            visual.Shape.ToolTip = $"Player heatmap IslePilot · {point.Intensity:P0}";
-        }
-
-        _mapLayerGeometryDirty = true;
-        UpdateMapLayerControls();
-        return true;
     }
 
-    private static MapZoneVisual CreateMapZoneVisual(GatewayStaticMapZone zone)
-    {
-        var polygon = new Polygon
-        {
-            StrokeThickness = 1.15d,
-            StrokeLineJoin = PenLineJoin.Round,
-            IsHitTestVisible = false
-        };
-        var labelText = new TextBlock
-        {
-            Text = zone.Kind == MapZoneKind.Migration
-                ? $"MMZ · {zone.Name}"
-                : $"PZ · {zone.Name}",
-            FontFamily = new FontFamily("Bahnschrift SemiCondensed"),
-            FontSize = 7.2d,
-            FontWeight = FontWeights.SemiBold,
-            TextTrimming = TextTrimming.CharacterEllipsis,
-            MaxWidth = 118d
-        };
-        var label = new Border
-        {
-            Child = labelText,
-            Padding = new Thickness(4d, 1.25d, 4d, 1.25d),
-            CornerRadius = new CornerRadius(2d),
-            BorderThickness = new Thickness(0.75d),
-            IsHitTestVisible = false
-        };
-        var visual = new MapZoneVisual(
-            polygon,
-            label,
-            labelText,
-            zone.Points,
-            Centroid(zone.Points),
-            zone.Kind);
-        ApplyZonePalette(visual);
-        return visual;
-    }
-
-    private static FoodRegionVisual CreateFoodRegionVisual(GatewayFoodRegion region)
-    {
-        var aquatic = region.Foods.All(food => food is "Rùa" or "Cua");
-        var stroke = aquatic ? "#CB72E9FA" : "#D6DCF466";
-        var fill = aquatic ? "#2926C8E8" : "#28BFD84C";
-        var shape = new Ellipse
-        {
-            Fill = BrushFrom(fill),
-            Stroke = BrushFrom(stroke),
-            StrokeThickness = 1.1d,
-            IsHitTestVisible = false
-        };
-        var labelText = new TextBlock
-        {
-            Text = region.Label.ToUpperInvariant(),
-            Foreground = BrushFrom(stroke),
-            FontFamily = new FontFamily("Bahnschrift SemiCondensed"),
-            FontSize = 7d,
-            FontWeight = FontWeights.SemiBold,
-            TextTrimming = TextTrimming.CharacterEllipsis,
-            MaxWidth = 118d
-        };
-        var label = new Border
-        {
-            Child = labelText,
-            Background = BrushFrom("#C80A1517"),
-            BorderBrush = BrushFrom(stroke),
-            BorderThickness = new Thickness(0.6d),
-            CornerRadius = new CornerRadius(2d),
-            Padding = new Thickness(4d, 1.2d, 4d, 1.2d),
-            IsHitTestVisible = false
-        };
-        return new FoodRegionVisual(
-            shape,
-            label,
-            region.Center,
-            region.RadiusX,
-            region.RadiusY);
-    }
-
-    private static PlayerHeatVisual CreatePlayerHeatVisual()
-    {
-        var fill = new RadialGradientBrush
-        {
-            Center = new Point(0.5d, 0.5d),
-            GradientOrigin = new Point(0.5d, 0.5d),
-            RadiusX = 0.5d,
-            RadiusY = 0.5d,
-            GradientStops =
-            {
-                new GradientStop((Color)ColorConverter.ConvertFromString("#E8FF4438"), 0d),
-                new GradientStop((Color)ColorConverter.ConvertFromString("#B8FF9E2F"), 0.38d),
-                new GradientStop((Color)ColorConverter.ConvertFromString("#42FFD057"), 0.68d),
-                new GradientStop(Colors.Transparent, 1d)
-            }
-        };
-        fill.Freeze();
-        return new PlayerHeatVisual(new Ellipse
-        {
-            Fill = fill,
-            IsHitTestVisible = false
-        });
-    }
-
-    private static void ApplyZonePalette(MapZoneVisual visual)
-    {
-        var migration = visual.Kind == MapZoneKind.Migration;
-        var fill = migration ? "#2CF0A423" : "#28A78BFA";
-        var stroke = migration ? "#D6FFB84D" : "#CDBDA9FF";
-        visual.Polygon.Fill = BrushFrom(fill);
-        visual.Polygon.Stroke = BrushFrom(stroke);
-        visual.Label.Background = BrushFrom(migration ? "#CD21170A" : "#CC171125");
-        visual.Label.BorderBrush = BrushFrom(stroke);
-        visual.LabelText.Foreground = BrushFrom(stroke);
-    }
-
-    private void PositionMapLayers(
-        double left,
-        double top,
-        double imageWidth,
-        double imageHeight)
+    private void PositionMapLayers(double left, double top, double imageWidth, double imageHeight)
     {
         foreach (var layer in new[] { MapHeatmapLayer, MapZoneLayer, MapFoodLayer })
         {
-            layer.Width = imageWidth;
-            layer.Height = imageHeight;
-            Canvas.SetLeft(layer, left);
-            Canvas.SetTop(layer, top);
+            layer.Width = imageWidth; layer.Height = imageHeight;
+            Canvas.SetLeft(layer, left); Canvas.SetTop(layer, top);
         }
-
         var sizeChanged = !NearlyEqual(imageWidth, _positionedLayerImageWidth)
                           || !NearlyEqual(imageHeight, _positionedLayerImageHeight);
         if (!_mapLayerGeometryDirty && !sizeChanged)
         {
-            UpdateMapLayerLabelVisibility(left, top, imageWidth, imageHeight);
             return;
         }
-
-        foreach (var visual in _mapZoneVisuals.Values)
+        foreach (var visual in _staticMapVisuals.Values)
         {
-            visual.Polygon.Points = new PointCollection(visual.Points.Select(point =>
-                new Point(point.Left * imageWidth, point.Top * imageHeight)));
-            PositionLabel(visual.Label, visual.LabelPoint, imageWidth, imageHeight);
+            if (visual.Shape is Polygon polygon)
+                polygon.Points = new PointCollection(visual.Points.Select(point => new Point(point.Left * imageWidth, point.Top * imageHeight)));
+            else if (visual.Shape is Polyline line)
+                line.Points = new PointCollection(visual.Points.Select(point => new Point(point.Left * imageWidth, point.Top * imageHeight)));
+            else
+            {
+                var width = visual.Shape.Width > 0 ? visual.Shape.Width : 13d;
+                var height = visual.Shape.Height > 0 ? visual.Shape.Height : 13d;
+                Canvas.SetLeft(visual.Shape, visual.Anchor.Left * imageWidth - width / 2d);
+                Canvas.SetTop(visual.Shape, visual.Anchor.Top * imageHeight - height / 2d);
+            }
+            if (visual.Label is not null && !ReferenceEquals(visual.Shape, visual.Label))
+                PositionLabel(visual.Label, visual.Anchor, imageWidth, imageHeight);
+            else if (visual.Label is not null)
+                PositionLabel(visual.Label, visual.Anchor, imageWidth, imageHeight);
         }
-
-        foreach (var visual in _foodRegionVisuals.Values)
-        {
-            var width = visual.RadiusX * imageWidth * 2d;
-            var height = visual.RadiusY * imageHeight * 2d;
-            visual.Shape.Width = width;
-            visual.Shape.Height = height;
-            Canvas.SetLeft(visual.Shape, visual.Center.Left * imageWidth - width / 2d);
-            Canvas.SetTop(visual.Shape, visual.Center.Top * imageHeight - height / 2d);
-            PositionLabel(visual.Label, visual.Center, imageWidth, imageHeight);
-        }
-
-        foreach (var visual in _playerHeatVisuals)
-        {
-            var radius = visual.Radius;
-            var width = radius * imageWidth * 2d;
-            var height = radius * imageHeight * 2d;
-            visual.Shape.Width = width;
-            visual.Shape.Height = height;
-            Canvas.SetLeft(visual.Shape, visual.Point.Left * imageWidth - width / 2d);
-            Canvas.SetTop(visual.Shape, visual.Point.Top * imageHeight - height / 2d);
-        }
-
         _positionedLayerImageWidth = imageWidth;
         _positionedLayerImageHeight = imageHeight;
         _mapLayerGeometryDirty = false;
-        UpdateMapLayerLabelVisibility(left, top, imageWidth, imageHeight);
+        UpdateStaticLayerVisibility();
     }
 
-    private void UpdateMapLayerLabelVisibility(
-        double left,
-        double top,
-        double imageWidth,
-        double imageHeight)
+    private void UpdateStaticLayerVisibility()
     {
-        var visibleLabels = new HashSet<Border>();
-        var occupied = new List<Rect>();
-        if (_mapZoom >= ZoneLabelMinimumZoom)
+        foreach (var visual in _staticMapVisuals.Values)
         {
-            foreach (var visual in _mapZoneVisuals.Values
-                         .Where(visual => IsPointInMapViewport(
-                             visual.LabelPoint,
-                             left,
-                             top,
-                             imageWidth,
-                             imageHeight))
-                         .OrderBy(visual => visual.Kind == MapZoneKind.Migration ? 0 : 1)
-                         .ThenBy(visual => DistanceFromViewportCenter(
-                             visual.LabelPoint,
-                             left,
-                             top,
-                             imageWidth,
-                             imageHeight))
-                         .Take(12))
+            var visible = _mapLayerPreferences.IsEnabled(visual.Group);
+            if (visual.Group is MapLayerGroup.Animals or MapLayerGroup.Plants or MapLayerGroup.Earth)
             {
-                var bounds = LabelScreenBounds(
-                    visual.Label,
-                    visual.LabelPoint,
-                    left,
-                    top,
-                    imageWidth,
-                    imageHeight);
-                if (occupied.Any(existing => existing.IntersectsWith(bounds)))
-                {
-                    continue;
-                }
-
-                visibleLabels.Add(visual.Label);
-                occupied.Add(Inflated(bounds, 3d));
-                if (occupied.Count >= 6)
-                {
-                    break;
-                }
+                visible = visible
+                          && _resourcesById.TryGetValue(visual.Id, out var resource)
+                          && _mapLayerPreferences.ResourceKeys.Contains(resource.Key);
             }
+            if (visual.Label is not null && _mapZoom < StaticLabelMinimumZoom)
+                visual.Label.Visibility = Visibility.Collapsed;
+            else if (visual.Label is not null)
+                visual.Label.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+            visual.Shape.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
         }
+        MapZoneLayer.Visibility = _staticMapVisuals.Values.Any(visual => visual.Shape.Visibility == Visibility.Visible)
+            ? Visibility.Visible : Visibility.Collapsed;
+        MapFoodLayer.Visibility = _staticMapVisuals.Values.Any(visual =>
+            (visual.Group is MapLayerGroup.Animals or MapLayerGroup.Plants or MapLayerGroup.Earth)
+            && visual.Shape.Visibility == Visibility.Visible)
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        MapHeatmapLayer.Visibility = Visibility.Collapsed;
+    }
 
-        if (_mapZoom >= FoodLabelMinimumZoom)
+    private void MapLayerToggle_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is ToggleButton toggle && toggle.Tag is string value && Enum.TryParse<MapLayerGroup>(value, out var group))
         {
-            var visibleFoodLabels = 0;
-            foreach (var visual in _foodRegionVisuals.Values
-                         .Where(visual => IsPointInMapViewport(
-                             visual.Center,
-                             left,
-                             top,
-                             imageWidth,
-                             imageHeight))
-                         .OrderBy(visual => DistanceFromViewportCenter(
-                             visual.Center,
-                             left,
-                             top,
-                             imageWidth,
-                             imageHeight)))
+            _mapLayerPreferences.SetEnabled(group, toggle.IsChecked == true);
+            if (group is MapLayerGroup.Animals or MapLayerGroup.Plants or MapLayerGroup.Earth)
             {
-                var bounds = LabelScreenBounds(
-                    visual.Label,
-                    visual.Center,
-                    left,
-                    top,
-                    imageWidth,
-                    imageHeight);
-                if (occupied.Any(existing => existing.IntersectsWith(bounds)))
+                var category = group switch
                 {
-                    continue;
-                }
-
-                visibleLabels.Add(visual.Label);
-                occupied.Add(Inflated(bounds, 3d));
-                visibleFoodLabels++;
-                if (visibleFoodLabels >= 3)
-                {
-                    break;
-                }
+                    MapLayerGroup.Animals => "animals",
+                    MapLayerGroup.Plants => "plants",
+                    _ => "earth"
+                };
+                var keys = _staticMapLayers.Resources
+                    .Where(resource => string.Equals(resource.Category, category, StringComparison.OrdinalIgnoreCase))
+                    .Select(resource => resource.Key)
+                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
+                if (toggle.IsChecked == true
+                    && !keys.Any(key => _mapLayerPreferences.ResourceKeys.Contains(key)))
+                    _mapLayerPreferences.ResourceKeys.UnionWith(keys);
             }
+            _mapLayerPreferencesStore.TrySave(_mapLayerPreferences, out _);
+            _mapNotesWindow?.UpdateLayerPreferences(_mapLayerPreferences);
+            _mapLayerGeometryDirty = true;
+            UpdateMapLayerControls();
+            PositionMap();
         }
+    }
 
-        // Compute final visibility first. Collapsing and immediately showing
-        // unchanged labels at every GPS step invalidates their layout twice.
-        foreach (var label in _mapZoneVisuals.Values.Select(visual => visual.Label)
-                     .Concat(_foodRegionVisuals.Values.Select(visual => visual.Label)))
+    private void ResourceLayerToggle_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is CheckBox { Tag: string key } toggle)
         {
-            var visibility = visibleLabels.Contains(label) ? Visibility.Visible : Visibility.Collapsed;
-            if (label.Visibility != visibility)
-                label.Visibility = visibility;
+            if (toggle.IsChecked == true) _mapLayerPreferences.ResourceKeys.Add(key);
+            else _mapLayerPreferences.ResourceKeys.Remove(key);
+            _mapLayerPreferencesStore.TrySave(_mapLayerPreferences, out _);
+            _mapNotesWindow?.UpdateLayerPreferences(_mapLayerPreferences);
+            _mapLayerGeometryDirty = true;
+            UpdateMapLayerControls();
+            PositionMap();
         }
     }
 
-    private double DistanceFromViewportCenter(
-        MapPoint point,
-        double left,
-        double top,
-        double imageWidth,
-        double imageHeight)
+    private void UpdateMapLayerControls()
     {
-        var deltaX = left + point.Left * imageWidth - MapViewport.ActualWidth / 2d;
-        var deltaY = top + point.Top * imageHeight - MapViewport.ActualHeight / 2d;
-        return deltaX * deltaX + deltaY * deltaY;
+        if (!_mapLayersInitialized) return;
+        SetLayerToggle(MigrationLayerToggle, MapLayerGroup.Migration, "Migration Zone");
+        SetLayerToggle(PatrolLayerToggle, MapLayerGroup.Patrol, "Patrol Zone");
+        SetLayerToggle(SanctuaryLayerToggle, MapLayerGroup.Sanctuary, "Sanctuary");
+        SetLayerToggle(AiSpawnLayerToggle, MapLayerGroup.AiSpawnZones, "AI Spawn Zones");
+        SetLayerToggle(RoadLayerToggle, MapLayerGroup.Roads, "Roads & Trails");
+        SetLayerToggle(WaterLayerToggle, MapLayerGroup.Water, "Drinkable Water");
+        SetLayerToggle(AnimalsLayerToggle, MapLayerGroup.Animals, "Animals");
+        SetLayerToggle(PlantsLayerToggle, MapLayerGroup.Plants, "Plants & Fungi");
+        SetLayerToggle(EarthLayerToggle, MapLayerGroup.Earth, "Earth: Gastrolith · Salt · Mud");
+        foreach (var toggle in ResourceLayerChildrenPanel.Children.OfType<CheckBox>())
+        {
+            if (toggle.Tag is string key)
+                toggle.IsChecked = _mapLayerPreferences.ResourceKeys.Contains(key);
+        }
+        MapLayerSummaryLabel.Text = $"{_staticMapLayers.Zones.Count} ZONE · {_staticMapLayers.Resources.Count} RESOURCE";
     }
 
-    private static Rect LabelScreenBounds(
-        FrameworkElement label,
-        MapPoint point,
-        double left,
-        double top,
-        double imageWidth,
-        double imageHeight) => new(
-        left + point.Left * imageWidth - label.DesiredSize.Width / 2d,
-        top + point.Top * imageHeight - label.DesiredSize.Height / 2d,
-        label.DesiredSize.Width,
-        label.DesiredSize.Height);
-
-    private static Rect Inflated(Rect source, double margin)
+    private void SetLayerToggle(ToggleButton toggle, MapLayerGroup group, string label)
     {
-        source.Inflate(margin, margin);
-        return source;
+        var isResourceGroup = group is MapLayerGroup.Animals or MapLayerGroup.Plants or MapLayerGroup.Earth;
+        var selected = isResourceGroup
+            ? ResourceSelectionState(group)
+            : (_mapLayerPreferences.IsEnabled(group), false);
+        toggle.IsChecked = selected.Item1;
+        toggle.IsThreeState = false;
+        toggle.Content = selected.Item2 ? $"{label} · MỘT PHẦN" : label;
+        toggle.ToolTip = selected.Item2
+            ? "Đang bật một phần loại dữ liệu · click để bật/tắt toàn bộ nhóm"
+            : "Bật/tắt nhóm dữ liệu bản đồ";
     }
 
-    private bool IsPointInMapViewport(
-        MapPoint point,
-        double left,
-        double top,
-        double imageWidth,
-        double imageHeight)
+    private (bool Enabled, bool Partial) ResourceSelectionState(MapLayerGroup group)
     {
-        const double margin = 24d;
-        var x = left + point.Left * imageWidth;
-        var y = top + point.Top * imageHeight;
-        return x >= -margin
-               && x <= MapViewport.ActualWidth + margin
-               && y >= -margin
-               && y <= MapViewport.ActualHeight + margin;
+        var category = group switch
+        {
+            MapLayerGroup.Animals => "animals",
+            MapLayerGroup.Plants => "plants",
+            _ => "earth"
+        };
+        var keys = _staticMapLayers.Resources
+            .Where(resource => string.Equals(resource.Category, category, StringComparison.OrdinalIgnoreCase))
+            .Select(resource => resource.Key)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (keys.Count == 0)
+            return (_mapLayerPreferences.IsEnabled(group), false);
+        var selected = keys.Count(key => _mapLayerPreferences.ResourceKeys.Contains(key));
+        return (_mapLayerPreferences.IsEnabled(group), selected > 0 && selected < keys.Count);
     }
 
-    private static void PositionLabel(
-        FrameworkElement label,
-        MapPoint point,
-        double imageWidth,
-        double imageHeight)
+    private void ClearPlayerHeatmap()
+    {
+        // Activity heatmap is intentionally no longer consumed. Keep the old
+        // canvas empty for binary/XAML compatibility with the 2.1.x layout.
+        MapHeatmapLayer.Children.Clear();
+        MapHeatmapLayer.Visibility = Visibility.Collapsed;
+    }
+
+    private static MapPoint Centroid(IReadOnlyList<MapPoint> points) => new(points.Average(point => point.Left), points.Average(point => point.Top));
+    private static void PositionLabel(FrameworkElement label, MapPoint point, double imageWidth, double imageHeight)
     {
         label.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
         Canvas.SetLeft(label, point.Left * imageWidth - label.DesiredSize.Width / 2d);
         Canvas.SetTop(label, point.Top * imageHeight - label.DesiredSize.Height / 2d);
     }
+    private static bool NearlyEqual(double left, double right) => double.IsFinite(left) && double.IsFinite(right) && Math.Abs(left - right) < 0.01d;
 
-    private static MapPoint Centroid(IReadOnlyList<MapPoint> points) => new(
-        points.Average(point => point.Left),
-        points.Average(point => point.Top));
-
-    private void MapLayerToggle_Click(object sender, RoutedEventArgs e) =>
-        UpdateMapLayerControls();
-
-    private void UpdateMapLayerControls()
-    {
-        if (!HasCurrentProFeatures)
-        {
-            DisableProMapLayers();
-            return;
-        }
-
-        MapZoneLayer.Visibility = ZoneLayerToggle.IsChecked == true
-            ? Visibility.Visible
-            : Visibility.Collapsed;
-        MapFoodLayer.Visibility = FoodLayerToggle.IsChecked == true
-            ? Visibility.Visible
-            : Visibility.Collapsed;
-        HeatLayerToggle.IsEnabled = _playerHeatmapAvailable;
-        MapHeatmapLayer.Visibility = _playerHeatmapAvailable
-                                     && HeatLayerToggle.IsChecked == true
-            ? Visibility.Visible
-            : Visibility.Collapsed;
-        HeatLayerToggle.ToolTip = _playerHeatmapAvailable
-            ? "Ẩn/hiện Player heatmap do IslePilot cung cấp"
-            : "Server hiện tại không cung cấp Player heatmap qua IslePilot";
-        MapLayerSummaryLabel.Text = $"MMZ {_staticMapLayers.Zones.Count(zone => zone.Kind == MapZoneKind.Migration)}"
-                                    + $" · PZ {_staticMapLayers.Zones.Count(zone => zone.Kind == MapZoneKind.Patrol)}"
-                                    + $" · FOOD {_staticMapLayers.FoodRegions.Count}"
-                                    + (_playerHeatmapAvailable ? " · HEAT LIVE" : string.Empty);
-    }
-
-    private void ClearPlayerHeatmap()
-    {
-        if (_renderedPlayerHeatmap.Points.Count == 0
-            && _playerHeatVisuals.Count == 0
-            && !_playerHeatmapAvailable)
-        {
-            return;
-        }
-
-        MapHeatmapLayer.Children.Clear();
-        _playerHeatVisuals.Clear();
-        _renderedPlayerHeatmap = PlayerHeatmapRenderData.Empty;
-        _playerHeatmapAvailable = false;
-        _mapLayerGeometryDirty = true;
-    }
-
-    private static bool NearlyEqual(double left, double right) =>
-        double.IsFinite(left)
-        && double.IsFinite(right)
-        && Math.Abs(left - right) < 0.01d;
-
-    private sealed record MapZoneVisual(
-        Polygon Polygon,
-        Border Label,
-        TextBlock LabelText,
+    private sealed record StaticMapVisual(
+        string Id,
+        MapLayerGroup Group,
+        FrameworkElement Shape,
+        FrameworkElement? Label,
         IReadOnlyList<MapPoint> Points,
-        MapPoint LabelPoint,
-        MapZoneKind Kind);
-
-    private sealed record FoodRegionVisual(
-        Ellipse Shape,
-        Border Label,
-        MapPoint Center,
-        double RadiusX,
-        double RadiusY);
-
-    private sealed class PlayerHeatVisual(Ellipse shape)
-    {
-        public Ellipse Shape { get; } = shape;
-        public MapPoint Point { get; set; }
-        public double Intensity { get; set; }
-        public double Radius { get; set; }
-    }
+        MapPoint Anchor,
+        bool IsPolygon);
 }

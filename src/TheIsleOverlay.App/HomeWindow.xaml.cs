@@ -99,7 +99,7 @@ public partial class HomeWindow : Window
         await proAccessTask;
         await gachaCredentialTask;
         var highlightsStore = new ReleaseHighlightsPreferenceStore();
-        if (highlightsStore.ShouldShow(ReleaseHighlightsWindow.ReleaseVersion))
+        if (highlightsStore.ShouldShow(ReleaseHighlightsWindow.BriefingKey))
         {
             var currentVersion = CurrentVersion();
             var highlightsWindow = new ReleaseHighlightsWindow(

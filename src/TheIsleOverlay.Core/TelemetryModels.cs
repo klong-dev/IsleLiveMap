@@ -27,6 +27,8 @@ public sealed record PlayerTelemetry
     public string? Name { get; init; }
     public string? Class { get; init; }
     public string? Server { get; init; }
+    /// <summary>Stable endpoint identity when the source exposes one (IP/DNS + port).</summary>
+    public string? ServerEndpoint { get; init; }
     public bool? Female { get; init; }
     public double? GrowthPercent { get; init; }
     public double? HealthPercent { get; init; }

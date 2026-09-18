@@ -35,6 +35,10 @@ public static class AppPaths
         Root,
         "map-notes.json");
 
+    public static string MapLayerSettings { get; } = Path.Combine(
+        Root,
+        "map-layer-settings.json");
+
     public static string ReleaseHighlightsPreferences { get; } = Path.Combine(
         Root,
         "release-highlights.json");

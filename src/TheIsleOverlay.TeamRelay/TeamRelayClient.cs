@@ -21,6 +21,14 @@ public sealed class TeamRelayClient : IAsyncDisposable
     private readonly object _stateGate = new();
     private readonly Dictionary<Guid, TeamMemberSnapshot> _members = [];
     private readonly Dictionary<Guid, TeamMapPingSnapshot> _mapPings = [];
+    private readonly Dictionary<Guid, long> _memberRevisions = [];
+    private readonly Dictionary<Guid, long> _memberSequences = [];
+    private readonly Dictionary<Guid, long> _memberRemovalRevisions = [];
+    private long _stateRevision;
+    private long _snapshotRevision;
+    private long _mapPingRevision;
+    private bool _receivedVersionedPingBatch;
+    private bool _receivedVersionedRemoval;
 
     private TeamRelayState _state = new();
     private TeamSession? _session;
@@ -241,6 +249,7 @@ public sealed class TeamRelayClient : IAsyncDisposable
                 _connection = connection;
                 _intentionalStop = false;
                 await connection.StartAsync(operationToken).ConfigureAwait(false);
+                await RequestSnapshotAsync(connection, operationToken).ConfigureAwait(false);
                 StartHeartbeat(session);
                 SetState(TeamRelayConnectionState.Live);
                 return session;
@@ -315,7 +324,9 @@ public sealed class TeamRelayClient : IAsyncDisposable
         connection.On<TeamSnapshot>("ReceiveSnapshot", ReceiveSnapshot);
         connection.On<TeamMemberSnapshot>("MemberUpdated", MemberUpdated);
         connection.On<Guid>("MemberRemoved", MemberRemoved);
+        connection.On<TeamMemberRemoval>("MemberRemovedV2", MemberRemoved);
         connection.On<IReadOnlyList<TeamMapPingSnapshot>>("MapPingsChanged", MapPingsChanged);
+        connection.On<TeamMapPingBatch>("MapPingsChangedV2", MapPingsChanged);
         connection.On("TeamClosed", () => MarkExpired("Nhóm đã kết thúc."));
 
         connection.Reconnecting += _ =>
@@ -333,8 +344,7 @@ public sealed class TeamRelayClient : IAsyncDisposable
             {
                 SetState(TeamRelayConnectionState.Live);
             }
-
-            return Task.CompletedTask;
+            return RequestSnapshotAsync(connection);
         };
         connection.Closed += exception =>
         {
@@ -455,9 +465,33 @@ public sealed class TeamRelayClient : IAsyncDisposable
             cancellation.Token);
     }
 
+    private async Task RequestSnapshotAsync(
+        HubConnection? connection = null,
+        CancellationToken cancellationToken = default)
+    {
+        connection ??= _connection;
+        if (connection?.State != HubConnectionState.Connected)
+            return;
+        try
+        {
+            var snapshot = await connection.InvokeAsync<TeamSnapshot>("GetSnapshot", cancellationToken)
+                .ConfigureAwait(false);
+            ReceiveSnapshot(snapshot);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
+        catch
+        {
+            // A reconnect/next heartbeat will retry. Do not tear down the team
+            // session for a single snapshot request failure.
+        }
+    }
+
     private async Task RunHeartbeatAsync(TimeSpan interval, CancellationToken cancellationToken)
     {
         using var timer = new PeriodicTimer(interval);
+        var lastSnapshotAt = DateTimeOffset.UtcNow;
         try
         {
             while (await timer.WaitForNextTickAsync(cancellationToken).ConfigureAwait(false))
@@ -471,6 +505,11 @@ public sealed class TeamRelayClient : IAsyncDisposable
                 try
                 {
                     await connection.InvokeAsync("Heartbeat", cancellationToken).ConfigureAwait(false);
+                    if (DateTimeOffset.UtcNow - lastSnapshotAt >= TimeSpan.FromSeconds(10))
+                    {
+                        await RequestSnapshotAsync(connection, cancellationToken).ConfigureAwait(false);
+                        lastSnapshotAt = DateTimeOffset.UtcNow;
+                    }
                 }
                 catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                 {
@@ -507,14 +546,29 @@ public sealed class TeamRelayClient : IAsyncDisposable
         }
     }
 
-    private void ReceiveSnapshot(TeamSnapshot snapshot)
+    internal void ReceiveSnapshot(TeamSnapshot snapshot)
     {
         lock (_stateGate)
         {
+            if (snapshot.StateRevision > 0 && snapshot.StateRevision < _stateRevision)
+                return;
+            _stateRevision = Math.Max(_stateRevision, snapshot.StateRevision);
+            _snapshotRevision = Math.Max(_snapshotRevision, snapshot.StateRevision);
+            _mapPingRevision = Math.Max(_mapPingRevision, snapshot.StateRevision);
+            if (snapshot.StateRevision > 0)
+            {
+                _receivedVersionedPingBatch = true;
+                _receivedVersionedRemoval = true;
+            }
             _members.Clear();
+            _memberRevisions.Clear();
+            _memberSequences.Clear();
+            _memberRemovalRevisions.Clear();
             foreach (var member in snapshot.Members)
             {
                 _members[member.MemberId] = member;
+                _memberRevisions[member.MemberId] = member.StateRevision;
+                _memberSequences[member.MemberId] = member.Telemetry?.Sequence ?? -1;
             }
             _mapPings.Clear();
             foreach (var ping in snapshot.MapPings ?? [])
@@ -526,12 +580,38 @@ public sealed class TeamRelayClient : IAsyncDisposable
         SetState(TeamRelayConnectionState.Live);
     }
 
-    private void MemberUpdated(TeamMemberSnapshot member)
+    internal void MemberUpdated(TeamMemberSnapshot member)
     {
         bool isLocalMember;
         lock (_stateGate)
         {
+            var revision = member.StateRevision;
+            var sequence = member.Telemetry?.Sequence ?? -1;
+            if (_memberRemovalRevisions.TryGetValue(member.MemberId, out var removalRevision)
+                && revision > 0
+                && revision <= removalRevision)
+                return;
+            // The room revision is shared by every member. Updates from two
+            // members can arrive in the opposite order without either being stale.
+            if (revision > 0
+                && !_members.ContainsKey(member.MemberId)
+                && revision <= _snapshotRevision)
+                return;
+            if (_memberRevisions.TryGetValue(member.MemberId, out var previousRevision)
+                && revision > 0 && previousRevision > revision)
+                return;
+            if (_memberSequences.TryGetValue(member.MemberId, out var previousSequence)
+                && sequence >= 0 && previousSequence > sequence)
+                return;
+            if (_members.TryGetValue(member.MemberId, out var previousMember)
+                && revision == previousMember.StateRevision
+                && member.LastSeenAt < previousMember.LastSeenAt)
+                return;
+            _stateRevision = Math.Max(_stateRevision, revision);
             _members[member.MemberId] = member;
+            _memberRevisions[member.MemberId] = revision;
+            _memberSequences[member.MemberId] = sequence;
+            _memberRemovalRevisions.Remove(member.MemberId);
             isLocalMember = _session?.MemberId == member.MemberId;
         }
 
@@ -547,22 +627,70 @@ public sealed class TeamRelayClient : IAsyncDisposable
             : TeamRelayConnectionState.Live);
     }
 
-    private void MemberRemoved(Guid memberId)
+    internal void MemberRemoved(Guid memberId)
     {
         lock (_stateGate)
         {
+            if (_receivedVersionedRemoval)
+                return;
             _members.Remove(memberId);
+            _memberRevisions.Remove(memberId);
+            _memberSequences.Remove(memberId);
         }
 
         SetState(CurrentState.ConnectionState);
     }
 
-    private void MapPingsChanged(IReadOnlyList<TeamMapPingSnapshot> mapPings)
+    internal void MemberRemoved(TeamMemberRemoval removal)
     {
         lock (_stateGate)
         {
+            _receivedVersionedRemoval = true;
+            if (removal.StateRevision > 0
+                && (removal.StateRevision < _snapshotRevision
+                    || _memberRevisions.TryGetValue(removal.MemberId, out var memberRevision)
+                    && memberRevision > removal.StateRevision))
+                return;
+            if (removal.StateRevision > 0)
+            {
+                _stateRevision = Math.Max(_stateRevision, removal.StateRevision);
+                _memberRemovalRevisions[removal.MemberId] = removal.StateRevision;
+            }
+            _members.Remove(removal.MemberId);
+            _memberRevisions.Remove(removal.MemberId);
+            _memberSequences.Remove(removal.MemberId);
+        }
+
+        SetState(CurrentState.ConnectionState);
+    }
+
+    internal void MapPingsChanged(IReadOnlyList<TeamMapPingSnapshot> mapPings)
+    {
+        lock (_stateGate)
+        {
+            if (_receivedVersionedPingBatch)
+                return;
             _mapPings.Clear();
             foreach (var ping in mapPings)
+            {
+                _mapPings[ping.PingId] = ping;
+            }
+        }
+
+        SetState(CurrentState.ConnectionState);
+    }
+
+    internal void MapPingsChanged(TeamMapPingBatch batch)
+    {
+        lock (_stateGate)
+        {
+            _receivedVersionedPingBatch = true;
+            if (batch.StateRevision > 0 && batch.StateRevision < _mapPingRevision)
+                return;
+            _mapPingRevision = Math.Max(_mapPingRevision, batch.StateRevision);
+            _stateRevision = Math.Max(_stateRevision, batch.StateRevision);
+            _mapPings.Clear();
+            foreach (var ping in batch.MapPings)
             {
                 _mapPings[ping.PingId] = ping;
             }
@@ -599,6 +727,14 @@ public sealed class TeamRelayClient : IAsyncDisposable
             {
                 _members.Clear();
                 _mapPings.Clear();
+                _memberRevisions.Clear();
+                _memberSequences.Clear();
+                _memberRemovalRevisions.Clear();
+                _stateRevision = 0;
+                _snapshotRevision = 0;
+                _mapPingRevision = 0;
+                _receivedVersionedPingBatch = false;
+                _receivedVersionedRemoval = false;
             }
 
             state = new TeamRelayState
@@ -612,6 +748,7 @@ public sealed class TeamRelayClient : IAsyncDisposable
                     .OrderBy(ping => ping.CreatedAt)
                     .ThenBy(ping => ping.PingId)
                     .ToArray(),
+                StateRevision = _stateRevision,
                 Message = message
             };
             _state = state;

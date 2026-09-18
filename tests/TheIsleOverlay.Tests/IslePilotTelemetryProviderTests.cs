@@ -134,7 +134,7 @@ public sealed class IslePilotTelemetryProviderTests
     }
 
     [Fact]
-    public async Task GetSnapshotAsync_UsesOfficialHeatmapCellsWithoutInferringFromMarkers()
+    public async Task GetSnapshotAsync_DoesNotRequestDynamicHeatmap()
     {
         const string markers = """
             {"ok":true,"markers":[{"steamId":"1","x":1000,"y":-2000,"self":true}]}
@@ -149,12 +149,9 @@ public sealed class IslePilotTelemetryProviderTests
 
         var snapshot = await provider.GetSnapshotAsync();
 
-        Assert.True(snapshot.Map?.PlayerHeatmapEnabled);
-        Assert.Equal(0.03, snapshot.Map?.PlayerHeatmapRadius);
-        var cell = Assert.Single(snapshot.Map?.PlayerHeatmapCells ?? []);
-        Assert.Equal(new TheIsleOverlay.Core.MapPoint(0.25, 0.75), cell.Location);
-        Assert.Equal(0.8, cell.Intensity);
-        Assert.Equal(1, handler.HeatmapRequests);
+        Assert.False(snapshot.Map?.PlayerHeatmapEnabled);
+        Assert.Empty(snapshot.Map?.PlayerHeatmapCells ?? []);
+        Assert.Equal(0, handler.HeatmapRequests);
     }
 
     private sealed class IslePilotHandler(

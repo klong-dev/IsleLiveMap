@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Gastrolith">
+  <defs>
+    <linearGradient id="stone" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#d9d5c4"/>
+      <stop offset="1" stop-color="#8f8a78"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#081013" flood-opacity="0.55"/>
+    </filter>
+  </defs>
+  <g filter="url(#shadow)">
+    <ellipse cx="31" cy="51" rx="22" ry="6" fill="#101817" opacity="0.35"/>
+    <path d="M14 41c2-9 9-16 18-17 10-1 17 5 19 15-6 8-28 10-37 2z" fill="url(#stone)" stroke="#4b4a42" stroke-width="3" stroke-linejoin="round"/>
+    <path d="M23 27c1-8 7-14 15-13 7 1 12 7 12 15-7 3-18 4-27-2z" fill="#b9b49e" stroke="#4b4a42" stroke-width="3" stroke-linejoin="round"/>
+    <path d="M16 42c4 4 25 6 34-2" fill="none" stroke="#f1ecd7" stroke-width="3" stroke-linecap="round" opacity="0.55"/>
+    <circle cx="31" cy="34" r="3" fill="#6f6a5c" opacity="0.6"/>
+    <circle cx="41" cy="28" r="2" fill="#6f6a5c" opacity="0.55"/>
+  </g>
+</svg>

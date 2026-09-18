@@ -99,6 +99,9 @@ public static class LocalPositionSnapshotMerger
             Server = string.IsNullOrWhiteSpace(remotePlayer?.Server)
                 ? serverEndpoint
                 : remotePlayer.Server,
+            ServerEndpoint = string.IsNullOrWhiteSpace(serverEndpoint)
+                ? remotePlayer?.ServerEndpoint
+                : serverEndpoint,
             Class = string.IsNullOrWhiteSpace(verifiedLocalSpeciesId)
                 ? remotePlayer?.Class
                 : verifiedLocalSpeciesId.Trim(),

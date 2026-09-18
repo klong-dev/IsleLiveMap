@@ -92,6 +92,7 @@ public partial class MainWindow : Window
     private bool _mapPanActive;
     private bool _rawMapPanReceived;
     private bool _rawMouseInputRegistered;
+    private bool _mapLayerInspectorOpen;
     private DispatcherTimer? _proFeatureExpiryTimer;
     private DispatcherTimer? _uiRenderTimer;
     private DispatcherTimer? _mouseShortcutActivationTimer;
@@ -299,7 +300,9 @@ public partial class MainWindow : Window
                 }
                 : null,
             Local = snapshot?.Player?.Location,
-            ServerEndpoint = snapshot?.Player?.Server,
+            ServerEndpoint = snapshot?.Player is { } diagnosticServer
+                ? diagnosticServer.ServerEndpoint ?? diagnosticServer.Server
+                : null,
             InputMarkerCount = snapshot?.Map?.Markers.Count ?? 0,
             RenderedMarkerCount = _renderedRemotePlayerMarkers.Count,
             RenderedMarkers = _renderedRemotePlayerMarkers.Select(marker => new
@@ -672,17 +675,7 @@ public partial class MainWindow : Window
             _location = player.Location;
             _mapLocation = player.MapLocation;
             UpdateMapNotesPlayer();
-            var heatmapChanged = SyncPlayerHeatmap(snapshot.Map);
             var remoteMarkersChanged = SyncRemotePlayerMarkers(snapshot);
-            if (_location is not null)
-            {
-                var altitude = _location.Z is null ? "—" : $"{_location.Z.Value / 1000d:0.0}";
-                CoordinateLabel.Text = $"X {_location.X / 1000d:0.0}  Y {_location.Y / 1000d:0.0}  Z {altitude}";
-            }
-            else
-            {
-                CoordinateLabel.Text = "X —  Y —  Z —";
-            }
 
             var markerVisibility = ResolvePlayerMapPoint() is null
                 ? Visibility.Collapsed
@@ -691,7 +684,7 @@ public partial class MainWindow : Window
             PlayerMarker.Visibility = markerVisibility;
             if (MapRenderInvalidationPolicy.ShouldPositionMap(
                     mapPositionChanged,
-                    heatmapChanged,
+                    heatmapChanged: false,
                     remoteMarkersChanged,
                     markerVisibilityChanged))
             {
@@ -1702,6 +1695,29 @@ public partial class MainWindow : Window
 
     private void LockButton_Click(object sender, RoutedEventArgs e) => SetClickThrough(true);
 
+    private void OpenMapNotesFallbackButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (HasCurrentProFeatures)
+            ToggleMapNotesWindow();
+        else
+            MessageBox.Show(this, "Mốc bản đồ là tính năng Pro. Hãy kích hoạt Pro để sử dụng Alt+M.",
+                "Mở bản đồ mốc", MessageBoxButton.OK, MessageBoxImage.Information);
+    }
+
+    private void MapLayersButton_Click(object sender, RoutedEventArgs e)
+    {
+        _mapLayerInspectorOpen = !_mapLayerInspectorOpen;
+        MapLayerInspector.Visibility = _mapLayerInspectorOpen && !_clickThrough
+            ? Visibility.Visible : Visibility.Collapsed;
+        if (_mapLayerInspectorOpen) UpdateMapLayerControls();
+    }
+
+    private void CloseMapLayerInspectorButton_Click(object sender, RoutedEventArgs e)
+    {
+        _mapLayerInspectorOpen = false;
+        MapLayerInspector.Visibility = Visibility.Collapsed;
+    }
+
     private void ShortcutSettingsButton_Click(object sender, RoutedEventArgs e)
     {
         var dialog = new ShortcutSettingsWindow(_shortcutSettings)
@@ -1722,12 +1738,18 @@ public partial class MainWindow : Window
         var result = _shortcutRegistrationManager.TryApply(requested);
         if (!result.Success)
         {
+            _shortcutSettings = result.ActiveSettings;
+            RefreshShortcutCopy();
+            if (_shortcutRegistrationManager.HasCompleteRegistration)
+            {
+                _shortcutSettingsStore.TrySave(_shortcutSettings, out _);
+            }
             SetClickThrough(true);
             MessageBox.Show(
                 this,
                 result.FriendlyError + Environment.NewLine
                     + (_shortcutRegistrationManager.HasCompleteRegistration
-                        ? "Các phím đang dùng trước đó đã được khôi phục."
+                        ? "Các action khác vẫn hoạt động; action bị trùng đã dùng tổ hợp dự phòng."
                         : "Bộ phím cũ cũng đang bị chiếm; overlay đã khóa xuyên chuột để giữ an toàn."),
                 "Không thể đổi phím tắt",
                 MessageBoxButton.OK,
@@ -1758,7 +1780,9 @@ public partial class MainWindow : Window
         var choice = MessageBox.Show(
             this,
             result.FriendlyError + Environment.NewLine
-                + "Overlay vẫn ở chế độ xuyên chuột an toàn. Mở cài đặt để chọn tổ hợp khác?",
+                + (result.Statuses.Any(status => status.Registered)
+                    ? "Các phím còn lại vẫn hoạt động độc lập. Mở cài đặt để đổi action bị trùng?"
+                    : "Overlay vẫn ở chế độ xuyên chuột an toàn. Mở cài đặt để chọn tổ hợp khác?"),
             "Phím tắt đang bị trùng",
             MessageBoxButton.YesNo,
             MessageBoxImage.Warning);
@@ -1824,7 +1848,7 @@ public partial class MainWindow : Window
         TeamMoveBadge.Visibility = enabled ? Visibility.Collapsed : Visibility.Visible;
         MissionMoveBadge.Visibility = enabled ? Visibility.Collapsed : Visibility.Visible;
         MapZoomControls.Visibility = enabled ? Visibility.Collapsed : Visibility.Visible;
-        MapLayerControls.Visibility = enabled ? Visibility.Collapsed : Visibility.Visible;
+        _mapLayerInspectorOpen = false;
         foreach (var grip in WidgetResizeGrips)
         {
             grip.Visibility = enabled ? Visibility.Collapsed : Visibility.Visible;
@@ -1885,6 +1909,9 @@ public partial class MainWindow : Window
             ? Visibility.Visible
             : Visibility.Collapsed;
         LayoutControls.Visibility = editControlsVisible
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        MapLayerInspector.Visibility = editControlsVisible && _mapLayerInspectorOpen
             ? Visibility.Visible
             : Visibility.Collapsed;
 
@@ -2038,7 +2065,6 @@ public partial class MainWindow : Window
         _proFeatureExpiryTimer?.Stop();
         _proFeatureExpiryTimer = null;
         DetachTeamOverlay();
-        App.CurrentTeam.ClearTelemetry();
         _shutdown.Cancel();
         if (_telemetryWatchTask is not null)
         {

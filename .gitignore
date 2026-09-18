@@ -13,6 +13,7 @@ output/playwright/messenger-training/
 output/
 tools/.dotnet-tools/
 tools/__pycache__/
+tools/myislemap-import/snapshot/render/
 *.WebView2/
 src/TheIsleOverlay.App/Assets/*.png
 !src/TheIsleOverlay.App/Assets/ProMapPreview.png

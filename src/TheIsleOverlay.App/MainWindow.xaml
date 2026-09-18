@@ -78,7 +78,7 @@
                 </Canvas>
 
                 <Border x:Name="MapInfoPanel" HorizontalAlignment="Left" VerticalAlignment="Top"
-                        Margin="7" MaxWidth="290" Background="#C0071517" BorderBrush="#503E625B"
+                        Margin="7" MinWidth="160" MaxWidth="290" Background="#C0071517" BorderBrush="#503E625B"
                         BorderThickness="1" CornerRadius="3" Padding="7,4">
                     <StackPanel>
                         <Grid>
@@ -88,14 +88,11 @@
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <TextBlock Text="GATEWAY" Foreground="#DCE8E0"
+                                <TextBlock Text="PLAYER / AI" Foreground="#DCE8E0"
                                            FontFamily="Bahnschrift SemiCondensed" FontSize="9.5"
                                            FontWeight="SemiBold" />
                                 <Ellipse Width="4" Height="4" Fill="#37D4C6"
                                          Margin="6,0,4,0" VerticalAlignment="Center" />
-                                <TextBlock Text="LIVE" Foreground="#75B9AE"
-                                           FontFamily="Bahnschrift SemiCondensed" FontSize="7.5"
-                                           FontWeight="SemiBold" VerticalAlignment="Center" />
                             </StackPanel>
                             <TextBlock x:Name="RemotePlayerCountLabel" Grid.Column="2"
                                        Text="P 0 · AI 0" Visibility="Collapsed"
@@ -103,7 +100,7 @@
                                        FontSize="8" FontWeight="SemiBold" Margin="10,0,0,0"
                                        VerticalAlignment="Center" />
                         </Grid>
-                        <TextBlock x:Name="CoordinateLabel" Text="X —  Y —  Z —"
+                        <TextBlock x:Name="CoordinateLabel" Text="X —  Y —  Z —" Visibility="Collapsed"
                                    Foreground="#82A49B" FontFamily="Bahnschrift" FontSize="8.2"
                                    Margin="0,1,0,0" />
                         <Grid Margin="0,1,0,0">
@@ -111,7 +108,8 @@
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
-                            <TextBlock x:Name="MapLayerSummaryLabel" Text="MMZ — · PZ — · FOOD —"
+                            <TextBlock x:Name="MapLayerSummaryLabel" Text=""
+                                       Visibility="Collapsed"
                                        Foreground="#76968D" FontFamily="Bahnschrift SemiCondensed"
                                        FontSize="6.8" VerticalAlignment="Center" />
                             <StackPanel x:Name="RemoteEntityLegend" Grid.Column="1"
@@ -145,18 +143,10 @@
                 <TextBlock x:Name="MapStateLabel" Text="ĐANG TẢI BẢN ĐỒ" Foreground="#A5BDB5" Background="#C0091718" Padding="10,6" HorizontalAlignment="Center" VerticalAlignment="Center" FontFamily="Bahnschrift SemiCondensed" FontSize="10" />
                 </Grid>
 
-                <StackPanel x:Name="MapLayerControls" Orientation="Horizontal"
-                            HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,8,74,8">
-                    <ToggleButton x:Name="ZoneLayerToggle" Style="{StaticResource MapLayerToggle}"
-                                  Content="ZONE" IsChecked="True" Click="MapLayerToggle_Click"
-                                  ToolTip="Ẩn/hiện Migration và Patrol Zones" />
-                    <ToggleButton x:Name="FoodLayerToggle" Style="{StaticResource MapLayerToggle}"
-                                  Content="FOOD" IsChecked="True" Margin="3,0,0,0"
-                                  Click="MapLayerToggle_Click" ToolTip="Ẩn/hiện các vùng nguồn thức ăn" />
-                    <ToggleButton x:Name="HeatLayerToggle" Style="{StaticResource MapLayerToggle}"
-                                  Content="HEAT" IsChecked="True" IsEnabled="False" Margin="3,0,0,0"
-                                  Click="MapLayerToggle_Click" />
-                </StackPanel>
+                <!-- Layer switches live in the Edit Mode inspector. Keeping this
+                     small surface free of toggles prevents accidental clicks on
+                     the map and keeps Free/Pro rendering identical. -->
+                <StackPanel x:Name="MapLayerControls" Visibility="Collapsed" />
 
                 <StackPanel x:Name="MapZoomControls" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,8,40,8">
                     <Button Style="{StaticResource ChromeButton}" Content="+" Width="27" Height="25" Padding="0" Click="ZoomInButton_Click" />
@@ -579,6 +569,14 @@
                     Margin="4,0,0,0" Padding="7,3"
                     Click="ShortcutSettingsButton_Click"
                     ToolTip="Đổi các tổ hợp phím của overlay" />
+            <Button x:Name="OpenMapNotesFallbackButton" Style="{StaticResource ChromeButton}" Content="MỐC"
+                    Margin="4,0,0,0" Padding="7,3"
+                    Click="OpenMapNotesFallbackButton_Click"
+                    ToolTip="Mở bản đồ mốc khi Alt+M bị ứng dụng khác chiếm" />
+            <Button x:Name="MapLayersButton" Style="{StaticResource ChromeButton}" Content="LỚP BẢN ĐỒ"
+                    Margin="4,0,0,0" Padding="7,3"
+                    Click="MapLayersButton_Click"
+                    ToolTip="Mở bảng bật/tắt các lớp bản đồ offline" />
             <Button x:Name="LockButton" Style="{StaticResource ChromeButton}" Content="LOCK"
                     Margin="4,0,0,0" Click="LockButton_Click"
                     ToolTip="Thoát Edit Mode và bật xuyên chuột" />
@@ -589,6 +587,50 @@
                     Margin="4,0,0,0" Width="25" Padding="0"
                     Click="CloseButton_Click" />
         </StackPanel>
+
+        <Border x:Name="MapLayerInspector" Panel.ZIndex="95" Visibility="Collapsed"
+                HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,52,12,0"
+                Width="235" MaxHeight="620" Background="#F20B1B1A"
+                BorderBrush="#6E7F766E" BorderThickness="1" CornerRadius="4" Padding="10,8">
+            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <StackPanel>
+                    <Grid Margin="0,0,0,6">
+                        <TextBlock Text="LỚP BẢN ĐỒ OFFLINE" Foreground="#F3DE8D"
+                                   FontFamily="Bahnschrift SemiCondensed" FontSize="11" FontWeight="SemiBold" />
+                        <Button HorizontalAlignment="Right" Content="×" Width="22" Height="20"
+                                Style="{StaticResource ChromeButton}" Click="CloseMapLayerInspectorButton_Click" />
+                    </Grid>
+                    <TextBlock Text="Nguồn snapshot: myislemap.com · không cần mạng khi chạy"
+                               Foreground="#789A92" FontFamily="Bahnschrift" FontSize="7.5"
+                               TextWrapping="Wrap" Margin="0,0,0,7" />
+                    <TextBlock Text="ZONES &amp; NAVIGATION" Foreground="#8FE3D0"
+                               FontFamily="Bahnschrift SemiCondensed" FontSize="8" Margin="0,2,0,3" />
+                    <ToggleButton x:Name="MigrationLayerToggle" Tag="Migration" Content="Migration Zone"
+                                  Style="{StaticResource MapLayerToggle}" Click="MapLayerToggle_Click" />
+                    <ToggleButton x:Name="PatrolLayerToggle" Tag="Patrol" Content="Patrol Zone"
+                                  Style="{StaticResource MapLayerToggle}" Click="MapLayerToggle_Click" />
+                    <ToggleButton x:Name="SanctuaryLayerToggle" Tag="Sanctuary" Content="Sanctuary"
+                                  Style="{StaticResource MapLayerToggle}" Click="MapLayerToggle_Click" />
+                    <ToggleButton x:Name="AiSpawnLayerToggle" Tag="AiSpawnZones" Content="AI Spawn Zones"
+                                  Style="{StaticResource MapLayerToggle}" Click="MapLayerToggle_Click" />
+                    <ToggleButton x:Name="RoadLayerToggle" Tag="Roads" Content="Roads &amp; Trails"
+                                  Style="{StaticResource MapLayerToggle}" Click="MapLayerToggle_Click" />
+                    <ToggleButton x:Name="WaterLayerToggle" Tag="Water" Content="Drinkable Water"
+                                  Style="{StaticResource MapLayerToggle}" Click="MapLayerToggle_Click" />
+                    <TextBlock Text="FOOD &amp; RESOURCES" Foreground="#8FE3D0"
+                               FontFamily="Bahnschrift SemiCondensed" FontSize="8" Margin="0,9,0,3" />
+                    <ToggleButton x:Name="AnimalsLayerToggle" Tag="Animals" Content="Animals"
+                                  Style="{StaticResource MapLayerToggle}" Click="MapLayerToggle_Click" />
+                    <ToggleButton x:Name="PlantsLayerToggle" Tag="Plants" Content="Plants &amp; Fungi"
+                                  Style="{StaticResource MapLayerToggle}" Click="MapLayerToggle_Click" />
+                    <ToggleButton x:Name="EarthLayerToggle" Tag="Earth" Content="Earth: Gastrolith · Salt · Mud"
+                                  Style="{StaticResource MapLayerToggle}" Click="MapLayerToggle_Click" />
+                    <TextBlock Text="LỌC TỪNG LOẠI" Foreground="#789A92"
+                               FontFamily="Bahnschrift SemiCondensed" FontSize="7.5" Margin="0,8,0,2" />
+                    <StackPanel x:Name="ResourceLayerChildrenPanel" />
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
 
         <Border x:Name="MissionToast" Panel.ZIndex="100" Visibility="Collapsed" Opacity="0"
                 HorizontalAlignment="Center" VerticalAlignment="Top" Margin="12,18,12,0"

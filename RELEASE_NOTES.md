@@ -1,3 +1,33 @@
+# Isle Live Map 2.2.0
+
+## Bản đồ offline và điều khiển layer
+
+- Thay dữ liệu zone/food/heat cũ bằng snapshot offline từ MyIsleMap: 12 Migration Zone, 61 Patrol Zone, 7 Sanctuary, 52 AI Spawn Zone, 32 tuyến đường, 28 nguồn nước và 953 điểm tài nguyên.
+- Trong Edit Mode, `LỚP BẢN ĐỒ` cho phép bật/tắt Zone, Roads, Water, Animals, Plants/Fungi và Earth; có thể lọc riêng từng loài hoặc tài nguyên.
+- Layer offline dùng được cho cả Free và Pro, không gọi website khi app đang chạy và tự ghi nhớ lựa chọn sau khi khởi động lại.
+- Static geometry chỉ được dựng lại khi filter, zoom, resize hoặc catalog thay đổi; GPS, Player và AI telemetry không còn khiến layer tĩnh rebuild liên tục.
+
+## Alt+M và set point ổn định hơn
+
+- Hotkey được đăng ký độc lập; một phím khác bị trùng không còn làm `Alt + M` ngừng hoạt động.
+- Edit Mode có nút `MỐC` để mở bản đồ lớn khi Windows hoặc ứng dụng khác chiếm hotkey.
+- Marker được cache theo ID thay vì bị xóa/tạo lại theo mỗi nhịp GPS, giúp click và popup không mất giữa chừng.
+- Mốc của bạn có thể xóa bằng thùng rác, nút `XÓA MỐC`, phím `Delete` hoặc chuột phải; ping đồng đội vẫn chỉ chủ sở hữu được sửa/xóa.
+
+## Nhóm sinh tồn tự phục hồi
+
+- Relay bổ sung snapshot/revision tương thích ngược; client lấy snapshot khi connect, reconnect và định kỳ để phục hồi delta bị bỏ lỡ.
+- So khớp cùng server ưu tiên endpoint `IP/DNS + port`, đồng thời tương thích `ServerKey` của relay cũ để tránh ẩn nhầm đồng đội khi tên server khác nhau.
+- Chống telemetry, member removal và team ping đến sai thứ tự; dữ liệu cũ không còn kéo marker về vị trí trước hoặc làm mốc đã xóa xuất hiện lại.
+- Marker giữ vị trí cuối tối đa 15 giây và giảm opacity khi reconnect; dòng thành viên giữ đến 35 giây rồi được relay dọn.
+- Chuyển Home ↔ Overlay sẽ publish lại telemetry mới nhất mà không cần tạo hoặc vào lại nhóm.
+
+## HUD gọn và thông báo cập nhật mới
+
+- Bỏ `GATEWAY / LIVE`, tọa độ XYZ và dòng MMZ/PZ/FOOD khỏi góc trái minimap; giữ số Player/AI, legend phân loại và trạng thái đồng bộ.
+- Modal cập nhật 5 trang dùng ảnh chụp đúng từng khung UI: layer offline, Alt+M, nhóm sinh tồn và minimap mới.
+- Checkbox “Không hiển thị lại” chỉ xuất hiện ở trang cuối và dùng briefing key riêng cho đợt cập nhật này.
+
 # Isle Live Map 2.1.2
 
 ## Kênh thông báo Zalo chính thức

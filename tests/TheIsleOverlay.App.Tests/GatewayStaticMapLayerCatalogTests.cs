@@ -8,27 +8,43 @@ namespace TheIsleOverlay.App.Tests;
 public sealed class GatewayStaticMapLayerCatalogTests
 {
     [Fact]
-    public void LoadBundled_ContainsCalibratedFoodRegions()
+    public void LoadBundled_ContainsPinnedOfflineSnapshot()
     {
         var layers = GatewayStaticMapLayerCatalog.LoadBundled();
 
-        Assert.Equal(34, layers.Zones.Count);
-        Assert.Equal(6, layers.Zones.Count(zone => zone.Kind == MapZoneKind.Migration));
-        Assert.Equal(28, layers.Zones.Count(zone => zone.Kind == MapZoneKind.Patrol));
+        Assert.Equal(80, layers.Zones.Count);
+        Assert.Equal(12, layers.Zones.Count(zone => zone.Kind == MapZoneKind.Migration));
+        Assert.Equal(61, layers.Zones.Count(zone => zone.Kind == MapZoneKind.Patrol));
+        Assert.Equal(7, layers.Zones.Count(zone => zone.Kind == MapZoneKind.Sanctuary));
         Assert.Contains(layers.Zones, zone =>
             zone.Kind == MapZoneKind.Migration && zone.Name == "Swamp");
         Assert.Contains(layers.Zones, zone =>
             zone.Kind == MapZoneKind.Patrol && zone.Name == "Swamps");
-        Assert.Equal(13, layers.FoodRegions.Count);
-        Assert.Contains(layers.FoodRegions, region =>
-            region.Id == "central-mixed"
-            && region.Foods.SequenceEqual(["Heo", "Nai", "Dê", "Gà"]));
-        Assert.All(layers.FoodRegions, region =>
+        Assert.Equal(52, layers.AiSpawnZones.Count);
+        Assert.Equal(32, layers.Routes.Count);
+        Assert.Equal(876, layers.Routes.Sum(route => route.Points.Count));
+        Assert.Equal(28, layers.WaterLabels.Count);
+        Assert.Equal(953, layers.Resources.Count);
+        Assert.Equal(430, layers.Resources.Count(resource => resource.Category == "animals"));
+        Assert.Equal(245, layers.Resources.Count(resource => resource.Category == "plants"));
+        Assert.Equal(278, layers.Resources.Count(resource => resource.Category == "earth"));
+        Assert.Equal(35, layers.Icons.Count);
+        var iconKeys = layers.Icons
+            .Select(icon => icon.Key)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        Assert.All(layers.Resources, resource =>
         {
-            Assert.InRange(region.Center.Left, 0d, 1d);
-            Assert.InRange(region.Center.Top, 0d, 1d);
-            Assert.InRange(region.RadiusX, 0.001d, 0.25d);
-            Assert.InRange(region.RadiusY, 0.001d, 0.25d);
+            Assert.False(string.IsNullOrWhiteSpace(resource.IconKey));
+            Assert.Contains(resource.IconKey!, iconKeys);
+        });
+        Assert.Equal("myislemap.com", layers.Provenance.Provider);
+        Assert.Equal("build-time-offline", layers.Provenance.SnapshotMode);
+        Assert.Equal(12, layers.Provenance.Counts["migrationZones"]);
+        Assert.Equal(876, layers.Provenance.Counts["routePoints"]);
+        Assert.All(layers.Resources, resource =>
+        {
+            Assert.InRange(resource.Point.Left, 0d, 1d);
+            Assert.InRange(resource.Point.Top, 0d, 1d);
         });
     }
 

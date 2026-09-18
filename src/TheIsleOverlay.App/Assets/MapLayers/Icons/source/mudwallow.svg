@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Mud wallow">
+  <defs>
+    <radialGradient id="mud" cx="42%" cy="34%" r="68%">
+      <stop offset="0" stop-color="#b78b62"/>
+      <stop offset="0.58" stop-color="#765137"/>
+      <stop offset="1" stop-color="#3f2a20"/>
+    </radialGradient>
+    <filter id="shadow" x="-20%" y="-25%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#07110f" flood-opacity="0.62"/>
+    </filter>
+  </defs>
+  <g filter="url(#shadow)">
+    <path d="M7 39c0-8 7-12 14-12 4-7 14-9 21-4 8 0 15 5 15 13 0 9-10 16-25 16S7 48 7 39z" fill="url(#mud)" stroke="#2a1b16" stroke-width="3"/>
+    <path d="M16 38c4-4 10-5 15-3M35 29c5-1 10 1 13 4M24 44c7 3 17 2 23-2" fill="none" stroke="#d0a77c" stroke-width="2.4" stroke-linecap="round" opacity="0.7"/>
+    <ellipse cx="20" cy="31" rx="3" ry="2" fill="#d9b58d" opacity="0.72"/>
+    <ellipse cx="45" cy="38" rx="2.5" ry="1.7" fill="#d9b58d" opacity="0.58"/>
+  </g>
+</svg>

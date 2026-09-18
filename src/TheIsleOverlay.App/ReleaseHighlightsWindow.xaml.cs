@@ -10,10 +10,8 @@ namespace TheIsleOverlay.App;
 
 public partial class ReleaseHighlightsWindow : Window
 {
-    // Bump the briefing key when its copy changes so users who dismissed an
-    // earlier briefing still receive this corrected feature summary.
-    public const string ReleaseVersion = "2.0.2";
-    public const int PageCount = 6;
+    public const string BriefingKey = "offline-map-layers-team-recovery-2026-09-18";
+    public const int PageCount = 5;
 
     private static readonly Brush ActiveMarkerBrush = new SolidColorBrush(Color.FromRgb(0xF1, 0xC7, 0x5B));
     private static readonly Brush ActiveDigitBrush = new SolidColorBrush(Color.FromRgb(0x16, 0x13, 0x04));
@@ -38,9 +36,9 @@ public partial class ReleaseHighlightsWindow : Window
         _preferenceStore = preferenceStore ?? new ReleaseHighlightsPreferenceStore();
         InitializeComponent();
 
-        _pages = [PageIntro, PageOne, PageTwo, PageThree, PageFour, PageFive];
-        _markers = [StepIntroMarker, StepOneMarker, StepTwoMarker, StepThreeMarker, StepFourMarker, StepFiveMarker];
-        var displayedVersion = string.IsNullOrWhiteSpace(version) ? ReleaseVersion : version.Trim();
+        _pages = [PageLayers, PageNotes, PageTeam, PageHud, PageSummary];
+        _markers = [StepLayersMarker, StepNotesMarker, StepTeamMarker, StepHudMarker, StepSummaryMarker];
+        var displayedVersion = string.IsNullOrWhiteSpace(version) ? "CANDIDATE" : version.Trim();
         TitleVersionLabel.Text = $"   ISLE LIVE MAP · v{displayedVersion}";
         UpdatePage();
     }
@@ -98,7 +96,7 @@ public partial class ReleaseHighlightsWindow : Window
 
         if (DoNotShowAgainCheckBox.IsChecked == true)
         {
-            _preferenceStore.HideVersion(ReleaseVersion);
+            _preferenceStore.HideVersion(BriefingKey);
         }
 
         DialogResult = true;

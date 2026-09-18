@@ -42,6 +42,8 @@ public sealed record ShortcutRegistrationResult(
     OverlayShortcutSettings ActiveSettings,
     IReadOnlyList<ShortcutRegistrationFailure> Failures)
 {
+    public IReadOnlyList<ShortcutRegistrationStatus> Statuses { get; init; } = [];
+
     public string FriendlyError => Failures.Count == 0
         ? string.Empty
         : string.Join(
@@ -50,6 +52,13 @@ public sealed record ShortcutRegistrationResult(
                 ? $"{failure.Label}: {failure.Binding}"
                 : $"{failure.Label}: {failure.Binding} đang bị game hoặc ứng dụng khác sử dụng."));
 }
+
+public sealed record ShortcutRegistrationStatus(
+    OverlayShortcutAction Action,
+    string Label,
+    string Binding,
+    bool Registered,
+    bool UsedFallback);
 
 public static class OverlayInputSafetyPolicy
 {
@@ -64,6 +73,7 @@ public sealed class ShortcutRegistrationManager : IDisposable
     private readonly IntPtr _windowHandle;
     private readonly bool _includeMapNotes;
     private readonly HashSet<int> _registeredIds = [];
+    private readonly HashSet<(uint Modifiers, uint VirtualKey)> _registeredBindings = [];
     private bool _disposed;
 
     public ShortcutRegistrationManager(
@@ -84,22 +94,9 @@ public sealed class ShortcutRegistrationManager : IDisposable
     {
         ThrowIfDisposed();
         UnregisterAll();
-        var result = TryRegisterSet(requested);
-        if (result.Success)
-        {
-            ActiveSettings = requested;
-            return result;
-        }
-
-        if (requested != OverlayShortcutSettings.Defaults)
-        {
-            var fallback = TryRegisterSet(OverlayShortcutSettings.Defaults);
-            if (fallback.Success)
-            {
-                ActiveSettings = OverlayShortcutSettings.Defaults;
-            }
-        }
-        return result with { ActiveSettings = ActiveSettings };
+        return RegisterIndependently(
+            requested,
+            OverlayShortcutSettings.Defaults);
     }
 
     /// <summary>
@@ -112,20 +109,7 @@ public sealed class ShortcutRegistrationManager : IDisposable
         ThrowIfDisposed();
         var previous = ActiveSettings;
         UnregisterAll();
-        var requestedResult = TryRegisterSet(requested);
-        if (requestedResult.Success)
-        {
-            ActiveSettings = requested;
-            return requestedResult;
-        }
-
-        UnregisterAll();
-        var rollbackResult = TryRegisterSet(previous);
-        if (rollbackResult.Success)
-        {
-            ActiveSettings = previous;
-        }
-        return requestedResult with { ActiveSettings = ActiveSettings };
+        return RegisterIndependently(requested, previous);
     }
 
     public void Dispose()
@@ -136,9 +120,16 @@ public sealed class ShortcutRegistrationManager : IDisposable
         GC.SuppressFinalize(this);
     }
 
-    private ShortcutRegistrationResult TryRegisterSet(OverlayShortcutSettings settings)
+    private ShortcutRegistrationResult RegisterIndependently(
+        OverlayShortcutSettings requested,
+        OverlayShortcutSettings fallbackSettings)
     {
-        var validation = ShortcutSettingsManager.Validate(settings, _includeMapNotes);
+        // Duplicate chords are handled per action below. A conflict in Alt+U
+        // must not prevent the independent Alt+M registration from starting.
+        var validation = ShortcutSettingsManager.Validate(
+            requested,
+            _includeMapNotes,
+            checkDuplicates: false);
         if (validation.Count > 0)
         {
             var invalid = validation.Select(message => new ShortcutRegistrationFailure(
@@ -146,16 +137,29 @@ public sealed class ShortcutRegistrationManager : IDisposable
                 "Phím tắt không hợp lệ",
                 message,
                 0)).ToArray();
+            HasCompleteRegistration = false;
             return new(false, ActiveSettings, invalid);
         }
 
         var failures = new List<ShortcutRegistrationFailure>();
+        var statuses = new List<ShortcutRegistrationStatus>();
+        var active = requested;
         foreach (var definition in ShortcutSettingsManager.Definitions(_includeMapNotes))
         {
-            ShortcutBinding.TryParse(settings.For(definition.Action), out var binding, out _);
-            if (_nativeApi.Register(_windowHandle, definition.Id, binding))
+            var requestedText = requested.For(definition.Action);
+            ShortcutBinding.TryParse(requestedText, out var binding, out _);
+            var requestedKey = (binding.Modifiers, binding.VirtualKey);
+            if (!_registeredBindings.Contains(requestedKey)
+                && _nativeApi.Register(_windowHandle, definition.Id, binding))
             {
                 _registeredIds.Add(definition.Id);
+                _registeredBindings.Add(requestedKey);
+                statuses.Add(new ShortcutRegistrationStatus(
+                    definition.Action,
+                    definition.Label,
+                    binding.DisplayText,
+                    Registered: true,
+                    UsedFallback: false));
                 continue;
             }
 
@@ -163,19 +167,69 @@ public sealed class ShortcutRegistrationManager : IDisposable
                 definition.Action,
                 definition.Label,
                 binding.DisplayText,
-                _nativeApi.LastError));
-            break;
+                _registeredBindings.Contains(requestedKey) ? 1409 : _nativeApi.LastError));
+
+            var fallbackText = fallbackSettings.For(definition.Action);
+            if (string.Equals(requestedText, fallbackText, StringComparison.OrdinalIgnoreCase)
+                || !ShortcutBinding.TryParse(fallbackText, out var fallbackBinding, out _))
+            {
+                statuses.Add(new ShortcutRegistrationStatus(
+                    definition.Action,
+                    definition.Label,
+                    binding.DisplayText,
+                    Registered: false,
+                    UsedFallback: false));
+                continue;
+            }
+
+            var fallbackKey = (fallbackBinding.Modifiers, fallbackBinding.VirtualKey);
+            if (!_registeredBindings.Contains(fallbackKey)
+                && _nativeApi.Register(_windowHandle, definition.Id, fallbackBinding))
+            {
+                _registeredIds.Add(definition.Id);
+                _registeredBindings.Add(fallbackKey);
+                active = WithBinding(active, definition.Action, fallbackText);
+                statuses.Add(new ShortcutRegistrationStatus(
+                    definition.Action,
+                    definition.Label,
+                    fallbackBinding.DisplayText,
+                    Registered: true,
+                    UsedFallback: true));
+            }
+            else
+            {
+                statuses.Add(new ShortcutRegistrationStatus(
+                    definition.Action,
+                    definition.Label,
+                    binding.DisplayText,
+                    Registered: false,
+                    UsedFallback: true));
+            }
         }
 
-        if (failures.Count == 0)
+        ActiveSettings = active;
+        HasCompleteRegistration = statuses.All(status => status.Registered);
+        return new(
+            failures.Count == 0,
+            active,
+            failures)
         {
-            HasCompleteRegistration = true;
-            return new(true, settings, []);
-        }
-
-        UnregisterAll();
-        return new(false, ActiveSettings, failures);
+            Statuses = statuses
+        };
     }
+
+    private static OverlayShortcutSettings WithBinding(
+        OverlayShortcutSettings settings,
+        OverlayShortcutAction action,
+        string binding) => action switch
+    {
+        OverlayShortcutAction.EditMode => settings with { EditMode = binding },
+        OverlayShortcutAction.ToggleMissions => settings with { ToggleMissions = binding },
+        OverlayShortcutAction.ToggleHud => settings with { ToggleHud = binding },
+        OverlayShortcutAction.MapNotes => settings with { MapNotes = binding },
+        OverlayShortcutAction.MutationGuide => settings with { MutationGuide = binding },
+        _ => settings
+    };
 
     private void UnregisterAll()
     {
@@ -184,6 +238,7 @@ public sealed class ShortcutRegistrationManager : IDisposable
             _nativeApi.Unregister(_windowHandle, id);
         }
         _registeredIds.Clear();
+        _registeredBindings.Clear();
         HasCompleteRegistration = false;
     }
 

@@ -12,6 +12,7 @@ public partial class MainWindow
     private readonly MapNoteStore _mapNoteStore = new();
     private MapNotesWindow? _mapNotesWindow;
     private TeamRelayState _mapNoteTeamState = new();
+    private readonly Dictionary<Guid, MiniMapNoteVisual> _miniMapNoteVisuals = [];
 
     private void InitializeMapNotes() => _mapNoteStore.Changed += MapNoteStore_Changed;
 
@@ -25,6 +26,7 @@ public partial class MainWindow
         }
         MapNoteLineLayer.Children.Clear();
         MapNoteMarkerLayer.Children.Clear();
+        _miniMapNoteVisuals.Clear();
         _mapNoteTeamState = new TeamRelayState();
     }
 
@@ -67,7 +69,7 @@ public partial class MainWindow
         _mapNoteTeamState = new TeamRelayState();
         MapNoteLineLayer.Children.Clear();
         MapNoteMarkerLayer.Children.Clear();
-        DisableProMapLayers();
+        _miniMapNoteVisuals.Clear();
         ClearRemotePlayerMarkers();
     }
 
@@ -114,10 +116,9 @@ public partial class MainWindow
         var height = MapViewport.ActualHeight;
         MapNoteLineLayer.Width = MapNoteMarkerLayer.Width = width;
         MapNoteLineLayer.Height = MapNoteMarkerLayer.Height = height;
-        MapNoteLineLayer.Children.Clear();
-        MapNoteMarkerLayer.Children.Clear();
         if (width <= 0d || height <= 0d)
         {
+            ClearMiniMapNoteVisuals();
             return;
         }
 
@@ -128,10 +129,22 @@ public partial class MainWindow
             : null;
         if (!HasCurrentProFeatures)
         {
+            ClearMiniMapNoteVisuals();
             return;
         }
 
         var notes = MapNotePresentationBuilder.Merge(_mapNoteStore.Notes, _mapNoteTeamState);
+        var visibleIds = notes.Select(note => note.Id).ToHashSet();
+        foreach (var removedId in _miniMapNoteVisuals.Keys
+                     .Where(id => !visibleIds.Contains(id))
+                     .ToArray())
+        {
+            var removed = _miniMapNoteVisuals[removedId];
+            MapNoteLineLayer.Children.Remove(removed.Line);
+            MapNoteMarkerLayer.Children.Remove(removed.Marker);
+            _miniMapNoteVisuals.Remove(removedId);
+        }
+
         foreach (var note in notes)
         {
             var item = MapNoteIconCatalog.For(note.Kind);
@@ -143,29 +156,50 @@ public partial class MainWindow
                 : new Point(
                     Math.Clamp(target.X, 12d, Math.Max(12d, width - 12d)),
                     Math.Clamp(target.Y, 12d, Math.Max(12d, height - 12d)));
-            var brush = BrushFrom(item.Color);
-
-            if (player is { } origin)
+            if (!_miniMapNoteVisuals.TryGetValue(note.Id, out var visual)
+                || visual.Kind != note.Kind
+                || visual.IsTeamPing != note.IsTeamPing
+                || visual.Revision != note.Revision)
             {
-                MapNoteLineLayer.Children.Add(new Line
+                if (visual is not null)
                 {
-                    X1 = origin.X,
-                    Y1 = origin.Y,
-                    X2 = visibleTarget.X,
-                    Y2 = visibleTarget.Y,
-                    Stroke = brush,
+                    MapNoteLineLayer.Children.Remove(visual.Line);
+                    MapNoteMarkerLayer.Children.Remove(visual.Marker);
+                }
+
+                var line = new Line
+                {
+                    Stroke = BrushFrom(item.Color),
                     StrokeThickness = 1.25d,
                     StrokeDashArray = [4d, 3d],
-                    Opacity = notes.Count >= 4 ? 0.34d : 0.5d,
                     IsHitTestVisible = false
-                });
+                };
+                var marker = CreateMiniMapNote(item);
+                visual = new MiniMapNoteVisual(line, marker, note.Kind, note.IsTeamPing, note.Revision);
+                _miniMapNoteVisuals[note.Id] = visual;
+                MapNoteLineLayer.Children.Add(line);
+                MapNoteMarkerLayer.Children.Add(marker);
             }
 
-            var marker = CreateMiniMapNote(item);
-            Canvas.SetLeft(marker, visibleTarget.X - marker.Width / 2d);
-            Canvas.SetTop(marker, visibleTarget.Y - marker.Height / 2d);
-            MapNoteMarkerLayer.Children.Add(marker);
+            visual.Line.Visibility = player is null ? Visibility.Collapsed : Visibility.Visible;
+            if (player is { } origin)
+            {
+                visual.Line.X1 = origin.X;
+                visual.Line.Y1 = origin.Y;
+                visual.Line.X2 = visibleTarget.X;
+                visual.Line.Y2 = visibleTarget.Y;
+                visual.Line.Opacity = notes.Count >= 4 ? 0.34d : 0.5d;
+            }
+            Canvas.SetLeft(visual.Marker, visibleTarget.X - visual.Marker.Width / 2d);
+            Canvas.SetTop(visual.Marker, visibleTarget.Y - visual.Marker.Height / 2d);
         }
+    }
+
+    private void ClearMiniMapNoteVisuals()
+    {
+        MapNoteLineLayer.Children.Clear();
+        MapNoteMarkerLayer.Children.Clear();
+        _miniMapNoteVisuals.Clear();
     }
 
     private static FrameworkElement CreateMiniMapNote(MapNotePaletteItem item)
@@ -212,4 +246,11 @@ public partial class MainWindow
             Math.Clamp(start.X + dx * t, minX, maxX),
             Math.Clamp(start.Y + dy * t, minY, maxY));
     }
+
+    private sealed record MiniMapNoteVisual(
+        Line Line,
+        FrameworkElement Marker,
+        MapNoteKind Kind,
+        bool IsTeamPing,
+        long Revision);
 }
