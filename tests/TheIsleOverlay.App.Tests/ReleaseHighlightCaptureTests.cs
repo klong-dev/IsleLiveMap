@@ -11,6 +11,7 @@ using TheIsleOverlay.TeamRelay;
 
 namespace TheIsleOverlay.App.Tests;
 
+[Collection(WpfApplicationCollection.Name)]
 public sealed class ReleaseHighlightCaptureTests
 {
     [Fact]
@@ -77,6 +78,13 @@ public sealed class ReleaseHighlightCaptureTests
             (FrameworkElement)window.Content,
             inspector,
             Path.Combine(outputDirectory, "MapLayerInspector.png"),
+            scale: 2d);
+        Element<Border>(window, "EditToolbar").Visibility = Visibility.Visible;
+        LayoutWindow(window, 1040d, 900d);
+        SaveRegion(
+            (FrameworkElement)window.Content,
+            Element<Border>(window, "EditToolbar"),
+            Path.Combine(outputDirectory, "EditModeCommandBar.png"),
             scale: 2d);
 
         PopulateTeamPreview(window);

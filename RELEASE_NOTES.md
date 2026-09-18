@@ -1,3 +1,12 @@
+# Isle Live Map 2.2.2
+
+## Edit Mode dễ nhìn hơn
+
+- Làm lớn và tăng tương phản bốn nút `HOME`, `PHÍM`, `MỐC` và `LỚP BẢN ĐỒ` để dễ nhận biết trên overlay.
+- Bổ sung icon, nền màu theo nhóm chức năng, chữ đậm và trạng thái focus/hover rõ ràng hơn.
+- Nút `LỚP BẢN ĐỒ` đổi màu khi inspector đang mở; trạng thái khóa hiển thị trực tiếp bằng `KHÓA`/`ĐÃ KHÓA`.
+- Thanh công cụ mới vẫn dùng các luồng cũ, có nút `MỐC` dự phòng cho trường hợp Windows chiếm `Alt + M`.
+
 # Isle Live Map 2.2.1
 
 ## Hotfix nhóm sinh tồn ngang quyền

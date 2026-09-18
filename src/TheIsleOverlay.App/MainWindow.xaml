@@ -8,6 +8,59 @@
         FontFamily="Segoe UI Variable Text" TextOptions.TextFormattingMode="Display"
         Loaded="Window_Loaded" Closed="Window_Closed" StateChanged="Window_StateChanged">
     <Window.Resources>
+        <Style x:Key="EditCommandButton" TargetType="Button">
+            <Setter Property="Height" Value="42" />
+            <Setter Property="MinWidth" Value="92" />
+            <Setter Property="Foreground" Value="#E9F4EE" />
+            <Setter Property="Background" Value="#E31A3430" />
+            <Setter Property="BorderBrush" Value="#6C5E8C82" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="FontFamily" Value="Bahnschrift SemiCondensed" />
+            <Setter Property="FontSize" Value="11.5" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="Padding" Value="10,0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="EditCommandChrome"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="4"
+                                Padding="{TemplateBinding Padding}"
+                                SnapsToDevicePixels="True">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="EditCommandChrome" Property="BorderBrush" Value="#D7E8F5EF" />
+                                <Setter TargetName="EditCommandChrome" Property="Effect">
+                                    <Setter.Value><DropShadowEffect Color="#6EE2C9" BlurRadius="10" ShadowDepth="0" Opacity="0.34" /></Setter.Value>
+                                </Setter>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="EditCommandChrome" Property="Opacity" Value="0.72" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="EditCommandChrome" Property="BorderBrush" Value="#FFFFFF" />
+                                <Setter TargetName="EditCommandChrome" Property="BorderThickness" Value="2" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="EditCommandChrome" Property="Opacity" Value="0.42" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="EditUtilityButton" TargetType="Button" BasedOn="{StaticResource EditCommandButton}">
+            <Setter Property="MinWidth" Value="42" />
+            <Setter Property="Padding" Value="9,0" />
+            <Setter Property="FontSize" Value="10" />
+            <Setter Property="Background" Value="#E50D2220" />
+            <Setter Property="BorderBrush" Value="#5A617A73" />
+        </Style>
         <Style x:Key="WidgetResizeThumb" TargetType="{x:Type primitives:Thumb}">
             <Setter Property="Width" Value="27" />
             <Setter Property="Height" Value="27" />
@@ -554,42 +607,100 @@
         </Canvas>
 
         <!-- Kept outside MapPanel so hiding Map never removes the recovery controls. -->
-        <StackPanel x:Name="EditToolbar" Panel.ZIndex="90"
-                    Orientation="Horizontal" HorizontalAlignment="Right"
-                    VerticalAlignment="Top" Margin="0,12,12,0" Visibility="Collapsed">
-            <Border Background="#E7102424" BorderBrush="#5D7B7267"
-                    BorderThickness="1" CornerRadius="2" Padding="8,4">
-                <TextBlock Text="EDIT MODE" Foreground="#8FE3D0"
-                           FontFamily="Bahnschrift SemiCondensed" FontSize="9" FontWeight="SemiBold" />
-            </Border>
-            <Button Style="{StaticResource ChromeButton}" Content="HOME"
-                    Margin="4,0,0,0" Padding="7,3"
-                    Click="HomeButton_Click" ToolTip="Đổi nguồn telemetry" />
-            <Button Style="{StaticResource ChromeButton}" Content="PHÍM"
-                    Margin="4,0,0,0" Padding="7,3"
-                    Click="ShortcutSettingsButton_Click"
-                    ToolTip="Đổi các tổ hợp phím của overlay" />
-            <Button x:Name="OpenMapNotesFallbackButton" Style="{StaticResource ChromeButton}" Content="MỐC"
-                    Margin="4,0,0,0" Padding="7,3"
-                    Click="OpenMapNotesFallbackButton_Click"
-                    ToolTip="Mở bản đồ mốc khi Alt+M bị ứng dụng khác chiếm" />
-            <Button x:Name="MapLayersButton" Style="{StaticResource ChromeButton}" Content="LỚP BẢN ĐỒ"
-                    Margin="4,0,0,0" Padding="7,3"
-                    Click="MapLayersButton_Click"
-                    ToolTip="Mở bảng bật/tắt các lớp bản đồ offline" />
-            <Button x:Name="LockButton" Style="{StaticResource ChromeButton}" Content="LOCK"
-                    Margin="4,0,0,0" Click="LockButton_Click"
-                    ToolTip="Thoát Edit Mode và bật xuyên chuột" />
-            <Button Style="{StaticResource ChromeButton}" Content="—"
-                    Margin="4,0,0,0" Width="25" Padding="0"
-                    Click="MinimizeButton_Click" />
-            <Button Style="{StaticResource ChromeButton}" Content="×"
-                    Margin="4,0,0,0" Width="25" Padding="0"
-                    Click="CloseButton_Click" />
-        </StackPanel>
+        <Border x:Name="EditToolbar" Panel.ZIndex="90"
+                HorizontalAlignment="Right" VerticalAlignment="Top"
+                Margin="0,12,12,0" Padding="6"
+                Background="#F00A1816" BorderBrush="#78627770"
+                BorderThickness="1" CornerRadius="6" Visibility="Collapsed">
+            <StackPanel Orientation="Horizontal">
+                <Border Background="#E7132D29" BorderBrush="#607E756E"
+                        BorderThickness="1" CornerRadius="4" Padding="10,0"
+                        Height="42" VerticalAlignment="Center">
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="EDIT MODE" Foreground="#A8EEE0"
+                                   FontFamily="Bahnschrift SemiCondensed" FontSize="11"
+                                   FontWeight="Bold" HorizontalAlignment="Center" />
+                        <TextBlock Text="ACTIVE" Foreground="#5EA99B"
+                                   FontFamily="Bahnschrift" FontSize="7.5"
+                                   HorizontalAlignment="Center" Margin="0,1,0,0" />
+                    </StackPanel>
+                </Border>
+                <Button x:Name="EditHomeButton" Style="{StaticResource EditCommandButton}"
+                        MinWidth="94" Margin="6,0,0,0"
+                        Background="#E31B3442" BorderBrush="#7281A6B7"
+                        Foreground="#E8F7FF" Click="HomeButton_Click"
+                        ToolTip="Về Home và đổi nguồn telemetry"
+                        AutomationProperties.Name="Mở Home">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE80F;" FontFamily="Segoe Fluent Icons"
+                                   FontSize="17" VerticalAlignment="Center" Margin="0,0,8,0" />
+                        <TextBlock Text="HOME" FontSize="11.5" FontWeight="Bold" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+                <Button x:Name="EditShortcutsButton" Style="{StaticResource EditCommandButton}"
+                        MinWidth="92" Margin="5,0,0,0"
+                        Background="#E3163A38" BorderBrush="#6B5EAAA1"
+                        Foreground="#E4FFF8" Click="ShortcutSettingsButton_Click"
+                        ToolTip="Cài đặt phím tắt và xử lý phím bị trùng"
+                        AutomationProperties.Name="Mở cài đặt phím tắt">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE765;" FontFamily="Segoe Fluent Icons"
+                                   FontSize="17" VerticalAlignment="Center" Margin="0,0,8,0" />
+                        <TextBlock Text="PHÍM" FontSize="11.5" FontWeight="Bold" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+                <Button x:Name="OpenMapNotesFallbackButton" Style="{StaticResource EditCommandButton}"
+                        MinWidth="92" Margin="5,0,0,0"
+                        Background="#E33B3013" BorderBrush="#A18D7132"
+                        Foreground="#FFF0A8" Click="OpenMapNotesFallbackButton_Click"
+                        ToolTip="Mở bản đồ mốc Pro khi Alt+M bị ứng dụng khác chiếm"
+                        AutomationProperties.Name="Mở bản đồ mốc">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE707;" FontFamily="Segoe Fluent Icons"
+                                   FontSize="17" VerticalAlignment="Center" Margin="0,0,8,0" />
+                        <TextBlock Text="MỐC" FontSize="11.5" FontWeight="Bold" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+                <Button x:Name="MapLayersButton" Style="{StaticResource EditCommandButton}"
+                        MinWidth="142" Margin="5,0,0,0"
+                        Background="#E31A3827" BorderBrush="#6D4F9268"
+                        Foreground="#DDF8E5" Click="MapLayersButton_Click"
+                        ToolTip="Bật/tắt zone, đường, nước và tài nguyên offline"
+                        AutomationProperties.Name="Mở lớp bản đồ">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE81E;" FontFamily="Segoe Fluent Icons"
+                                   FontSize="17" VerticalAlignment="Center" Margin="0,0,8,0" />
+                        <TextBlock Text="LỚP BẢN ĐỒ" FontSize="11.5" FontWeight="Bold" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+                <Border Width="1" Height="30" Background="#526E665F" Margin="7,6,2,6" />
+                <Button x:Name="LockButton" Style="{StaticResource EditUtilityButton}"
+                        MinWidth="78" Margin="5,0,0,0" Click="LockButton_Click"
+                        ToolTip="Thoát Edit Mode và bật xuyên chuột"
+                        AutomationProperties.Name="Khóa overlay">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE72E;" FontFamily="Segoe Fluent Icons"
+                                   FontSize="15" VerticalAlignment="Center" Margin="0,0,6,0" />
+                        <TextBlock x:Name="LockButtonLabel" Text="KHÓA"
+                                   FontSize="10.5" FontWeight="Bold" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+                <Button Style="{StaticResource EditUtilityButton}" Margin="5,0,0,0"
+                        Width="42" Padding="0" Click="MinimizeButton_Click"
+                        ToolTip="Thu nhỏ" AutomationProperties.Name="Thu nhỏ overlay">
+                    <TextBlock Text="&#xE921;" FontFamily="Segoe Fluent Icons" FontSize="15" />
+                </Button>
+                <Button Style="{StaticResource EditUtilityButton}" Margin="5,0,0,0"
+                        Width="42" Padding="0" Background="#E3381C1C" BorderBrush="#7E9B4E4E"
+                        Foreground="#FFD7D7" Click="CloseButton_Click"
+                        ToolTip="Đóng" AutomationProperties.Name="Đóng overlay">
+                    <TextBlock Text="&#xE8BB;" FontFamily="Segoe Fluent Icons" FontSize="15" />
+                </Button>
+            </StackPanel>
+        </Border>
 
         <Border x:Name="MapLayerInspector" Panel.ZIndex="95" Visibility="Collapsed"
-                HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,52,12,0"
+                HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,70,12,0"
                 Width="235" MaxHeight="620" Background="#F20B1B1A"
                 BorderBrush="#6E7F766E" BorderThickness="1" CornerRadius="4" Padding="10,8">
             <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">

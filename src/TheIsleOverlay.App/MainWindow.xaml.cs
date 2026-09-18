@@ -1707,6 +1707,7 @@ public partial class MainWindow : Window
     private void MapLayersButton_Click(object sender, RoutedEventArgs e)
     {
         _mapLayerInspectorOpen = !_mapLayerInspectorOpen;
+        UpdateMapLayersCommandState();
         MapLayerInspector.Visibility = _mapLayerInspectorOpen && !_clickThrough
             ? Visibility.Visible : Visibility.Collapsed;
         if (_mapLayerInspectorOpen) UpdateMapLayerControls();
@@ -1715,7 +1716,17 @@ public partial class MainWindow : Window
     private void CloseMapLayerInspectorButton_Click(object sender, RoutedEventArgs e)
     {
         _mapLayerInspectorOpen = false;
+        UpdateMapLayersCommandState();
         MapLayerInspector.Visibility = Visibility.Collapsed;
+    }
+
+    private void UpdateMapLayersCommandState()
+    {
+        if (MapLayersButton is null)
+            return;
+        MapLayersButton.Background = BrushFrom(_mapLayerInspectorOpen ? "#F03D6748" : "#E31A3827");
+        MapLayersButton.BorderBrush = BrushFrom(_mapLayerInspectorOpen ? "#C1B9E39C" : "#6D4F9268");
+        MapLayersButton.Foreground = BrushFrom(_mapLayerInspectorOpen ? "#FFFFFF" : "#DDF8E5");
     }
 
     private void ShortcutSettingsButton_Click(object sender, RoutedEventArgs e)
@@ -1857,7 +1868,8 @@ public partial class MainWindow : Window
         {
             widget.Cursor = enabled ? Cursors.Arrow : Cursors.SizeAll;
         }
-        LockButton.Content = enabled ? "LOCKED" : "LOCK";
+        LockButtonLabel.Text = enabled ? "ĐÃ KHÓA" : "KHÓA";
+        UpdateMapLayersCommandState();
         RefreshOptionalWidgetVisibility();
         if (!enabled)
         {

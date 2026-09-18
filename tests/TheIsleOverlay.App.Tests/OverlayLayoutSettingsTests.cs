@@ -367,6 +367,30 @@ public sealed class OverlayLayoutSettingsTests
             ancestor => (string?)ancestor.Attribute(nameAttribute) == "MapPanel");
         foreach (var name in new[]
                  {
+                     "EditHomeButton",
+                     "EditShortcutsButton",
+                     "OpenMapNotesFallbackButton",
+                     "MapLayersButton"
+                 })
+        {
+            var button = Control(name);
+            Assert.Equal("42", (string?)button.Attribute("Height")
+                ?? "42"); // Height is supplied by EditCommandButton when omitted.
+            Assert.NotNull(button.Elements().SingleOrDefault());
+            var icon = Assert.Single(button.Descendants(), element =>
+                element.Name.LocalName == "TextBlock"
+                && (string?)element.Attribute("FontFamily") == "Segoe Fluent Icons");
+            Assert.True(int.TryParse((string?)icon.Attribute("FontSize"), out var iconSize));
+            Assert.True(iconSize >= 17);
+            var label = Assert.Single(button.Descendants(), element =>
+                element.Name.LocalName == "TextBlock"
+                && (string?)element.Attribute("FontWeight") == "Bold");
+            Assert.Equal("11.5", (string?)label.Attribute("FontSize"));
+            Assert.StartsWith("#E3", (string?)button.Attribute("Background"), StringComparison.OrdinalIgnoreCase);
+        }
+        Assert.Equal("142", (string?)Control("MapLayersButton").Attribute("MinWidth"));
+        foreach (var name in new[]
+                 {
                      "MapVisibilityToggle",
                      "StatsVisibilityToggle",
                      "TeamVisibilityToggle",

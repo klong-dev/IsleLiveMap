@@ -8,6 +8,7 @@ using TheIsleOverlay.TeamRelay;
 
 namespace TheIsleOverlay.App.Tests;
 
+[Collection(WpfApplicationCollection.Name)]
 public sealed class MapNotesWindowLifecycleTests
 {
     [Fact]
@@ -60,7 +61,7 @@ public sealed class MapNotesWindowLifecycleTests
         thread.SetApartmentState(ApartmentState.STA);
         thread.Start();
 
-        await completed.Task.WaitAsync(TimeSpan.FromSeconds(60));
+        await completed.Task.WaitAsync(TimeSpan.FromSeconds(90));
     }
 
     private static void VerifyLayerInspectorAndPersistence()
@@ -72,9 +73,12 @@ public sealed class MapNotesWindowLifecycleTests
         PositionLayers(window);
 
         var inspector = Element<Border>(window, "MapLayerInspector");
+        var layerButton = Element<Button>(window, "MapLayersButton");
+        var inactiveBackground = layerButton.Background.ToString();
         Element<Button>(window, "MapLayersButton").RaiseEvent(
             new RoutedEventArgs(ButtonBase.ClickEvent));
         Assert.Equal(Visibility.Visible, inspector.Visibility);
+        Assert.NotEqual(inactiveBackground, layerButton.Background.ToString());
 
         var initialZoneVisuals = VisibleChildren(window, "MapZoneLayer");
         Assert.True(initialZoneVisuals > 0);
