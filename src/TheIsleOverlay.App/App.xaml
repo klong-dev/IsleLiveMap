@@ -58,9 +58,10 @@
             <Setter Property="BorderBrush" Value="#405E58" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="FontFamily" Value="Bahnschrift SemiCondensed" />
-            <Setter Property="FontSize" Value="7.5" />
+            <Setter Property="FontSize" Value="12" />
             <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="Padding" Value="5,3" />
+            <Setter Property="Padding" Value="10,8" />
+            <Setter Property="MinHeight" Value="40" />
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="Template">
                 <Setter.Value>
@@ -95,8 +96,9 @@
         <Style x:Key="LayerInspectorCheckBox" TargetType="CheckBox">
             <Setter Property="Foreground" Value="#B9CCC5" />
             <Setter Property="FontFamily" Value="Bahnschrift SemiCondensed" />
-            <Setter Property="FontSize" Value="8" />
-            <Setter Property="Margin" Value="0,1,0,1" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Margin" Value="0,3,0,3" />
+            <Setter Property="MinHeight" Value="30" />
             <Setter Property="Cursor" Value="Hand" />
         </Style>
     </Application.Resources>

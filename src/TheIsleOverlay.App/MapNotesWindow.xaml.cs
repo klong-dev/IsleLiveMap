@@ -15,8 +15,14 @@ public partial class MapNotesWindow : Window
     private static readonly Uri GatewayMapResourceUri = new(
         "pack://application:,,,/IsleLiveMap;component/Assets/GatewayMap.jpg",
         UriKind.Absolute);
+    private static readonly Uri GatewayMapWaterResourceUri = new(
+        "pack://application:,,,/IsleLiveMap;component/Assets/GatewayMapWater.jpg",
+        UriKind.Absolute);
     private static readonly Lazy<BitmapSource> GatewayMapImage = new(
         LoadGatewayMapImage,
+        LazyThreadSafetyMode.ExecutionAndPublication);
+    private static readonly Lazy<BitmapSource> GatewayMapWaterImage = new(
+        LoadGatewayMapWaterImage,
         LazyThreadSafetyMode.ExecutionAndPublication);
     private readonly MapNoteStore _store;
     private readonly CancellationTokenSource _shutdown = new();
@@ -77,6 +83,9 @@ public partial class MapNotesWindow : Window
     internal void UpdateLayerPreferences(MapLayerPreferences preferences)
     {
         _layerPreferences = preferences ?? throw new ArgumentNullException(nameof(preferences));
+        MapImage.Source = _layerPreferences.Water
+            ? GatewayMapWaterImage.Value
+            : GatewayMapImage.Value;
         if (IsLoaded)
         {
             BuildStaticLayerVisuals();
@@ -100,12 +109,28 @@ public partial class MapNotesWindow : Window
         Focus();
     }
 
-    private void LoadMap() => MapImage.Source = GatewayMapImage.Value;
+    private void LoadMap() => MapImage.Source = _layerPreferences.Water
+        ? GatewayMapWaterImage.Value
+        : GatewayMapImage.Value;
 
     private static BitmapSource LoadGatewayMapImage()
     {
         var resource = Application.GetResourceStream(GatewayMapResourceUri)
             ?? throw new InvalidOperationException("Bundled Gateway map resource was not found.");
+        using var stream = resource.Stream;
+        var image = new BitmapImage();
+        image.BeginInit();
+        image.CacheOption = BitmapCacheOption.OnLoad;
+        image.StreamSource = stream;
+        image.EndInit();
+        image.Freeze();
+        return image;
+    }
+
+    private static BitmapSource LoadGatewayMapWaterImage()
+    {
+        var resource = Application.GetResourceStream(GatewayMapWaterResourceUri)
+            ?? throw new InvalidOperationException("Bundled water map resource was not found.");
         using var stream = resource.Stream;
         var image = new BitmapImage();
         image.BeginInit();
@@ -122,6 +147,9 @@ public partial class MapNotesWindow : Window
         {
             _staticLayers = GatewayStaticMapLayerCatalog.LoadBundled();
             _layerPreferences = new MapLayerPreferencesStore().Load(_staticLayers.Defaults);
+            MapImage.Source = _layerPreferences.Water
+                ? GatewayMapWaterImage.Value
+                : GatewayMapImage.Value;
             BuildStaticLayerVisuals();
         }
         catch (Exception)
@@ -157,11 +185,9 @@ public partial class MapNotesWindow : Window
                 StrokeThickness = 1d,
                 IsHitTestVisible = false
             };
-            var label = CreateStaticLabel(zone.Name, "#D6E7DFFF");
             _staticLayerVisuals[zone.Id] = new StaticLayerVisual(
-                zone.Id, group, polygon, label, zone.Points, Centroid(zone.Points));
+                zone.Id, group, polygon, null, zone.Points, Centroid(zone.Points));
             StaticLayer.Children.Add(polygon);
-            StaticLayer.Children.Add(label);
         }
 
         if (_layerPreferences.AiSpawnZones)
@@ -181,11 +207,9 @@ public partial class MapNotesWindow : Window
                         StrokeThickness = 1d, StrokeDashArray = [3d, 2d],
                         IsHitTestVisible = false
                     };
-                var label = CreateStaticLabel($"AI · {zone.Name}", "#C8F5C542");
                 _staticLayerVisuals[zone.Id] = new StaticLayerVisual(
-                    zone.Id, MapLayerGroup.AiSpawnZones, shape, label, zone.Points, Centroid(zone.Points));
+                    zone.Id, MapLayerGroup.AiSpawnZones, shape, null, zone.Points, Centroid(zone.Points));
                 StaticLayer.Children.Add(shape);
-                StaticLayer.Children.Add(label);
             }
         }
 
@@ -205,17 +229,6 @@ public partial class MapNotesWindow : Window
             }
         }
 
-        if (_layerPreferences.Water)
-        {
-            foreach (var water in _staticLayers.WaterLabels)
-            {
-                var label = CreateStaticLabel($"💧 {water.Name}", "#C878C8FF");
-                _staticLayerVisuals[water.Id] = new StaticLayerVisual(
-                    water.Id, MapLayerGroup.Water, label, label, [water.Point], water.Point);
-                StaticLayer.Children.Add(label);
-            }
-        }
-
         foreach (var resource in _staticLayers.Resources)
         {
             var group = ResourceGroup(resource.Category);
@@ -226,7 +239,7 @@ public partial class MapNotesWindow : Window
                 && TryLoadMapIcon(resource.IconKey!, out var bitmap)
                 ? new Image
                 {
-                    Source = bitmap, Width = 12d, Height = 12d,
+                    Source = bitmap, Width = 18d, Height = 18d,
                     Stretch = Stretch.Uniform, IsHitTestVisible = false
                 }
                 : new Ellipse
@@ -253,20 +266,6 @@ public partial class MapNotesWindow : Window
         "animals" => MapLayerGroup.Animals,
         "plants" => MapLayerGroup.Plants,
         _ => MapLayerGroup.Earth
-    };
-
-    private static TextBlock CreateStaticLabel(string text, string color) => new()
-    {
-        Text = text.ToUpperInvariant(),
-        Foreground = BrushFrom(color),
-        Background = BrushFrom("#C80A1517"),
-        FontFamily = new FontFamily("Bahnschrift SemiCondensed"),
-        FontSize = 7d,
-        FontWeight = FontWeights.SemiBold,
-        TextTrimming = TextTrimming.CharacterEllipsis,
-        MaxWidth = 150d,
-        Padding = new Thickness(3d, 1d, 3d, 1d),
-        IsHitTestVisible = false
     };
 
     private static Brush ResourceBrush(string category) => BrushFrom(category.ToLowerInvariant() switch

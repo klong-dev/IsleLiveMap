@@ -131,10 +131,10 @@
                 </Canvas>
 
                 <Border x:Name="MapInfoPanel" HorizontalAlignment="Left" VerticalAlignment="Top"
-                        Margin="7" MinWidth="160" MaxWidth="290" Background="#C0071517" BorderBrush="#503E625B"
-                        BorderThickness="1" CornerRadius="3" Padding="7,4">
+                        Margin="10" MinWidth="170" MaxWidth="300" Background="Transparent"
+                        BorderThickness="0" Padding="0">
                     <StackPanel>
-                        <Grid>
+                        <Grid Visibility="Collapsed">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="*" />
@@ -156,7 +156,7 @@
                         <TextBlock x:Name="CoordinateLabel" Text="X —  Y —  Z —" Visibility="Collapsed"
                                    Foreground="#82A49B" FontFamily="Bahnschrift" FontSize="8.2"
                                    Margin="0,1,0,0" />
-                        <Grid Margin="0,1,0,0">
+                        <Grid Margin="0,4,0,0">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="*" />
@@ -168,11 +168,11 @@
                             <StackPanel x:Name="RemoteEntityLegend" Grid.Column="1"
                                         Orientation="Horizontal" HorizontalAlignment="Right"
                                         Visibility="Collapsed" Margin="9,0,0,0">
-                                <TextBlock Text="● THỊT" Foreground="#F04444" FontFamily="Bahnschrift SemiCondensed" FontSize="6.8" Margin="0,0,5,0" />
-                                <TextBlock Text="● CÙNG" Foreground="#42D66B" FontFamily="Bahnschrift SemiCondensed" FontSize="6.8" Margin="0,0,5,0" />
-                                <TextBlock Text="● CỎ" Foreground="#3EA6FF" FontFamily="Bahnschrift SemiCondensed" FontSize="6.8" Margin="0,0,5,0" />
-                                <TextBlock Text="● AI" Foreground="#F5C542" FontFamily="Bahnschrift SemiCondensed" FontSize="6.8" Margin="0,0,5,0" />
-                                <TextBlock Text="● ?" Foreground="#C7D0D4" FontFamily="Bahnschrift SemiCondensed" FontSize="6.8" />
+                                <TextBlock Text="● THỊT" Foreground="#F04444" FontFamily="Bahnschrift SemiCondensed" FontSize="10" FontWeight="Bold" Margin="0,0,7,0" />
+                                <TextBlock Text="● CÙNG" Foreground="#42D66B" FontFamily="Bahnschrift SemiCondensed" FontSize="10" FontWeight="Bold" Margin="0,0,7,0" />
+                                <TextBlock Text="● CỎ" Foreground="#3EA6FF" FontFamily="Bahnschrift SemiCondensed" FontSize="10" FontWeight="Bold" Margin="0,0,7,0" />
+                                <TextBlock Text="● AI" Foreground="#F5C542" FontFamily="Bahnschrift SemiCondensed" FontSize="10" FontWeight="Bold" Margin="0,0,7,0" />
+                                <TextBlock Text="● ?" Foreground="#C7D0D4" FontFamily="Bahnschrift SemiCondensed" FontSize="10" FontWeight="Bold" />
                             </StackPanel>
                         </Grid>
                         <TextBlock x:Name="RemoteTrackingStatusLabel" Text="PRO · ĐANG KHỞI TẠO"
@@ -183,16 +183,44 @@
                     </StackPanel>
                 </Border>
 
-                <Border x:Name="MapHeadingPanel" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="9" Background="#92071517" Padding="7,4">
-                    <TextBlock x:Name="HeadingModeLabel" Text="COURSE · WAITING" Foreground="#7DA89F" FontFamily="Bahnschrift SemiCondensed" FontSize="9" />
-                </Border>
-
                 <Button x:Name="MapFocusModeButton" Style="{StaticResource ChromeButton}"
                         Content="FOLLOW · GPS" HorizontalAlignment="Left" VerticalAlignment="Bottom"
-                        Margin="9,0,0,33" MinWidth="88" Padding="8,4" FontSize="8.5"
-                        FontWeight="SemiBold" Background="#E30A1718" BorderBrush="#8A37D4C6"
+                        Margin="10,0,0,10" MinWidth="0" Padding="0" FontSize="12"
+                        FontWeight="Bold" Background="Transparent" BorderBrush="Transparent"
                         Foreground="#72E4D8" Click="MapFocusModeButton_Click"
                         ToolTip="Map tự bám theo GPS. ALT + kéo chuột trái để quan sát tự do." />
+                <!-- Kept as a non-visual target for telemetry code; heading is now represented by the compass. -->
+                <TextBlock x:Name="HeadingModeLabel" Visibility="Collapsed" />
+                <Grid x:Name="MapCompassLabel" Width="74" Height="74"
+                      HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                      Margin="0,0,8,8" IsHitTestVisible="False"
+                      AutomationProperties.Name="La bàn bốn hướng">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Row="0" Grid.Column="1" Text="B" HorizontalAlignment="Center"
+                               Foreground="#A82929" FontFamily="Bahnschrift" FontSize="18"
+                               FontWeight="Bold" AutomationProperties.Name="Bắc" />
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="T" HorizontalAlignment="Center"
+                               VerticalAlignment="Center" Foreground="#A82929" FontFamily="Bahnschrift"
+                               FontSize="18" FontWeight="Bold" AutomationProperties.Name="Tây" />
+                    <TextBlock Grid.Row="1" Grid.Column="1" Text="•" HorizontalAlignment="Center"
+                               VerticalAlignment="Center" Foreground="#A82929" FontFamily="Bahnschrift"
+                               FontSize="14" FontWeight="Bold" />
+                    <TextBlock Grid.Row="1" Grid.Column="2" Text="Đ" HorizontalAlignment="Center"
+                               VerticalAlignment="Center" Foreground="#A82929" FontFamily="Bahnschrift"
+                               FontSize="18" FontWeight="Bold" AutomationProperties.Name="Đông" />
+                    <TextBlock Grid.Row="2" Grid.Column="1" Text="N" HorizontalAlignment="Center"
+                               VerticalAlignment="Center" Foreground="#A82929" FontFamily="Bahnschrift"
+                               FontSize="18" FontWeight="Bold" AutomationProperties.Name="Nam" />
+                </Grid>
                 <TextBlock x:Name="MapStateLabel" Text="ĐANG TẢI BẢN ĐỒ" Foreground="#A5BDB5" Background="#C0091718" Padding="10,6" HorizontalAlignment="Center" VerticalAlignment="Center" FontFamily="Bahnschrift SemiCondensed" FontSize="10" />
                 </Grid>
 
@@ -701,43 +729,43 @@
 
         <Border x:Name="MapLayerInspector" Panel.ZIndex="95" Visibility="Collapsed"
                 HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,70,12,0"
-                Width="235" MaxHeight="620" Background="#F20B1B1A"
-                BorderBrush="#6E7F766E" BorderThickness="1" CornerRadius="4" Padding="10,8">
+                Width="390" MaxHeight="820" Background="#F20B1B1A"
+                BorderBrush="#6E7F766E" BorderThickness="1" CornerRadius="6" Padding="18,16">
             <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                 <StackPanel>
                     <Grid Margin="0,0,0,6">
                         <TextBlock Text="LỚP BẢN ĐỒ OFFLINE" Foreground="#F3DE8D"
-                                   FontFamily="Bahnschrift SemiCondensed" FontSize="11" FontWeight="SemiBold" />
-                        <Button HorizontalAlignment="Right" Content="×" Width="22" Height="20"
+                                   FontFamily="Bahnschrift SemiCondensed" FontSize="17" FontWeight="Bold" />
+                        <Button HorizontalAlignment="Right" Content="×" Width="34" Height="32"
                                 Style="{StaticResource ChromeButton}" Click="CloseMapLayerInspectorButton_Click" />
                     </Grid>
                     <TextBlock Text="Nguồn snapshot: myislemap.com · không cần mạng khi chạy"
-                               Foreground="#789A92" FontFamily="Bahnschrift" FontSize="7.5"
-                               TextWrapping="Wrap" Margin="0,0,0,7" />
-                    <TextBlock Text="ZONES &amp; NAVIGATION" Foreground="#8FE3D0"
-                               FontFamily="Bahnschrift SemiCondensed" FontSize="8" Margin="0,2,0,3" />
-                    <ToggleButton x:Name="MigrationLayerToggle" Tag="Migration" Content="Migration Zone"
+                               Foreground="#789A92" FontFamily="Bahnschrift" FontSize="11"
+                               TextWrapping="Wrap" Margin="0,0,0,14" />
+                    <TextBlock Text="KHU VỰC &amp; ĐI LẠI" Foreground="#8FE3D0"
+                               FontFamily="Bahnschrift SemiCondensed" FontSize="11" FontWeight="Bold" Margin="0,4,0,6" />
+                    <ToggleButton x:Name="MigrationLayerToggle" Tag="Migration" Content="◈  VÙNG DI CƯ"
                                   Style="{StaticResource MapLayerToggle}" Click="MapLayerToggle_Click" />
-                    <ToggleButton x:Name="PatrolLayerToggle" Tag="Patrol" Content="Patrol Zone"
+                    <ToggleButton x:Name="PatrolLayerToggle" Tag="Patrol" Content="◌  VÙNG TUẦN TRA"
                                   Style="{StaticResource MapLayerToggle}" Click="MapLayerToggle_Click" />
-                    <ToggleButton x:Name="SanctuaryLayerToggle" Tag="Sanctuary" Content="Sanctuary"
+                    <ToggleButton x:Name="SanctuaryLayerToggle" Tag="Sanctuary" Content="⌂  KHU AN TOÀN"
                                   Style="{StaticResource MapLayerToggle}" Click="MapLayerToggle_Click" />
-                    <ToggleButton x:Name="AiSpawnLayerToggle" Tag="AiSpawnZones" Content="AI Spawn Zones"
+                    <ToggleButton x:Name="AiSpawnLayerToggle" Tag="AiSpawnZones" Content="✦  VÙNG AI"
                                   Style="{StaticResource MapLayerToggle}" Click="MapLayerToggle_Click" />
-                    <ToggleButton x:Name="RoadLayerToggle" Tag="Roads" Content="Roads &amp; Trails"
+                    <ToggleButton x:Name="RoadLayerToggle" Tag="Roads" Content="╱  ĐƯỜNG &amp; LỐI MÒN"
                                   Style="{StaticResource MapLayerToggle}" Click="MapLayerToggle_Click" />
-                    <ToggleButton x:Name="WaterLayerToggle" Tag="Water" Content="Drinkable Water"
+                    <ToggleButton x:Name="WaterLayerToggle" Tag="Water" Content="≈  NƯỚC UỐNG ĐƯỢC"
                                   Style="{StaticResource MapLayerToggle}" Click="MapLayerToggle_Click" />
-                    <TextBlock Text="FOOD &amp; RESOURCES" Foreground="#8FE3D0"
-                               FontFamily="Bahnschrift SemiCondensed" FontSize="8" Margin="0,9,0,3" />
-                    <ToggleButton x:Name="AnimalsLayerToggle" Tag="Animals" Content="Animals"
+                    <TextBlock Text="THỨC ĂN &amp; TÀI NGUYÊN" Foreground="#8FE3D0"
+                               FontFamily="Bahnschrift SemiCondensed" FontSize="11" FontWeight="Bold" Margin="0,16,0,6" />
+                    <ToggleButton x:Name="AnimalsLayerToggle" Tag="Animals" Content="●  ĐỘNG VẬT"
                                   Style="{StaticResource MapLayerToggle}" Click="MapLayerToggle_Click" />
-                    <ToggleButton x:Name="PlantsLayerToggle" Tag="Plants" Content="Plants &amp; Fungi"
+                    <ToggleButton x:Name="PlantsLayerToggle" Tag="Plants" Content="❧  THỰC VẬT &amp; NẤM"
                                   Style="{StaticResource MapLayerToggle}" Click="MapLayerToggle_Click" />
-                    <ToggleButton x:Name="EarthLayerToggle" Tag="Earth" Content="Earth: Gastrolith · Salt · Mud"
+                    <ToggleButton x:Name="EarthLayerToggle" Tag="Earth" Content="◆  ĐẤT &amp; KHOÁNG"
                                   Style="{StaticResource MapLayerToggle}" Click="MapLayerToggle_Click" />
                     <TextBlock Text="LỌC TỪNG LOẠI" Foreground="#789A92"
-                               FontFamily="Bahnschrift SemiCondensed" FontSize="7.5" Margin="0,8,0,2" />
+                               FontFamily="Bahnschrift SemiCondensed" FontSize="10" FontWeight="Bold" Margin="0,14,0,4" />
                     <StackPanel x:Name="ResourceLayerChildrenPanel" />
                 </StackPanel>
             </ScrollViewer>

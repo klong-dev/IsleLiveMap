@@ -403,7 +403,7 @@ public sealed class OverlayLayoutSettingsTests
         Assert.Equal(
             "ShowAllWidgetsButton_Click",
             (string?)Control("ShowAllWidgetsButton").Attribute("Click"));
-        Assert.Equal("290", (string?)Control("MapInfoPanel").Attribute("MaxWidth"));
+        Assert.Equal("300", (string?)Control("MapInfoPanel").Attribute("MaxWidth"));
         Assert.Equal("P 0 · AI 0", (string?)Control("RemotePlayerCountLabel").Attribute("Text"));
         Assert.Equal("StackPanel", Control("RemoteEntityLegend").Name.LocalName);
         Assert.Equal(

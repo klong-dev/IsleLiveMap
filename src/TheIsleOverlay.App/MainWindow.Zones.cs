@@ -12,7 +12,6 @@ namespace TheIsleOverlay.App;
 /// <summary>Offline map-layer renderer. Telemetry never invalidates static geometry.</summary>
 public partial class MainWindow
 {
-    private const double StaticLabelMinimumZoom = 1.45d;
     private readonly Dictionary<string, StaticMapVisual> _staticMapVisuals = new(StringComparer.Ordinal);
     private readonly Dictionary<string, GatewayMapResource> _resourcesById = new(StringComparer.Ordinal);
     private readonly Dictionary<string, BitmapImage> _mapIconCache = new(StringComparer.OrdinalIgnoreCase);
@@ -62,12 +61,10 @@ public partial class MainWindow
                 IsHitTestVisible = false
             };
             ApplyZonePalette(polygon, zone.Kind);
-            var label = CreateLabel(zone.Name, zone.Kind == MapZoneKind.Migration ? "#D6FFB84D" : "#CDBDA9FF");
-            var visual = new StaticMapVisual(zone.Id, MapLayerGroupFor(zone.Kind), polygon, label,
+            var visual = new StaticMapVisual(zone.Id, MapLayerGroupFor(zone.Kind), polygon, null,
                 zone.Points, Centroid(zone.Points), IsPolygon: true);
             _staticMapVisuals.Add(zone.Id, visual);
             MapZoneLayer.Children.Add(polygon);
-            MapZoneLayer.Children.Add(label);
         }
 
         foreach (var zone in _staticMapLayers.AiSpawnZones)
@@ -87,12 +84,10 @@ public partial class MainWindow
                 shape.Fill = BrushFrom("#16F5C542");
                 shape.Stroke = BrushFrom("#B8F5C542");
             }
-            var label = CreateLabel($"AI · {zone.Name}", "#C8F5C542");
-            var visual = new StaticMapVisual(zone.Id, MapLayerGroup.AiSpawnZones, polygon, label,
+            var visual = new StaticMapVisual(zone.Id, MapLayerGroup.AiSpawnZones, polygon, null,
                 zone.Points, Centroid(zone.Points), true);
             _staticMapVisuals.Add(zone.Id, visual);
             MapZoneLayer.Children.Add(polygon);
-            MapZoneLayer.Children.Add(label);
         }
 
         foreach (var route in _staticMapLayers.Routes)
@@ -108,15 +103,6 @@ public partial class MainWindow
             MapZoneLayer.Children.Add(line);
         }
 
-        foreach (var water in _staticMapLayers.WaterLabels)
-        {
-            var label = CreateLabel($"💧 {water.Name}", "#C878C8FF");
-            var visual = new StaticMapVisual(water.Id, MapLayerGroup.Water, label, label,
-                [water.Point], water.Point, false);
-            _staticMapVisuals.Add(water.Id, visual);
-            MapZoneLayer.Children.Add(label);
-        }
-
         foreach (var resource in _staticMapLayers.Resources)
         {
             _resourcesById[resource.Id] = resource;
@@ -124,7 +110,13 @@ public partial class MainWindow
             if (!string.IsNullOrWhiteSpace(resource.IconKey)
                 && TryLoadMapIcon(resource.IconKey!, out var bitmap))
             {
-                icon = new Image { Source = bitmap, Width = 13d, Height = 13d, Stretch = Stretch.Uniform, IsHitTestVisible = false };
+                icon = new Border
+                {
+                    Width = 17d, Height = 17d, CornerRadius = new CornerRadius(8.5d),
+                    Background = BrushFrom("#A8142526"), BorderBrush = BrushFrom("#8068B3A5"),
+                    BorderThickness = new Thickness(0.5d), IsHitTestVisible = false,
+                    Child = new Image { Source = bitmap, Width = 14d, Height = 14d, Stretch = Stretch.Uniform, IsHitTestVisible = false }
+                };
             }
             else
             {
@@ -164,13 +156,18 @@ public partial class MainWindow
                     },
                     Foreground = BrushFrom("#789A92"),
                     FontFamily = new FontFamily("Bahnschrift SemiCondensed"),
-                    FontSize = 7.5d,
-                    Margin = new Thickness(0d, 7d, 0d, 2d)
+                    FontSize = 10.5d,
+                    FontWeight = FontWeights.Bold,
+                    Margin = new Thickness(0d, 14d, 0d, 5d)
                 });
             }
+            var content = new StackPanel { Orientation = Orientation.Horizontal };
+            if (TryLoadMapIcon(key, out var icon))
+                content.Children.Add(new Image { Source = icon, Width = 22d, Height = 22d, Margin = new Thickness(0d, 0d, 9d, 0d), Stretch = Stretch.Uniform });
+            content.Children.Add(new TextBlock { Text = ResourceDisplayName(key, name), VerticalAlignment = VerticalAlignment.Center });
             var toggle = new CheckBox
             {
-                Content = name,
+                Content = content,
                 Tag = key,
                 IsChecked = _mapLayerPreferences.ResourceKeys.Contains(key),
                 Style = (Style)FindResource("LayerInspectorCheckBox"),
@@ -196,12 +193,51 @@ public partial class MainWindow
         _ => MapLayerGroup.Earth
     };
 
-    private static TextBlock CreateLabel(string text, string color) => new()
+    private static string ResourceDisplayName(string key, string fallback) => key.ToLowerInvariant() switch
     {
-        Text = text.ToUpperInvariant(), Foreground = BrushFrom(color),
-        Background = BrushFrom("#C80A1517"), FontFamily = new FontFamily("Bahnschrift SemiCondensed"),
-        FontSize = 7d, FontWeight = FontWeights.SemiBold, TextTrimming = TextTrimming.CharacterEllipsis,
-        MaxWidth = 132d, Padding = new Thickness(3d, 1d, 3d, 1d), IsHitTestVisible = false
+        "boar" => "Lợn rừng",
+        "chicken" => "Gà",
+        "crab" => "Cua",
+        "deer" => "Hươu",
+        "deino" => "Deino",
+        "dryo" => "Dryo",
+        "fish" => "Cá",
+        "frog" => "Ếch",
+        "galli" => "Galli",
+        "goat" => "Dê",
+        "rabbit" => "Thỏ",
+        "taco" => "Taco",
+        "turtle" => "Rùa",
+        "agave" => "Thùa",
+        "ash" => "Tần bì",
+        "azureapol" => "Táo xanh",
+        "banana" => "Chuối",
+        "cashew" => "Điều",
+        "chanterelle" => "Nấm mào gà",
+        "coconut" => "Dừa",
+        "crimapol" => "Táo đỏ",
+        "fiddlehead" => "Dương xỉ non",
+        "fireweed" => "Cỏ lửa",
+        "jackfruit" => "Mít",
+        "mango" => "Xoài",
+        "marigold" => "Cúc vạn thọ",
+        "melon" => "Dưa",
+        "orange" => "Cam",
+        "papaya" => "Đu đủ",
+        "potato" => "Khoai tây",
+        "potatovine" => "Dây khoai tây",
+        "pumpkin" => "Bí ngô",
+        "radish" => "Củ cải",
+        "redcurrant" => "Lý chua đỏ",
+        "russula" => "Nấm russula",
+        "sumac" => "Cây thù du",
+        "sunchoke" => "Cúc vuốt",
+        "trillium" => "Tam diệp",
+        "violetapol" => "Táo tím",
+        "gastro" => "Đá dạ dày",
+        "mudwallow" => "Vũng bùn",
+        "saltrock" => "Đá muối",
+        _ => fallback
     };
 
     private static void ApplyZonePalette(Polygon polygon, MapZoneKind kind)
@@ -291,9 +327,7 @@ public partial class MainWindow
                           && _resourcesById.TryGetValue(visual.Id, out var resource)
                           && _mapLayerPreferences.ResourceKeys.Contains(resource.Key);
             }
-            if (visual.Label is not null && _mapZoom < StaticLabelMinimumZoom)
-                visual.Label.Visibility = Visibility.Collapsed;
-            else if (visual.Label is not null)
+            if (visual.Label is not null)
                 visual.Label.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
             visual.Shape.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
         }
@@ -329,6 +363,8 @@ public partial class MainWindow
                     _mapLayerPreferences.ResourceKeys.UnionWith(keys);
             }
             _mapLayerPreferencesStore.TrySave(_mapLayerPreferences, out _);
+            if (group == MapLayerGroup.Water)
+                ApplyWaterMapImage();
             _mapNotesWindow?.UpdateLayerPreferences(_mapLayerPreferences);
             _mapLayerGeometryDirty = true;
             UpdateMapLayerControls();
@@ -353,21 +389,21 @@ public partial class MainWindow
     private void UpdateMapLayerControls()
     {
         if (!_mapLayersInitialized) return;
-        SetLayerToggle(MigrationLayerToggle, MapLayerGroup.Migration, "Migration Zone");
-        SetLayerToggle(PatrolLayerToggle, MapLayerGroup.Patrol, "Patrol Zone");
-        SetLayerToggle(SanctuaryLayerToggle, MapLayerGroup.Sanctuary, "Sanctuary");
-        SetLayerToggle(AiSpawnLayerToggle, MapLayerGroup.AiSpawnZones, "AI Spawn Zones");
-        SetLayerToggle(RoadLayerToggle, MapLayerGroup.Roads, "Roads & Trails");
-        SetLayerToggle(WaterLayerToggle, MapLayerGroup.Water, "Drinkable Water");
-        SetLayerToggle(AnimalsLayerToggle, MapLayerGroup.Animals, "Animals");
-        SetLayerToggle(PlantsLayerToggle, MapLayerGroup.Plants, "Plants & Fungi");
-        SetLayerToggle(EarthLayerToggle, MapLayerGroup.Earth, "Earth: Gastrolith · Salt · Mud");
+        SetLayerToggle(MigrationLayerToggle, MapLayerGroup.Migration, "◈  VÙNG DI CƯ");
+        SetLayerToggle(PatrolLayerToggle, MapLayerGroup.Patrol, "◌  VÙNG TUẦN TRA");
+        SetLayerToggle(SanctuaryLayerToggle, MapLayerGroup.Sanctuary, "⌂  KHU AN TOÀN");
+        SetLayerToggle(AiSpawnLayerToggle, MapLayerGroup.AiSpawnZones, "✦  VÙNG AI");
+        SetLayerToggle(RoadLayerToggle, MapLayerGroup.Roads, "╱  ĐƯỜNG & LỐI MÒN");
+        SetLayerToggle(WaterLayerToggle, MapLayerGroup.Water, "≈  NƯỚC UỐNG ĐƯỢC");
+        SetLayerToggle(AnimalsLayerToggle, MapLayerGroup.Animals, "●  ĐỘNG VẬT");
+        SetLayerToggle(PlantsLayerToggle, MapLayerGroup.Plants, "❧  THỰC VẬT & NẤM");
+        SetLayerToggle(EarthLayerToggle, MapLayerGroup.Earth, "◆  ĐẤT & KHOÁNG");
         foreach (var toggle in ResourceLayerChildrenPanel.Children.OfType<CheckBox>())
         {
             if (toggle.Tag is string key)
                 toggle.IsChecked = _mapLayerPreferences.ResourceKeys.Contains(key);
         }
-        MapLayerSummaryLabel.Text = $"{_staticMapLayers.Zones.Count} ZONE · {_staticMapLayers.Resources.Count} RESOURCE";
+        MapLayerSummaryLabel.Text = $"{_staticMapLayers.Zones.Count} KHU VỰC · {_staticMapLayers.Resources.Count} TÀI NGUYÊN";
     }
 
     private void SetLayerToggle(ToggleButton toggle, MapLayerGroup group, string label)

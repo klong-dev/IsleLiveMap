@@ -19,6 +19,7 @@ namespace TheIsleOverlay.App;
 public partial class MainWindow : Window
 {
     private static readonly Uri GatewayMapResourceUri = new("Assets/GatewayMap.jpg", UriKind.Relative);
+    private static readonly Uri GatewayMapWaterResourceUri = new("Assets/GatewayMapWater.jpg", UriKind.Relative);
     private static readonly TimeSpan LiveHeadingAnimationDuration = TimeSpan.FromMilliseconds(35);
     private static readonly TimeSpan MovementHeadingAnimationDuration = TimeSpan.FromMilliseconds(80);
     private static readonly TimeSpan UiRenderInterval = TimeSpan.FromMilliseconds(50);
@@ -524,7 +525,10 @@ public partial class MainWindow : Window
             image.EndInit();
             image.Freeze();
             MapImage.Source = image;
+            _baseMapImage = image;
+            _waterMapImage = LoadBitmapResource(GatewayMapWaterResourceUri);
             InitializeMapLayers();
+            ApplyWaterMapImage();
             MapStateLabel.Visibility = Visibility.Collapsed;
             PositionMap();
         }
@@ -1512,18 +1516,12 @@ public partial class MainWindow : Window
         MapInfoPanel.Margin = isCircle
             ? new Thickness(0d, 27d, 0d, 0d)
             : new Thickness(9d);
-        MapHeadingPanel.HorizontalAlignment = isCircle
-            ? HorizontalAlignment.Center
-            : HorizontalAlignment.Left;
-        MapHeadingPanel.Margin = isCircle
-            ? new Thickness(0d, 0d, 0d, 13d)
-            : new Thickness(9d);
         MapFocusModeButton.HorizontalAlignment = isCircle
             ? HorizontalAlignment.Center
             : HorizontalAlignment.Left;
         MapFocusModeButton.Margin = isCircle
-            ? new Thickness(0d, 0d, 0d, 39d)
-            : new Thickness(9d, 0d, 0d, 33d);
+            ? new Thickness(0d, 0d, 0d, 12d)
+            : new Thickness(10d, 0d, 0d, 10d);
         MapShapeButton.Content = isCircle ? "MAP · TRÒN" : "MAP · VUÔNG";
         MapShapeButton.ToolTip = isCircle
             ? "Đang dùng minimap tròn · bấm để chuyển sang vuông"
@@ -1702,6 +1700,32 @@ public partial class MainWindow : Window
         else
             MessageBox.Show(this, "Mốc bản đồ là tính năng Pro. Hãy kích hoạt Pro để sử dụng Alt+M.",
                 "Mở bản đồ mốc", MessageBoxButton.OK, MessageBoxImage.Information);
+    }
+
+    private BitmapImage? _baseMapImage;
+    private BitmapImage? _waterMapImage;
+
+    private static BitmapImage LoadBitmapResource(Uri resourceUri)
+    {
+        var resource = Application.GetResourceStream(resourceUri)
+                       ?? throw new InvalidOperationException($"Map resource not found: {resourceUri}");
+        using var stream = resource.Stream;
+        var image = new BitmapImage();
+        image.BeginInit();
+        image.CacheOption = BitmapCacheOption.OnLoad;
+        image.StreamSource = stream;
+        image.EndInit();
+        image.Freeze();
+        return image;
+    }
+
+    private void ApplyWaterMapImage()
+    {
+        if (_baseMapImage is null || _waterMapImage is null)
+            return;
+        MapImage.Source = _mapLayerPreferences.Water ? _waterMapImage : _baseMapImage;
+        _mapLayerGeometryDirty = true;
+        PositionMap();
     }
 
     private void MapLayersButton_Click(object sender, RoutedEventArgs e)

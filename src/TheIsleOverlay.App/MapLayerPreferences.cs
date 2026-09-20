@@ -19,7 +19,7 @@ internal enum MapLayerGroup
 /// <summary>Versioned local visibility preferences shared by minimap and Alt+M.</summary>
 internal sealed class MapLayerPreferences
 {
-    public const int CurrentVersion = 2;
+    public const int CurrentVersion = 3;
 
     public int Version { get; set; } = CurrentVersion;
     public bool Migration { get; set; } = true;
@@ -27,7 +27,7 @@ internal sealed class MapLayerPreferences
     public bool Sanctuary { get; set; } = true;
     public bool AiSpawnZones { get; set; }
     public bool Roads { get; set; } = true;
-    public bool Water { get; set; }
+    public bool Water { get; set; } = true;
     public bool Animals { get; set; }
     public bool Plants { get; set; }
     public bool Earth { get; set; }
@@ -84,6 +84,8 @@ internal sealed class MapLayerPreferences
 
     public MapLayerPreferences Normalize(MapLayerDefaults defaults)
     {
+        if (Version < CurrentVersion)
+            Water = true;
         Version = CurrentVersion;
         ResourceKeys ??= new(StringComparer.OrdinalIgnoreCase);
         var allowed = defaults.SelectedResourceKeys.Values

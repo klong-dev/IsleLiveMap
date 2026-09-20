@@ -5,7 +5,7 @@
   "provenance": {
     "provider": "myislemap.com",
     "snapshotMode": "build-time-offline",
-    "retrievedAt": "2026-09-18T10:44:55.405Z",
+    "retrievedAt": "2026-09-19T12:11:10.859Z",
     "sources": [
       {
         "key": "mapData",
@@ -52,7 +52,7 @@
     "sanctuary": true,
     "aiSpawnZones": false,
     "roads": true,
-    "water": false,
+    "water": true,
     "animals": false,
     "plants": false,
     "earth": false,

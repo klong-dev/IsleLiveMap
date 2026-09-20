@@ -15,7 +15,7 @@ public sealed class MapLayerPreferencesTests
         Assert.True(preferences.Sanctuary);
         Assert.True(preferences.Roads);
         Assert.False(preferences.AiSpawnZones);
-        Assert.False(preferences.Water);
+        Assert.True(preferences.Water);
         Assert.False(preferences.Animals);
         Assert.False(preferences.Plants);
         Assert.False(preferences.Earth);

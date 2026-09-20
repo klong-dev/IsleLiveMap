@@ -82,14 +82,26 @@ public sealed class MapNotesWindowLifecycleTests
 
         var initialZoneVisuals = VisibleChildren(window, "MapZoneLayer");
         Assert.True(initialZoneVisuals > 0);
+        Assert.All(
+            Element<Canvas>(window, "MapZoneLayer").Children.Cast<UIElement>().ToArray(),
+            child => Assert.IsNotType<TextBlock>(child));
         Assert.Equal(0, VisibleChildren(window, "MapFoodLayer"));
 
-        AssertGroupDelta(window, "MigrationLayerToggle", catalog.Zones.Count(zone => zone.Kind == MapZoneKind.Migration) * 2);
-        AssertGroupDelta(window, "PatrolLayerToggle", catalog.Zones.Count(zone => zone.Kind == MapZoneKind.Patrol) * 2);
-        AssertGroupDelta(window, "SanctuaryLayerToggle", catalog.Zones.Count(zone => zone.Kind == MapZoneKind.Sanctuary) * 2);
+        AssertGroupDelta(window, "MigrationLayerToggle", catalog.Zones.Count(zone => zone.Kind == MapZoneKind.Migration));
+        AssertGroupDelta(window, "PatrolLayerToggle", catalog.Zones.Count(zone => zone.Kind == MapZoneKind.Patrol));
+        AssertGroupDelta(window, "SanctuaryLayerToggle", catalog.Zones.Count(zone => zone.Kind == MapZoneKind.Sanctuary));
         AssertGroupDelta(window, "RoadLayerToggle", catalog.Routes.Count);
-        AssertGroupGain(window, "AiSpawnLayerToggle", catalog.AiSpawnZones.Count * 2);
-        AssertGroupGain(window, "WaterLayerToggle", catalog.WaterLabels.Count);
+        AssertGroupGain(window, "AiSpawnLayerToggle", catalog.AiSpawnZones.Count);
+        var waterVisualsBeforeToggle = VisibleChildren(window, "MapZoneLayer");
+        SetToggle(window, "WaterLayerToggle", false);
+        PositionLayers(window);
+        Assert.Equal(waterVisualsBeforeToggle, VisibleChildren(window, "MapZoneLayer"));
+        SetToggle(window, "WaterLayerToggle", true);
+        PositionLayers(window);
+        Assert.Equal(waterVisualsBeforeToggle, VisibleChildren(window, "MapZoneLayer"));
+        Assert.All(
+            Element<Canvas>(window, "MapZoneLayer").Children.OfType<FrameworkElement>().ToArray(),
+            child => Assert.IsNotType<TextBlock>(child));
 
         AssertResourceGroup(window, "AnimalsLayerToggle", catalog.Resources.Count(resource => resource.Category == "animals"));
         var boarCount = catalog.Resources.Count(resource => resource.Key == "boar");

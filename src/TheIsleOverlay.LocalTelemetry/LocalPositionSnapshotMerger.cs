@@ -23,7 +23,8 @@ public static class LocalPositionSnapshotMerger
         IReadOnlyList<VerifiedRemoteEntityTelemetry>? remotePlayers = null,
         string? verifiedLocalSpeciesId = null,
         RemotePlayerTelemetryFrame? verifiedLocalFallback = null,
-        bool allowLocalVitals = false)
+        bool allowLocalVitals = false,
+        bool requireFreshLocalMovement = false)
     {
         var localObservation = local.GetValueOrDefault();
         var fallback = verifiedLocalFallback;
@@ -47,7 +48,22 @@ public static class LocalPositionSnapshotMerger
         var hasFreshVerifiedFallback = fallback is not null
                                        && IsRemoteFrameFresh(fallback, now)
                                        && IsFinite(fallback.LocalLocation)
-                                       && double.IsFinite(fallback.MapHeadingDegrees);
+            && double.IsFinite(fallback.MapHeadingDegrees);
+        if (requireFreshLocalMovement
+            && !hasFreshLocal
+            && !hasFreshVerifiedFallback
+            && !useLocalVitals)
+        {
+            return remote is null
+                ? Waiting(sourceName)
+                : remote with
+                {
+                    PlayerOnline = false,
+                    Player = null,
+                    SessionState = TelemetrySessionState.Connecting,
+                    StatusMessage = "Đang chờ The Isle và dữ liệu movement cục bộ."
+                };
+        }
         if (!hasFreshLocal && !hasFreshVerifiedFallback && !useLocalVitals)
         {
             if (remote?.Player is { } previousPlayer

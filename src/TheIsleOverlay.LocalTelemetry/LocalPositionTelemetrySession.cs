@@ -152,7 +152,8 @@ public sealed class LocalPositionTelemetrySession : ITelemetrySession
                     remotePlayers,
                     verifiedLocalSpeciesId,
                     usableRemotePlayerFrame,
-                    allowLocalVitals: _enableLocalVitals);
+                    allowLocalVitals: _enableLocalVitals,
+                    requireFreshLocalMovement: true);
                 if (remote is null
                     && local is null
                     && !string.IsNullOrWhiteSpace(localError))
