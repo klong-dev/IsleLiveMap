@@ -344,7 +344,6 @@ public sealed class ProAgentRemotePlayerSource :
             frame.LocalSpeciesShortName);
 
         var entities = (frame.RemoteEntities ?? [])
-            .Where(IsValidEntity)
             .Select(entity => new VerifiedRemoteEntityTelemetry(
                 entity.TrackId,
                 MapKind(entity.Kind),
@@ -492,7 +491,7 @@ public sealed class ProAgentRemotePlayerSource :
     {
         MapEntityKind.Player => RemoteEntityKind.Player,
         MapEntityKind.Ai => RemoteEntityKind.Ai,
-        _ => throw new ProAgentException("The Pro Agent returned an invalid entity kind.")
+        _ => RemoteEntityKind.Unknown
     };
 
     private static CreatureDiet MapDiet(MapCreatureDiet diet) => diet switch

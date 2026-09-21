@@ -100,6 +100,7 @@ public sealed record RemotePlayerSyncState(
 
 public enum RemoteEntityKind
 {
+    Unknown = 0,
     Player = 1,
     Ai = 2
 }
