@@ -212,6 +212,8 @@ public sealed class LocalPositionTelemetrySession : ITelemetrySession
                 }
                 if (remote is null
                     && local is null
+                    && lastMergedSnapshot is null
+                    && _remotePlayerSource is null
                     && !string.IsNullOrWhiteSpace(localError))
                 {
                     merged = LocalPositionSnapshotMerger.Waiting(_sourceName, localError);

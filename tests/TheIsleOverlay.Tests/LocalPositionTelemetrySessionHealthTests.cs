@@ -103,6 +103,42 @@ public sealed class LocalPositionTelemetrySessionHealthTests
         Assert.Equal(100, watch.Current.Player?.Location?.X);
     }
 
+    [Fact]
+    public async Task WatchAsync_LocalCaptureFailureDoesNotEraseRemoteFrame()
+    {
+        var remote = new SingleRemotePlayerSource();
+        await using var session = new LocalPositionTelemetrySession(
+            remoteSession: new StaticRemoteSession(),
+            localSource: new FailingLocalSource(),
+            remotePlayerSource: remote);
+
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+        await using var watch = session.WatchAsync(timeout.Token).GetAsyncEnumerator(timeout.Token);
+        Assert.True(await watch.MoveNextAsync());
+
+        TelemetrySnapshot? withRemote = null;
+        for (var attempt = 0; attempt < 8 && withRemote is null; attempt++)
+        {
+            Assert.True(await watch.MoveNextAsync());
+            if (watch.Current.ProTrackingDiagnostics?.RenderedCount > 0)
+            {
+                withRemote = watch.Current;
+            }
+        }
+
+        Assert.NotNull(withRemote);
+        Assert.Contains(
+            withRemote!.Map!.Markers,
+            marker => marker.SteamId == "pro-entity:player:77");
+
+        // The local lane has already failed. A subsequent tick must keep the
+        // remote frame/map alive instead of replacing it with local Waiting.
+        Assert.True(await watch.MoveNextAsync());
+        Assert.Contains(
+            watch.Current.Map!.Markers,
+            marker => marker.SteamId == "pro-entity:player:77");
+    }
+
     private sealed class FakeLocalSource : ILocalMovementSource
     {
         private readonly Channel<LocalMovementObservation> _items =
@@ -125,6 +161,71 @@ public sealed class LocalPositionTelemetrySessionHealthTests
             _items.Writer.TryComplete();
             return ValueTask.CompletedTask;
         }
+    }
+
+    private sealed class FailingLocalSource : ILocalMovementSource
+    {
+        public async IAsyncEnumerable<LocalMovementObservation> WatchAsync(
+            [System.Runtime.CompilerServices.EnumeratorCancellation]
+            CancellationToken cancellationToken = default)
+        {
+            await Task.Yield();
+            throw new LocalPacketCaptureUnavailableException("local capture failed");
+            #pragma warning disable CS0162
+            yield break;
+            #pragma warning restore CS0162
+        }
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    }
+
+    private sealed class StaticRemoteSession : ITelemetrySession
+    {
+        public async IAsyncEnumerable<TelemetrySnapshot> WatchAsync(
+            [System.Runtime.CompilerServices.EnumeratorCancellation]
+            CancellationToken cancellationToken = default)
+        {
+            yield return new TelemetrySnapshot
+            {
+                Source = "TEST",
+                Success = true,
+                ServerOnline = true,
+                PlayerOnline = true
+            };
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+        }
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    }
+
+    private sealed class SingleRemotePlayerSource : IRemotePlayerTelemetrySource
+    {
+        public async IAsyncEnumerable<RemotePlayerTelemetryFrame> WatchAsync(
+            [System.Runtime.CompilerServices.EnumeratorCancellation]
+            CancellationToken cancellationToken = default)
+        {
+            yield return new RemotePlayerTelemetryFrame(
+                1,
+                DateTimeOffset.UtcNow,
+                "server:7777",
+                new WorldLocation { X = 0, Y = 0, Z = 0 },
+                0,
+                [new VerifiedRemoteEntityTelemetry(
+                    77,
+                    RemoteEntityKind.Player,
+                    "proof",
+                    "rex",
+                    "Rex",
+                    CreatureDiet.Carnivore,
+                    null,
+                    new WorldLocation { X = 100, Y = 100, Z = 0 },
+                    100,
+                    1,
+                    DateTimeOffset.UtcNow)]);
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+        }
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 
     private sealed class SilentRemotePlayerSource :
