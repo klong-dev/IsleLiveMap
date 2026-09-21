@@ -167,8 +167,12 @@ function Get-Percentile([double[]]$Values, [double]$Percentile) {
 }
 
 function Invoke-Analyze([string]$Path) {
-    $agent = @(Read-JsonLines (Join-Path $Path 'agent-live-compare.jsonl'))
-    $map = @(Read-JsonLines (Join-Path $Path 'map-diagnostics.jsonl'))
+    $agentPath = Join-Path $Path 'agent-live-compare.jsonl'
+    $mapPath = Join-Path $Path 'map-diagnostics.jsonl'
+    if (-not (Test-Path -LiteralPath $agentPath)) { $agentPath = Join-Path $Path 'raw-capture\agent-live-compare.jsonl' }
+    if (-not (Test-Path -LiteralPath $mapPath)) { $mapPath = Join-Path $Path 'raw-capture\map-diagnostics.jsonl' }
+    $agent = @(Read-JsonLines $agentPath)
+    $map = @(Read-JsonLines $mapPath)
     $renderRows = @($map | Where-Object { $_.stage -eq 'render-end' })
     $rendered = @($renderRows | ForEach-Object { @($_.RenderedMarkers) } | Where-Object { $_ })
     $renderIndex = @{}
@@ -198,12 +202,18 @@ function Invoke-Analyze([string]$Path) {
             $eligible = Test-EligibleEntity $entity
             $key = Get-EntityKey $entity $endpoint $seenByEndpoint[$endpoint]
             $render = $null
-            if ($eligible -and $renderIndex.ContainsKey("pro-entity:$($entity.Kind.ToString().ToLowerInvariant()):$($entity.TrackId)")) {
-                $candidates = $renderIndex["pro-entity:$($entity.Kind.ToString().ToLowerInvariant()):$($entity.TrackId)"]
+            $identityPrefix = "pro-entity:$($entity.Kind.ToString().ToLowerInvariant()):$($entity.TrackId)"
+            if ($eligible) {
+                $candidates = @($renderIndex.Keys |
+                    Where-Object { $_ -eq $identityPrefix -or $_.StartsWith("$identityPrefix#", [StringComparison]::Ordinal) } |
+                    ForEach-Object { $renderIndex[$_] })
                 if ($null -ne $frameAt) {
-                    $render = @($candidates | Where-Object { $_.At -ge $frameAt } | Select-Object -First 1)
-                    if ($render.Count -eq 0) { $render = @($candidates | Select-Object -Last 1) }
-                    if ($render.Count -gt 0) { $render = $render[0] }
+                    if ($candidates.Count -gt 0) {
+                        $render = @($candidates | ForEach-Object { $_ } |
+                            Where-Object { $_.At -ge $frameAt } | Select-Object -First 1)
+                        if ($render.Count -eq 0) { $render = @($candidates | Select-Object -Last 1) }
+                        if ($render.Count -gt 0) { $render = $render[0] }
+                    }
                 }
             }
             $renderedNow = $null -ne $render
@@ -291,6 +301,7 @@ function Invoke-Analyze([string]$Path) {
 
 function Invoke-Replay([string]$Path) {
     $agentPath = Join-Path $Path 'agent-live-compare.jsonl'
+    if (-not (Test-Path -LiteralPath $agentPath)) { $agentPath = Join-Path $Path 'raw-capture\agent-live-compare.jsonl' }
     if (-not (Test-Path -LiteralPath $agentPath)) {
         throw "Khong co raw Agent capture de replay: $agentPath"
     }

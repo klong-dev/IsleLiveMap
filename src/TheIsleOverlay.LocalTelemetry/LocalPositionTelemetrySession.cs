@@ -78,6 +78,7 @@ public sealed class LocalPositionTelemetrySession : ITelemetrySession
         }
 
         TelemetrySnapshot? remote = null;
+        TelemetrySnapshot? lastMergedSnapshot = null;
         LocalMovementObservation? local = null;
         RemotePlayerTelemetryFrame? remotePlayerFrame = null;
         RemotePlayerCaptureHealth? remotePlayerHealth =
@@ -166,7 +167,7 @@ public sealed class LocalPositionTelemetrySession : ITelemetrySession
                     ? localSpeciesFrame.LocalSpeciesId
                     : null;
                 var merged = LocalPositionSnapshotMerger.Merge(
-                    remote,
+                    remote ?? lastMergedSnapshot,
                     local,
                     now,
                     _sourceName,
@@ -224,6 +225,7 @@ public sealed class LocalPositionTelemetrySession : ITelemetrySession
                     };
                 }
 
+                lastMergedSnapshot = merged;
                 yield return merged;
             }
         }
