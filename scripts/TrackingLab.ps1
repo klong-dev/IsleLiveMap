@@ -30,7 +30,10 @@ function Resolve-Session {
 }
 
 function Test-Preflight {
-    $game = Get-Process -Name 'TheIsle-Win64-Shipping' -ErrorAction SilentlyContinue
+    $game = Get-Process -Name @(
+        'TheIsle-Win64-Shipping',
+        'TheIsleClient-Win64-Shipping'
+    ) -ErrorAction SilentlyContinue | Select-Object -First 1
     $agent = Get-Process -Name 'IsleLiveMap.Pro.Agent' -ErrorAction SilentlyContinue
     $npcapDll = @(
         (Join-Path $env:SystemRoot 'System32\wpcap.dll'),
