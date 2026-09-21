@@ -303,7 +303,11 @@ function Invoke-Replay([string]$Path) {
     $agentPath = Join-Path $Path 'agent-live-compare.jsonl'
     if (-not (Test-Path -LiteralPath $agentPath)) { $agentPath = Join-Path $Path 'raw-capture\agent-live-compare.jsonl' }
     if (-not (Test-Path -LiteralPath $agentPath)) {
-        throw "Khong co raw Agent capture de replay: $agentPath"
+        $analysis = Invoke-Analyze $Path
+        $analysis = $analysis | Add-Member -NotePropertyName ReplayStatus -NotePropertyValue 'NEED_DEVELOPER' -PassThru
+        $analysis = $analysis | Add-Member -NotePropertyName ReplayReason -NotePropertyValue 'Raw Agent capture is unavailable because preflight did not pass.' -PassThru
+        Write-JsonFile (Join-Path $Path 'tracking-analysis.json') $analysis
+        return $analysis
     }
 
     $analysis = Invoke-Analyze $Path
@@ -367,6 +371,37 @@ function New-RegressionFixture([string]$Path, $Analysis) {
     return $fixturePath
 }
 
+function Write-FixLoopState([string]$Path, $Analysis, [string]$FixturePath) {
+    $rootCause = if ($Analysis.MissingEligibleObservations -gt 0) {
+        'eligible-marker-missing'
+    } elseif ($Analysis.SequenceGapEstimate -gt 0) {
+        'sequence-gap'
+    } elseif ($Analysis.P95MarkerLatencyMs -gt 2000) {
+        'marker-latency'
+    } else {
+        'none-reproduced'
+    }
+    $state = [pscustomobject]@{
+        UpdatedAt = [DateTimeOffset]::UtcNow
+        Iteration = 1
+        BaselineStatus = $Analysis.Status
+        RootCause = $rootCause
+        FixturePath = $FixturePath
+        ReplayStatus = $Analysis.Status
+        RequiredNextAction = if ($Analysis.Status -eq 'NEED_DEVELOPER') {
+            'Developer must provide a live game/Pro/Npcap capture.'
+        } elseif ($Analysis.Status -eq 'FAIL') {
+            'Create one regression test for RootCause, patch one cause, replay the same raw capture, then run three live smoke sessions.'
+        } else {
+            'Run three live smoke sessions before committing a fix.'
+        }
+        CommitAllowed = $false
+    }
+    $statePath = Join-Path $Path 'loop-state.json'
+    Write-JsonFile $statePath $state
+    return $statePath
+}
+
 function Remove-PassedRawArtifacts {
     if ($KeepPassedRaw) { return }
     Get-ChildItem -LiteralPath $SessionRoot -Directory -ErrorAction SilentlyContinue | ForEach-Object {
@@ -410,13 +445,14 @@ switch ($Command) {
         $path = Resolve-Session
         $analysis = Invoke-Replay $path
         $fixturePath = New-RegressionFixture $path $analysis
+        $statePath = Write-FixLoopState $path $analysis $fixturePath
         Invoke-Report $path
         if ($analysis.Status -eq 'NEED_DEVELOPER') {
-            Write-Host "fix-loop: NEED_DEVELOPER; fixture saved at $fixturePath"
+            Write-Host "fix-loop: NEED_DEVELOPER; fixture saved at $fixturePath; state saved at $statePath"
         } elseif ($analysis.Status -eq 'PASS') {
-            Write-Host "fix-loop: replay baseline PASS; fixture saved at $fixturePath. Three live smoke sessions are still required before commit."
+            Write-Host "fix-loop: replay baseline PASS; fixture saved at $fixturePath; state saved at $statePath. Three live smoke sessions are still required before commit."
         } else {
-            Write-Host "fix-loop: divergence reproduced; fixture saved at $fixturePath. One root cause per iteration."
+            Write-Host "fix-loop: divergence reproduced; fixture saved at $fixturePath; state saved at $statePath. One root cause per iteration."
         }
     }
 }
