@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Position = 0)]
-    [ValidateSet('start-session', 'capture', 'run-round', 'analyze', 'report', 'fix-loop')]
+    [ValidateSet('start-session', 'capture', 'run-round', 'replay', 'analyze', 'report', 'fix-loop')]
     [string]$Command = 'start-session',
 
     [string]$SessionRoot = (Join-Path (Split-Path $PSScriptRoot -Parent) 'artifacts\tracking-lab'),
@@ -269,6 +269,23 @@ function Invoke-Analyze([string]$Path) {
     return $result
 }
 
+function Invoke-Replay([string]$Path) {
+    $agentPath = Join-Path $Path 'agent-live-compare.jsonl'
+    if (-not (Test-Path -LiteralPath $agentPath)) {
+        throw "Khong co raw Agent capture de replay: $agentPath"
+    }
+
+    $analysis = Invoke-Analyze $Path
+    $manifestPath = Join-Path $Path 'session-manifest.json'
+    if (Test-Path -LiteralPath $manifestPath) {
+        $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+        $manifest | Add-Member -NotePropertyName ReplayedAt -NotePropertyValue ([DateTimeOffset]::UtcNow) -Force
+        $manifest | Add-Member -NotePropertyName ReplayGroundTruth -NotePropertyValue 'replay-ground-truth.jsonl' -Force
+        Write-JsonFile $manifestPath $manifest
+    }
+    return $analysis
+}
+
 function Invoke-Report([string]$Path) {
     $analysisPath = Join-Path $Path 'tracking-analysis.json'
     if (-not (Test-Path -LiteralPath $analysisPath)) { $null = Invoke-Analyze $Path }
@@ -355,11 +372,12 @@ switch ($Command) {
     'start-session' { $null = New-Session; break }
     'capture' { Invoke-Capture (Resolve-Session); break }
     'run-round' { Invoke-Round; break }
+    'replay' { Invoke-Replay (Resolve-Session) | Format-List; break }
     'analyze' { Invoke-Analyze (Resolve-Session) | Format-List; break }
     'report' { Invoke-Report (Resolve-Session); break }
     'fix-loop' {
         $path = Resolve-Session
-        $analysis = Invoke-Analyze $path
+        $analysis = Invoke-Replay $path
         $fixturePath = New-RegressionFixture $path $analysis
         Invoke-Report $path
         if ($analysis.Status -eq 'NEED_DEVELOPER') {
