@@ -6,11 +6,9 @@ public static class LocalPositionSnapshotMerger
 {
     public static readonly TimeSpan LocalFreshness = TimeSpan.FromSeconds(2);
     public static readonly TimeSpan LocalVitalsFreshness = TimeSpan.FromSeconds(3);
-    // Pro/Iris frames arrive in sparse bursts and live measurements after a
-    // reconnect showed healthy gaps of roughly 1.1-4.3 seconds. Two seconds
-    // made an unchanged player roster flash to zero between valid frames.
-    // Endpoint changes still publish an empty roster immediately; this grace
-    // period is only the pipeline-liveness fallback for a stalled frame.
+    // Keep a reconnect grace window for sparse rosters. The latest-value lane
+    // prevents this grace period from becoming a substitute for queueing the
+    // newest position frame; diagnostics still expose the actual frame age.
     public static readonly TimeSpan RemotePlayerFreshness = TimeSpan.FromSeconds(6);
     // Unreal coordinates are centimetres: 100,000 units = 1 kilometre.
     public const double MaximumRemoteEntityDistance = 100_000d;
@@ -49,10 +47,12 @@ public static class LocalPositionSnapshotMerger
                                        && IsRemoteFrameFresh(fallback, now)
                                        && IsFinite(fallback.LocalLocation)
             && double.IsFinite(fallback.MapHeadingDegrees);
+        var hasFreshRemoteFrame = hasFreshVerifiedFallback && remotePlayers is not null;
         if (requireFreshLocalMovement
             && !hasFreshLocal
             && !hasFreshVerifiedFallback
-            && !useLocalVitals)
+            && !useLocalVitals
+            && !hasFreshRemoteFrame)
         {
             return remote is null
                 ? Waiting(sourceName)
@@ -160,7 +160,8 @@ public static class LocalPositionSnapshotMerger
             PlayerOnline = true,
             UpdatedAt = observedAt,
             Player = player,
-            Map = hasFreshLocal || hasFreshVerifiedFallback
+            Map = remotePlayers is not null
+                  && (hasFreshLocal || hasFreshVerifiedFallback)
                 ? MergeRemotePlayers(
                     baseSnapshot.Map,
                     remotePlayers,

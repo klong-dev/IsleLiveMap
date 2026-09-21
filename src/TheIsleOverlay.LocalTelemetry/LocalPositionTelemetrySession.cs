@@ -13,6 +13,8 @@ public sealed class LocalPositionTelemetrySession : ITelemetrySession
     private readonly string _sourceName;
     private readonly bool _enableLocalVitals;
     private readonly CancellationTokenSource _disposeCancellation = new();
+    private readonly object _latestRemoteFrameGate = new();
+    private RemotePlayerTelemetryFrame? _latestRemoteFrame;
     private int _watchStarted;
     private int _disposed;
 
@@ -102,6 +104,23 @@ public sealed class LocalPositionTelemetrySession : ITelemetrySession
                         break;
                     case RemotePlayersEvent remotePlayersEvent:
                         remotePlayerFrame = remotePlayersEvent.Frame;
+                        break;
+                    case RemotePlayersAvailableEvent:
+                        lock (_latestRemoteFrameGate)
+                        {
+                            remotePlayerFrame = _latestRemoteFrame;
+                        }
+                        break;
+                    case TickEvent:
+                        // A dropped best-effort wake-up must not strand the
+                        // latest remote frame behind the bounded event lane.
+                        lock (_latestRemoteFrameGate)
+                        {
+                            if (_latestRemoteFrame is not null)
+                            {
+                                remotePlayerFrame = _latestRemoteFrame;
+                            }
+                        }
                         break;
                     case RemotePlayersFailureEvent failureEvent:
                         remotePlayerFrame = null;
@@ -299,15 +318,20 @@ public sealed class LocalPositionTelemetrySession : ITelemetrySession
     {
         try
         {
-            await foreach (var frame in _remotePlayerSource!
+                await foreach (var frame in _remotePlayerSource!
                                .WatchAsync(cancellationToken)
                                .ConfigureAwait(false))
-            {
-                await writer.WriteAsync(
-                        new RemotePlayersEvent(frame),
-                        cancellationToken)
-                    .ConfigureAwait(false);
-            }
+                {
+                    // Remote position frames are latest-value data. A new
+                    // frame must never wait behind stale local/server events
+                    // in the shared FIFO. The periodic tick remains a
+                    // fallback wake-up if this best-effort signal is dropped.
+                    lock (_latestRemoteFrameGate)
+                    {
+                        _latestRemoteFrame = frame;
+                    }
+                    writer.TryWrite(RemotePlayersAvailableEvent.Instance);
+                }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -330,6 +354,10 @@ public sealed class LocalPositionTelemetrySession : ITelemetrySession
     private sealed record LocalMovementEvent(LocalMovementObservation Observation) : SessionEvent;
     private sealed record LocalFailureEvent(string Message) : SessionEvent;
     private sealed record RemotePlayersEvent(RemotePlayerTelemetryFrame Frame) : SessionEvent;
+    private sealed record RemotePlayersAvailableEvent : SessionEvent
+    {
+        public static RemotePlayersAvailableEvent Instance { get; } = new();
+    }
     private sealed record RemotePlayersFailureEvent(string Message) : SessionEvent;
     private sealed record TickEvent : SessionEvent
     {

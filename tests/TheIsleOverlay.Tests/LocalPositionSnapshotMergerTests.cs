@@ -540,6 +540,52 @@ public sealed class LocalPositionSnapshotMergerTests
     }
 
     [Fact]
+    public void Merge_RemoteFrameStillUpdatesEntitiesWhenLocalGpsIsStale()
+    {
+        var staleLocal = Observation(12_000, -67_500, 1_200, 45) with
+        {
+            ObservedAt = Now - LocalPositionSnapshotMerger.LocalFreshness - TimeSpan.FromMilliseconds(1)
+        };
+        VerifiedRemoteEntityTelemetry[] entities =
+        [
+            new VerifiedRemoteEntityTelemetry(
+                91,
+                RemoteEntityKind.Player,
+                "verified-player",
+                "deinosuchus",
+                "Deino",
+                CreatureDiet.Carnivore,
+                null,
+                new WorldLocation { X = 12_345, Y = -67_890, Z = 1_234 },
+                250,
+                4,
+                Now)
+        ];
+        var frame = RemoteFrame(
+            Now,
+            12_000,
+            -67_500,
+            1_200,
+            45,
+            "server:7777") with
+        {
+            RemoteEntities = entities
+        };
+
+        var merged = LocalPositionSnapshotMerger.Merge(
+            new TelemetrySnapshot { Player = new PlayerTelemetry { Location = staleLocal.Movement.Location } },
+            staleLocal,
+            Now,
+            remotePlayers: entities,
+            verifiedLocalFallback: frame,
+            requireFreshLocalMovement: true);
+
+        var marker = Assert.Single(merged.Map!.Markers);
+        Assert.Equal("pro-entity:player:91", marker.SteamId);
+        Assert.True(merged.ProPlayerTrackingActive);
+    }
+
+    [Fact]
     public void Merge_DoesNotPresentUnnamedMovingActorsAsPlayers()
     {
         var providerMarker = new MapMarkerTelemetry
