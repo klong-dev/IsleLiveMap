@@ -653,7 +653,7 @@ public sealed class LocalPositionSnapshotMergerTests
             3,
             Now,
             IsProvisional: false,
-            LocationObservedAt: Now - RemoteEntityLifecycleTracker.PositionFreshness - TimeSpan.FromMilliseconds(1));
+            LocationObservedAt: Now - VerifiedRemoteEntityTelemetry.LocationFreshness - TimeSpan.FromMilliseconds(1));
 
         var merged = LocalPositionSnapshotMerger.Merge(
             new TelemetrySnapshot { Map = new MapTelemetry() },

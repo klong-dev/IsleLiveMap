@@ -132,6 +132,8 @@ public sealed record VerifiedRemoteEntityTelemetry(
     bool IsProvisional = false,
     DateTimeOffset? LocationObservedAt = null)
 {
+    public static readonly TimeSpan LocationFreshness = TimeSpan.FromSeconds(90);
+
     public TimeSpan? LocationAgeAt(DateTimeOffset now) =>
         LocationObservedAt is { } observed && now >= observed
             ? now - observed

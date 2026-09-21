@@ -211,6 +211,14 @@ function Test-EligibleEntity($Entity, $Frame) {
     $kind = $Entity.Kind.ToString().ToLowerInvariant()
     $location = $Entity.Location
     if ($null -eq $location -or $null -eq $location.X -or $null -eq $location.Y) { return $false }
+    # Presence can refresh while a stationary actor keeps its last safe
+    # coordinate. That is valid for a short stationary window, but an old
+    # coordinate must not be treated as ground truth for marker accuracy.
+    $locationAt = Get-DateTimeOffsetOrNull $Entity.LocationObservedAt
+    $frameAt = Get-DateTimeOffsetOrNull $(if ($Entity.ObservedAt) { $Entity.ObservedAt } else { $Frame.ObservedAt })
+    if ($null -ne $locationAt -and $null -ne $frameAt -and
+        (($locationAt -gt $frameAt) -or
+         (($frameAt - $locationAt).TotalSeconds -gt 90))) { return $false }
     if ($kind -eq 'ai') {
         return -not [string]::IsNullOrWhiteSpace([string]$Entity.SpeciesId) -and
             -not [string]::IsNullOrWhiteSpace([string]$Entity.SpeciesShortName)
@@ -228,6 +236,9 @@ function Test-EligibleEntity($Entity, $Frame) {
 function Get-EntityRejectionReason($Entity, $Frame) {
     if ($null -eq $Entity -or [long]$Entity.TrackId -le 0) { return 'InvalidTrackId' }
     if ($null -eq $Entity.Location -or $null -eq $Entity.Location.X -or $null -eq $Entity.Location.Y) { return 'InvalidCoordinate' }
+    $locationAt = Get-DateTimeOffsetOrNull $Entity.LocationObservedAt
+    $frameAt = Get-DateTimeOffsetOrNull $(if ($Entity.ObservedAt) { $Entity.ObservedAt } else { $Frame.ObservedAt })
+    if ($null -ne $locationAt -and $null -ne $frameAt -and ($frameAt - $locationAt).TotalSeconds -gt 90) { return 'StaleLocation' }
     $kind = $Entity.Kind.ToString().ToLowerInvariant()
     if ($kind -eq 'ai' -and ([string]::IsNullOrWhiteSpace([string]$Entity.SpeciesId) -or [string]::IsNullOrWhiteSpace([string]$Entity.SpeciesShortName))) { return 'MissingSpecies' }
     if ($kind -eq 'player' -and -not [bool]$Entity.IsProvisional -and [string]::IsNullOrWhiteSpace([string]$Entity.PlayerProofName)) { return 'MissingPlayerProof' }

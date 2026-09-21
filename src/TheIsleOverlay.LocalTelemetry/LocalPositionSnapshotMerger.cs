@@ -368,7 +368,7 @@ public static class LocalPositionSnapshotMerger
         // making an old coordinate look live.
         var locationObservedAt = entity.LocationObservedAt ?? entity.ObservedAt;
         if (locationObservedAt > now
-            || now - locationObservedAt > RemoteEntityLifecycleTracker.PositionFreshness)
+            || now - locationObservedAt > VerifiedRemoteEntityTelemetry.LocationFreshness)
         {
             reason = RemoteEntityRejectionReason.StaleLocation;
             return true;
