@@ -69,20 +69,20 @@ function New-Session {
     Write-Host "Session: $id"
     Write-Host "Artifacts: $path"
     if (-not $preflight.NpcapLibraryFound -or -not $preflight.IslePilotCredentialFileFound) {
-        Write-Warning 'Npcap hoặc credential IslePilot chưa được phát hiện. Không bypass quyền; live tracking có thể không khởi động.'
+        Write-Warning 'Npcap or IslePilot credential not found. No bypass; live tracking may not start.'
     }
     if ($LaunchInstalledApp) {
         $exe = Join-Path $env:LOCALAPPDATA 'IsleLiveMap\current\IsleLiveMap.exe'
         if (-not (Test-Path -LiteralPath $exe)) { throw "Không tìm thấy app đã cài: $exe" }
         Start-Process -FilePath $exe | Out-Null
-        Write-Host 'Đã khởi chạy app cài sẵn. Hãy vào game/server và AFK.'
+        Write-Host 'Installed app launched. Enter the game/server and AFK.'
     }
     return $path
 }
 
 function Invoke-Capture([string]$Path) {
     $seconds = [Math]::Max(60, $DurationMinutes * 60)
-    Write-Host "Đang thu thập $DurationMinutes phút. Không tự gửi input vào game."
+    Write-Host "Capturing for $DurationMinutes minutes. No game input is sent."
     Start-Sleep -Seconds $seconds
     $manifestPath = Join-Path $Path 'session-manifest.json'
     $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
@@ -91,7 +91,7 @@ function Invoke-Capture([string]$Path) {
         'agent-live-compare.jsonl', 'map-diagnostics.jsonl'
     ) -Force
     Write-JsonFile $manifestPath $manifest
-    Write-Host "Đã kết thúc capture: $Path"
+    Write-Host "Capture complete: $Path"
 }
 
 function Read-JsonLines([string]$Path) {
@@ -242,8 +242,8 @@ function Invoke-Analyze([string]$Path) {
         P95MarkerLatencyMs = Get-Percentile $renderLatencies.ToArray() 0.95
         MissingEntities = $missing
         GroundTruthPath = (Join-Path $Path 'replay-ground-truth.jsonl')
-        Status = if ($agent.Count -eq 0 -or $renderRows.Count -eq 0) { 'CẦN DEVELOPER' } elseif ($missing.Count -gt 0) { 'FAIL' } else { 'PASS' }
-        MissingMarkerProof = if ($missing.Count -gt 0) { 'Có entity đủ điều kiện nhưng không tìm thấy marker tương ứng trong log render.' } else { 'Mỗi entity eligible trong replay đã có marker trong khoảng quan sát.' }
+        Status = if ($agent.Count -eq 0 -or $renderRows.Count -eq 0) { 'NEED_DEVELOPER' } elseif ($missing.Count -gt 0) { 'FAIL' } else { 'PASS' }
+        MissingMarkerProof = if ($missing.Count -gt 0) { 'Eligible entity has no matching marker in render log.' } else { 'Every eligible replay entity has a marker in the observed render window.' }
     }
     Write-JsonFile (Join-Path $Path 'tracking-analysis.json') $result
     return $result
@@ -254,24 +254,24 @@ function Invoke-Report([string]$Path) {
     if (-not (Test-Path -LiteralPath $analysisPath)) { $null = Invoke-Analyze $Path }
     $a = Get-Content -LiteralPath $analysisPath -Raw | ConvertFrom-Json
     $lines = @(
-        '# KẾT QUẢ TRACKING LOOP',
+        '# TRACKING LOOP RESULT',
         "- Session: $($a.SessionId)",
-        "- Agent frame: $($a.AgentFrames)",
+        "- Agent frames: $($a.AgentFrames)",
         "- Render row: $($a.MapRenderRows)",
         "- Marker sample: $($a.RenderedMarkerSamples)",
-        "- Marker key duy nhất: $($a.DistinctRenderedMarkerKeys)",
-        "- Sequence gap ước tính: $($a.SequenceGapEstimate)",
-        "- UI queue delay tối đa: $($a.MaxUiQueueDelayMs) ms",
-        "- Snapshot age tối đa: $($a.MaxSnapshotAgeMs) ms",
+        "- Distinct marker keys: $($a.DistinctRenderedMarkerKeys)",
+        "- Estimated sequence gaps: $($a.SequenceGapEstimate)",
+        "- Max UI queue delay: $($a.MaxUiQueueDelayMs) ms",
+        "- Max snapshot age: $($a.MaxSnapshotAgeMs) ms",
         "- Pro tracking active rows: $($a.ProTrackingActiveRows)",
-        "- Entity hợp lệ: $($a.EligibleEntityObservations)",
-        "- Entity hiển thị đủ: $($a.RenderedEligibleObservations)",
-        "- Entity thiếu marker: $($a.MissingEligibleObservations)",
-        "- Entity bị loại: $($a.RejectedEntityObservations)",
+        "- Eligible entity observations: $($a.EligibleEntityObservations)",
+        "- Rendered eligible observations: $($a.RenderedEligibleObservations)",
+        "- Missing marker observations: $($a.MissingEligibleObservations)",
+        "- Rejected entity observations: $($a.RejectedEntityObservations)",
         "- P50 latency marker: $($a.P50MarkerLatencyMs) ms",
         "- P95 latency marker: $($a.P95MarkerLatencyMs) ms",
         "- Ground truth: $($a.GroundTruthPath)",
-        "- Trạng thái: $($a.Status)",
+        "- Status: $($a.Status)",
         '',
         $a.MissingMarkerProof
     )
@@ -301,7 +301,7 @@ function Remove-PassedRawArtifacts {
         $analysisPath = Join-Path $_.FullName 'tracking-analysis.json'
         if (-not (Test-Path -LiteralPath $analysisPath)) { return }
         $analysis = Get-Content -LiteralPath $analysisPath -Raw | ConvertFrom-Json
-        if ($analysis.Status -eq 'ĐÃ THU THẬP') {
+        if ($analysis.Status -eq 'PASS') {
             Remove-Item -LiteralPath (Join-Path $_.FullName 'raw-capture') -Recurse -Force -ErrorAction SilentlyContinue
         }
     }
@@ -338,12 +338,12 @@ switch ($Command) {
         $analysis = Invoke-Analyze $path
         $fixturePath = New-RegressionFixture $path $analysis
         Invoke-Report $path
-        if ($analysis.Status -eq 'CẦN DEVELOPER') {
-            Write-Host "fix-loop: CẦN DEVELOPER; fixture đã lưu tại $fixturePath"
+        if ($analysis.Status -eq 'NEED_DEVELOPER') {
+            Write-Host "fix-loop: NEED_DEVELOPER; fixture saved at $fixturePath"
         } elseif ($analysis.Status -eq 'PASS') {
-            Write-Host "fix-loop: replay baseline PASS; fixture đã lưu tại $fixturePath. Live smoke 3 phiên vẫn bắt buộc trước commit."
+            Write-Host "fix-loop: replay baseline PASS; fixture saved at $fixturePath. Three live smoke sessions are still required before commit."
         } else {
-            Write-Host "fix-loop: divergence được tái hiện; fixture đã lưu tại $fixturePath. Không tự sửa nhiều root cause trong cùng vòng."
+            Write-Host "fix-loop: divergence reproduced; fixture saved at $fixturePath. One root cause per iteration."
         }
     }
 }

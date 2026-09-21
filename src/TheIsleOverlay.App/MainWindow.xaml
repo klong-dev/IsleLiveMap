@@ -180,6 +180,11 @@
                                    FontFamily="Bahnschrift SemiCondensed" FontSize="7.2"
                                    FontWeight="SemiBold" Margin="0,2,0,0"
                                    TextTrimming="CharacterEllipsis" MaxWidth="270" />
+                        <TextBlock x:Name="RemoteTrackingDiagnosticsLabel"
+                                   Visibility="Collapsed" Foreground="#B8C8C5"
+                                   FontFamily="Bahnschrift SemiCondensed" FontSize="7"
+                                   Margin="0,1,0,0" TextTrimming="CharacterEllipsis"
+                                   MaxWidth="270" />
                     </StackPanel>
                 </Border>
 
