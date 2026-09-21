@@ -8,7 +8,9 @@ param(
     [string]$SessionId,
     [int]$DurationMinutes = 5,
     [switch]$KeepPassedRaw,
-    [switch]$LaunchInstalledApp
+    [switch]$LaunchInstalledApp,
+    [switch]$RestartLauncher,
+    [string]$LauncherPath
 )
 
 $ErrorActionPreference = 'Stop'
@@ -126,8 +128,19 @@ function New-Session {
         Write-Warning 'Base preflight failed: Npcap, Pro credential, or Pro Agent executable is unavailable. IslePilot credential is optional for Pro tracking.'
     }
     if ($LaunchInstalledApp) {
-        $exe = Join-Path $env:LOCALAPPDATA 'IsleLiveMap\current\IsleLiveMap.exe'
+        $exe = if ([string]::IsNullOrWhiteSpace($LauncherPath)) {
+            Join-Path $env:LOCALAPPDATA 'IsleLiveMap\current\IsleLiveMap.exe'
+        } else {
+            [System.IO.Path]::GetFullPath($LauncherPath)
+        }
         if (-not (Test-Path -LiteralPath $exe)) { throw "Không tìm thấy app đã cài: $exe" }
+        if ($RestartLauncher) {
+            Get-Process -Name 'IsleLiveMap.Pro.Agent' -ErrorAction SilentlyContinue |
+                Stop-Process -Force -ErrorAction SilentlyContinue
+            Get-Process -Name 'IsleLiveMap' -ErrorAction SilentlyContinue |
+                Stop-Process -Force -ErrorAction SilentlyContinue
+            Start-Sleep -Milliseconds 500
+        }
         Start-Process -FilePath $exe | Out-Null
         Write-Host 'Installed app launched. Enter the game/server and AFK.'
     }
