@@ -269,7 +269,8 @@ public sealed class ProAccessService : IDisposable
         installation is not null,
         installation?.Version,
         session.OfflineLicenseExpiresAt,
-        statusCode);
+        statusCode,
+        session.OfflineLicenseToken);
 
     private ProAccessSnapshot SetState(
         StoredProSession? session,

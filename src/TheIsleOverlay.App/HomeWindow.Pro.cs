@@ -186,6 +186,9 @@ public partial class HomeWindow
 
     private void ApplyProAccessState(ProAccessSnapshot access)
     {
+        App.CurrentTeam.ConfigureAccess(
+            access.Entitlement.IsProAt(DateTimeOffset.UtcNow) ? TeamAccessTier.Pro : TeamAccessTier.Free,
+            access.EntitlementProof);
         var now = DateTimeOffset.UtcNow;
         var presentation = HomeProPresentationPolicy.Evaluate(access, now);
         ApplyHomePresentationTheme(presentation.HasCurrentProAccess);
@@ -316,23 +319,23 @@ public partial class HomeWindow
         var palette = premium
             ? new Dictionary<string, string>(StringComparer.Ordinal)
             {
-                ["HomeSurface"] = "#F20C0A06",
-                ["HomePanel"] = "#D0151008",
-                ["HomePanelSoft"] = "#B81A1408",
-                ["HomeInputSurface"] = "#AD100D07",
-                ["HomeBone"] = "#FFF5D8",
-                ["HomeMuted"] = "#C9B984",
-                ["HomeSubtle"] = "#927F55",
-                ["HomeLine"] = "#5C4720",
-                ["HomeLineStrong"] = "#8E6C24",
-                ["HomeShellLine"] = "#8A745131",
-                ["HomeAccent"] = "#E6B94C",
-                ["HomeAccentBright"] = "#FFE5A0",
-                ["HomeAccentDeep"] = "#3B2A07",
-                ["HomeSelection"] = "#6AE6B94C",
-                ["HomeButtonFill"] = "#D03A2A08",
-                ["HomeHover"] = "#2B2008",
-                ["HomePressed"] = "#47330A"
+                ["HomeSurface"] = "#F210171B",
+                ["HomePanel"] = "#D0162026",
+                ["HomePanelSoft"] = "#B817252B",
+                ["HomeInputSurface"] = "#AD10191E",
+                ["HomeBone"] = "#EAF0F1",
+                ["HomeMuted"] = "#A8B6BB",
+                ["HomeSubtle"] = "#81929A",
+                ["HomeLine"] = "#3A4C55",
+                ["HomeLineStrong"] = "#546B75",
+                ["HomeShellLine"] = "#6A73858C",
+                ["HomeAccent"] = "#C7A66A",
+                ["HomeAccentBright"] = "#E7D1A2",
+                ["HomeAccentDeep"] = "#3B3020",
+                ["HomeSelection"] = "#6AC7A66A",
+                ["HomeButtonFill"] = "#C52D332F",
+                ["HomeHover"] = "#26333A",
+                ["HomePressed"] = "#36464D"
             }
             : new Dictionary<string, string>(StringComparer.Ordinal)
             {

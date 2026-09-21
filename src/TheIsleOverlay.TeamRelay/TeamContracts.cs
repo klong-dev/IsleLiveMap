@@ -2,9 +2,34 @@ using System.Text.Json.Serialization;
 
 namespace TheIsleOverlay.TeamRelay;
 
-public sealed record CreateTeamRequest(string DisplayName);
+public enum TeamAccessTier
+{
+    Free = 0,
+    Pro = 1
+}
 
-public sealed record JoinTeamRequest(string InviteCode, string DisplayName);
+public static class TeamRoomLimits
+{
+    public const int FreeMaxMembers = 7;
+    public const int ProMaxMembers = 21;
+
+    public static int For(TeamAccessTier tier) =>
+        tier == TeamAccessTier.Pro ? ProMaxMembers : FreeMaxMembers;
+}
+
+// The relay must validate Tier against the authenticated entitlement. The
+// client-provided value is only a capability hint and never a security grant.
+public sealed record CreateTeamRequest(
+    string DisplayName,
+    TeamAccessTier Tier = TeamAccessTier.Free,
+    int RequestedMaxMembers = TeamRoomLimits.FreeMaxMembers,
+    string? EntitlementProof = null);
+
+public sealed record JoinTeamRequest(
+    string InviteCode,
+    string DisplayName,
+    TeamAccessTier Tier = TeamAccessTier.Free,
+    string? EntitlementProof = null);
 
 public sealed record TeamSession(
     Guid TeamId,

@@ -1,3 +1,25 @@
+# Isle Live Map 2.3.0
+
+## Nhóm sinh tồn và hỗ trợ cộng đồng
+
+- Thêm tab `NHÓM SINH TỒN` ngay sau Trang chủ với luồng tạo phòng, vào phòng, copy mã mời, xem trạng thái relay và rời phòng trong cùng workspace.
+- Phòng Free có giới hạn 7 người tính cả chủ phòng; phòng Pro có giới hạn 21 người. Client truyền tier/quota hint qua contract relay; relay production phải xác thực entitlement server-side trước khi cấp `MaxMembers`.
+- Thêm tab `LIÊN HỆ & BÁO LỖI` trước Hướng dẫn với Facebook Hoàng Kim Long, Zalo 0705 8787 81 và QR nhóm Góp ý - Báo lỗi.
+- Trang Pro đưa `ĐĂNG NHẬP / XÁC MINH` lên đầu, kèm `ĐĂNG KÝ PRO` mở https://isle.klong.dev.
+- Việt hóa trạng thái nhóm, tier phòng và thông báo lỗi chính trong launcher.
+
+# Isle Live Map 2.2.7
+
+## Launcher workspace dễ đọc hơn
+
+- Làm lại các nút server riêng trên Trang chủ với nền màu riêng, logo và tên server căn giữa trong đúng vùng nút: GACHA xanh lá nhạt, ORIGIN 5x xanh dương nhạt.
+- Tinh chỉnh nền server thành màu pastel đặc, mờ nhạt nhẹ và dễ nhận biết trên ảnh nền; không còn hiệu ứng xuyên thấu làm mất màu nút.
+- Rút gọn nhãn quyền Pro ở sidebar thành `PRO ĐANG BẬT` để không tràn, vẫn giữ tên trợ năng đầy đủ.
+- Tăng độ rộng rail ghi chú phiên bản, tăng tương phản, cỡ chữ và line-height; nội dung mở rộng dễ quét hơn.
+- Làm lại trang `PHÍM TẮT`: mỗi shortcut là một hàng riêng có hierarchy rõ, ô nhập nhận tổ hợp phím trực tiếp, trạng thái `HỢP LỆ` / `BỊ TRÙNG` / `CHƯA GÁN` / `KHÔNG HỢP LỆ`, nút mặc định gọn và footer lưu thay đổi.
+- Việt hóa toàn bộ nhãn thao tác mới và giữ các thay đổi trong workspace inline, không mở modal shortcut.
+- Đồng bộ nhãn Pro ngắn gọn trên title bar với sidebar, tránh lặp hoặc tràn trạng thái.
+
 # Isle Live Map 2.2.3
 
 ## Bản đồ nước tùy biến và HUD dễ đọc hơn

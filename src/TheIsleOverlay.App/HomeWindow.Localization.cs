@@ -22,6 +22,7 @@ public partial class HomeWindow
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
             LocalizationStatusLabel.Text = $"Chưa đọc được cấu hình ngôn ngữ: {exception.Message}";
+            LocalizationTabStatusLabel.Text = LocalizationStatusLabel.Text;
         }
     }
 
@@ -45,6 +46,7 @@ public partial class HomeWindow
         LocalizationStatusLabel.Text = locale == GameLocale.Vietnamese
             ? "Đang xác minh build, tải và cài resource Tiếng Việt…"
             : "Đang chuyển game về English…";
+        LocalizationTabStatusLabel.Text = LocalizationStatusLabel.Text;
         try
         {
             using var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(45) };
@@ -66,6 +68,7 @@ public partial class HomeWindow
         {
             LocalizationStatusLabel.Foreground = new SolidColorBrush(Color.FromRgb(0xEF, 0x8D, 0x7C));
             LocalizationStatusLabel.Text = FriendlyLocalizationError(exception);
+            LocalizationTabStatusLabel.Text = LocalizationStatusLabel.Text;
         }
         finally
         {
@@ -85,6 +88,7 @@ public partial class HomeWindow
         VietnameseLocaleButton.Opacity = locale == GameLocale.Vietnamese ? 1d : 0.72d;
         LocalizationStatusLabel.Foreground = (Brush)FindResource("HomeMuted");
         LocalizationStatusLabel.Text = $"ĐANG DÙNG: {(locale == GameLocale.Vietnamese ? "TIẾNG VIỆT" : "ENGLISH")} · {detail}";
+        LocalizationTabStatusLabel.Text = LocalizationStatusLabel.Text;
     }
 
     private static string FriendlyLocalizationError(Exception exception) => exception switch

@@ -17,9 +17,12 @@ public sealed class HomeProPresentationPolicyTests
         var presentation = HomeProPresentationPolicy.Evaluate(access, Now);
 
         Assert.True(presentation.HasCurrentProAccess);
+        Assert.True(presentation.IsPremiumMode);
         Assert.True(presentation.IsVerified);
+        Assert.Equal("PRO ĐANG HOẠT ĐỘNG", presentation.TierLabel);
+        Assert.Equal("PRO ĐANG HOẠT ĐỘNG · TRỢ LÝ SẴN SÀNG", presentation.StatusLabel);
         Assert.False(presentation.ShowPromotion);
-        Assert.Equal("MỞ MAP PRO", presentation.MapTitle);
+        Assert.Equal("KHÔNG GIAN THEO DÕI PRO", presentation.MapTitle);
         Assert.Equal("MỞ MAP PRO  →", presentation.MapAction);
     }
 
@@ -33,9 +36,11 @@ public sealed class HomeProPresentationPolicyTests
         var presentation = HomeProPresentationPolicy.Evaluate(access, Now);
 
         Assert.True(presentation.HasCurrentProAccess);
+        Assert.True(presentation.IsPremiumMode);
         Assert.False(presentation.IsVerified);
+        Assert.Equal("PRO ĐANG HOẠT ĐỘNG · TRỢ LÝ ĐANG CHỜ", presentation.StatusLabel);
         Assert.False(presentation.ShowPromotion);
-        Assert.Equal("MỞ MAP PRO", presentation.MapTitle);
+        Assert.Equal("KHÔNG GIAN THEO DÕI PRO", presentation.MapTitle);
     }
 
     [Fact]
@@ -48,9 +53,11 @@ public sealed class HomeProPresentationPolicyTests
         var presentation = HomeProPresentationPolicy.Evaluate(access, Now);
 
         Assert.False(presentation.HasCurrentProAccess);
+        Assert.False(presentation.IsPremiumMode);
         Assert.False(presentation.IsVerified);
         Assert.True(presentation.ShowPromotion);
-        Assert.Equal("MỞ LIVE MAP", presentation.MapTitle);
+        Assert.False(presentation.IsPremiumMode);
+        Assert.Equal("MỞ TRÌNH THEO DÕI", presentation.MapTitle);
         Assert.Equal("MỞ MAP  →", presentation.MapAction);
     }
 

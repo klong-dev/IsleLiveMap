@@ -58,7 +58,7 @@ public partial class HomeWindow
         SetTeamBusy(true, "ĐANG TẠO NHÓM…");
         try
         {
-            await App.CurrentTeam.CreateAsync(displayName, _shutdown.Token);
+            await App.CurrentTeam.CreateAsync(displayName, _proPresentation.HasCurrentProAccess ? TeamAccessTier.Pro : TeamAccessTier.Free, _shutdown.Token);
             TeamErrorLabel.Text = "Nhóm đã sẵn sàng. Gửi mã mời cho bạn bè.";
         }
         catch (OperationCanceledException) when (_shutdown.IsCancellationRequested)
@@ -91,7 +91,7 @@ public partial class HomeWindow
         SetTeamBusy(true, "ĐANG VÀO NHÓM…");
         try
         {
-            await App.CurrentTeam.JoinAsync(inviteCode, displayName, _shutdown.Token);
+            await App.CurrentTeam.JoinAsync(inviteCode, displayName, _proPresentation.HasCurrentProAccess ? TeamAccessTier.Pro : TeamAccessTier.Free, _shutdown.Token);
             TeamErrorLabel.Text = "Đã vào nhóm. Mở overlay để chia sẻ vị trí và status.";
         }
         catch (OperationCanceledException) when (_shutdown.IsCancellationRequested)

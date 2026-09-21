@@ -63,7 +63,7 @@ public partial class HomeWindow
             _originConnecting = false;
             if (OriginStatsButton is not null)
             {
-                OriginStatsButton.Content = "ORIGIN x5 · STATS + PRIME";
+                OriginStatsButton.Content = "ORIGIN";
             }
 
             RefreshMapLaunchControls();

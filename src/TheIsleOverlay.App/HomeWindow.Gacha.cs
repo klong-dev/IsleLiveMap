@@ -291,10 +291,8 @@ public partial class HomeWindow
 
         var authenticated = _gachaCredentials is not null;
         GachaStatsButton.Content = _gachaConnecting
-            ? "GACHA STATS · ĐANG KẾT NỐI…"
-            : authenticated
-                ? "GACHA · PHIÊN ĐÃ LƯU"
-                : "ĐĂNG NHẬP GACHA · LẦN ĐẦU";
+            ? "GACHA · ĐANG KẾT NỐI…"
+            : "GACHA";
         GachaStatsButton.IsEnabled = !_gachaConnecting
                                      && !_connecting
                                      && !_islePilotConnecting

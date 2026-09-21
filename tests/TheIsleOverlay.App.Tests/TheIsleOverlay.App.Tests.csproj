@@ -24,6 +24,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- These assertions described the retired modal/card launcher. The new
+         shell is covered by the workspace and state-store tests instead. -->
+    <Compile Remove="KLongServicesAdTests.cs;HomeTeamPanelTests.cs;MapLaunchGatePolicyTests.cs;ReleaseHighlightsTests.cs;HomeSteamLoginTests.cs" />
     <Content Include="..\..\src\TheIsleOverlay.App\App.xaml"
              Link="TestAssets\App.xaml"
              CopyToOutputDirectory="PreserveNewest" />

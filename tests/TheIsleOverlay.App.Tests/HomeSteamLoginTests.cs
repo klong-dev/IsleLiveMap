@@ -6,6 +6,39 @@ namespace TheIsleOverlay.App.Tests;
 public sealed class HomeSteamLoginTests
 {
     [Fact]
+    public void Home_UsesTabbedShellWithReleaseRailAndNoGithubPromotion()
+    {
+        var document = XDocument.Load(Path.Combine(
+            AppContext.BaseDirectory,
+            "TestAssets",
+            "HomeWindow.xaml"));
+        XName nameAttribute = "{http://schemas.microsoft.com/winfx/2006/xaml}Name";
+
+        var navigation = document.Descendants()
+            .Where(element => string.Equals((string?)element.Attribute(nameAttribute), "HomeTabButton", StringComparison.Ordinal))
+            .Concat(document.Descendants().Where(element => string.Equals((string?)element.Attribute(nameAttribute), "InfoTabButton", StringComparison.Ordinal)))
+            .Concat(document.Descendants().Where(element => string.Equals((string?)element.Attribute(nameAttribute), "LocalizationTabButton", StringComparison.Ordinal)))
+            .Concat(document.Descendants().Where(element => string.Equals((string?)element.Attribute(nameAttribute), "ShortcutTabButton", StringComparison.Ordinal)))
+            .Concat(document.Descendants().Where(element => string.Equals((string?)element.Attribute(nameAttribute), "SettingsTabButton", StringComparison.Ordinal)))
+            .Concat(document.Descendants().Where(element => string.Equals((string?)element.Attribute(nameAttribute), "GuideTabButton", StringComparison.Ordinal)))
+            .ToArray();
+        Assert.Equal(6, navigation.Length);
+        Assert.Contains(document.Descendants(), element => (string?)element.Attribute("Content") == "✦   KÍCH HOẠT PRO");
+        Assert.Contains(document.Descendants(), element => string.Equals((string?)element.Attribute(nameAttribute), "ReleaseNoteCard1", StringComparison.Ordinal));
+        Assert.Contains(document.Descendants(), element => string.Equals((string?)element.Attribute(nameAttribute), "ReleaseNoteCard2", StringComparison.Ordinal));
+        Assert.Contains(document.Descendants(), element => string.Equals((string?)element.Attribute(nameAttribute), "ReleaseNoteCard3", StringComparison.Ordinal));
+        Assert.Contains(document.Descendants(), element => string.Equals((string?)element.Attribute(nameAttribute), "HomeWaterToggle", StringComparison.Ordinal));
+        Assert.Contains(document.Descendants(), element => string.Equals((string?)element.Attribute(nameAttribute), "HomeZoneToggle", StringComparison.Ordinal));
+        Assert.Contains(document.Descendants(), element => string.Equals((string?)element.Attribute(nameAttribute), "HomeRoadToggle", StringComparison.Ordinal));
+        Assert.Contains(document.Descendants(), element => string.Equals((string?)element.Attribute(nameAttribute), "HomeResourceToggle", StringComparison.Ordinal));
+        Assert.Contains(document.Descendants(), element => (string?)element.Attribute("Source") == "Assets/ProMapPreview.png");
+        Assert.DoesNotContain("github.com", File.ReadAllText(Path.Combine(
+            AppContext.BaseDirectory,
+            "TestAssets",
+            "HomeWindow.xaml")), StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void Home_UsesIslePilotStatsWithDirectGpsAndRemovesWebsiteSourceBlocks()
     {
         var document = XDocument.Load(Path.Combine(

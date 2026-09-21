@@ -612,6 +612,7 @@ public partial class MainWindow : Window
     private void RenderSnapshot(TelemetrySnapshot snapshot)
     {
         _renderStartedAt = Stopwatch.GetTimestamp();
+        LatestTelemetrySnapshotStore.Shared.Update(snapshot);
         try
         {
             if (snapshot.SessionState == TelemetrySessionState.AuthenticationRequired)

@@ -8,7 +8,7 @@ public sealed class KLongServicesAdTests
     private static readonly string RepositoryRoot = FindRepositoryRoot();
 
     [Fact]
-    public void Startup_ShowsZaloInviteOncePerProcessBeforeProPromotion()
+    public void Startup_DoesNotShowZaloInviteOrPromotionModal()
     {
         var source = File.ReadAllText(Path.Combine(
             RepositoryRoot,
@@ -16,13 +16,10 @@ public sealed class KLongServicesAdTests
             "TheIsleOverlay.App",
             "HomeWindow.xaml.cs"));
 
-        var preferenceIndex = source.IndexOf("zaloInvitePreferences.ShouldShow()", StringComparison.Ordinal);
-        var oneShotIndex = source.IndexOf("TryMarkZaloChannelInviteShown", StringComparison.Ordinal);
-        var proIndex = source.IndexOf("ShowProPromotionIfNeeded();", oneShotIndex, StringComparison.Ordinal);
-
-        Assert.True(preferenceIndex >= 0);
-        Assert.True(oneShotIndex > preferenceIndex);
-        Assert.True(proIndex > oneShotIndex);
+        Assert.DoesNotContain("KLongServicesAdWindow", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("ShowProPromotionIfNeeded", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("ReleaseHighlightsWindow", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("GuideWindow", source, StringComparison.Ordinal);
     }
 
     [Fact]
