@@ -388,6 +388,15 @@ public partial class HomeWindow : Window
         var credentials = await store.LoadAsync(_shutdown.Token);
         if (credentials is null)
         {
+            var proPresentation = HomeProPresentationPolicy.Evaluate(
+                _pro,
+                DateTimeOffset.UtcNow);
+            if (proPresentation.IsVerified)
+            {
+                OpenProOnlyOverlay();
+                return;
+            }
+
             var login = new IslePilotSteamLoginWindow { Owner = this };
             if (login.ShowDialog() != true || login.Credentials is null)
             {
@@ -427,6 +436,30 @@ public partial class HomeWindow : Window
         catch (Exception ex)
         {
             SetStatus($"Không mở được phiên: {ex.Message}");
+        }
+    }
+
+    private void OpenProOnlyOverlay()
+    {
+        var proPlayerSource = _proService.CreateRemotePlayerSource();
+        try
+        {
+            var overlay = new MainWindow(
+                new LocalPositionTelemetrySession(
+                    remoteSession: null,
+                    localSource: App.CurrentApp.TakeLocalTelemetrySource(),
+                    sourceName: "PRO",
+                    remotePlayerSource: proPlayerSource),
+                "PRO",
+                ProFeatureAccessGrant.FromSnapshot(_pro, DateTimeOffset.UtcNow));
+            Application.Current.MainWindow = overlay;
+            overlay.Show();
+            Close();
+        }
+        catch
+        {
+            proPlayerSource?.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            throw;
         }
     }
 
