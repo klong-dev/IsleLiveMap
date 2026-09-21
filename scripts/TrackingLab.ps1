@@ -291,11 +291,45 @@ function Invoke-Analyze([string]$Path) {
     $agentUiLatencies = [System.Collections.Generic.List[double]]::new()
     $missing = [System.Collections.Generic.List[object]]::new()
     $entityStates = @{}
+    $stageCounters = [ordered]@{
+        CandidateActors = 0
+        SpeciesEvidenceActors = 0
+        LocatedActors = 0
+        InboundPlayers = 0
+        InboundAi = 0
+        FusedPlayers = 0
+        FusedAi = 0
+        NearbyPlayers = 0
+        UnmatchedInbound = 0
+        UnmatchedPresence = 0
+        BlockedNoProof = 0
+        BlockedFusionOrValidation = 0
+    }
+    $hasStageEvidence = $false
     foreach ($frame in $agent) {
         $frameAt = Get-DateTimeOffsetOrNull $(if ($frame.ReceivedAt) { $frame.ReceivedAt } else { $frame.ObservedAt })
         $endpoint = if ([string]::IsNullOrWhiteSpace([string]$frame.ServerEndpoint)) { 'unknown' } else { [string]$frame.ServerEndpoint }
         if (-not $seenByEndpoint.ContainsKey($endpoint)) { $seenByEndpoint[$endpoint] = 1 }
         $entities = @($frame.RemoteEntities)
+        if ($null -ne $frame.evidence -or $null -ne $frame.ongoingCandidates) {
+            $hasStageEvidence = $true
+            if ($frame.evidence) {
+                $stageCounters.CandidateActors += [int]$frame.evidence.candidateActors
+                $stageCounters.SpeciesEvidenceActors += [int]$frame.evidence.speciesEvidenceActors
+                $stageCounters.LocatedActors += [int]$frame.evidence.locatedActors
+            }
+            $stageCounters.InboundPlayers += @($frame.inboundPlayers).Count
+            $stageCounters.InboundAi += @($frame.inboundAi).Count
+            $stageCounters.FusedPlayers += @($frame.mapOutputPlayers).Count
+            $stageCounters.FusedAi += @($frame.mapOutputAi).Count
+            $stageCounters.NearbyPlayers += @($frame.islePilot.nearbyPlayers).Count
+            $stageCounters.UnmatchedInbound += @($frame.fusion.unmatchedInboundTrackIds).Count
+            $stageCounters.UnmatchedPresence += @($frame.fusion.unmatchedPresenceTrackIds).Count
+            foreach ($candidate in @($frame.ongoingCandidates)) {
+                if ([string]$candidate.decision -eq 'blocked-no-exact-player-proof') { $stageCounters.BlockedNoProof++ }
+                if ([string]$candidate.decision -eq 'blocked-by-fusion-or-validation') { $stageCounters.BlockedFusionOrValidation++ }
+            }
+        }
         foreach ($entity in $entities) {
             $eligible = Test-EligibleEntity $entity $frame
             $key = Get-EntityKey $entity $endpoint $seenByEndpoint[$endpoint]
@@ -400,8 +434,10 @@ function Invoke-Analyze([string]$Path) {
         P95AgentToUiLatencyMs = Get-Percentile $agentUiLatencies.ToArray() 0.95
         MissingEntities = $missing
         GroundTruthPath = (Join-Path $Path 'replay-ground-truth.jsonl')
-        Status = if ($agent.Count -eq 0 -or $renderRows.Count -eq 0) { 'NEED_DEVELOPER' } elseif ($missing.Count -gt 0) { 'FAIL' } else { 'PASS' }
-        MissingMarkerProof = if ($missing.Count -gt 0) { 'Eligible entity has no matching marker in render log.' } else { 'Every eligible replay entity has a marker in the observed render window.' }
+        StageEvidenceAvailable = $hasStageEvidence
+        StageCounters = $stageCounters
+        Status = if ($agent.Count -eq 0 -or $renderRows.Count -eq 0) { 'NEED_DEVELOPER' } elseif (-not $hasStageEvidence) { 'NEED_STAGE_EVIDENCE' } elseif ($missing.Count -gt 0) { 'FAIL' } else { 'PASS' }
+        MissingMarkerProof = if (-not $hasStageEvidence) { 'Capture predates stage-level recorder schema; no claim about audio/candidate loss is allowed.' } elseif ($missing.Count -gt 0) { 'Eligible entity has no matching marker in render log.' } else { 'Every eligible replay entity has a marker in the observed render window.' }
     }
     Write-JsonFile (Join-Path $Path 'tracking-analysis.json') $result
     return $result
@@ -448,6 +484,8 @@ function Invoke-Report([string]$Path) {
         "- Rendered eligible observations: $($a.RenderedEligibleObservations)",
         "- Missing marker observations: $($a.MissingEligibleObservations)",
         "- Rejected entity observations: $($a.RejectedEntityObservations)",
+        "- Stage evidence available: $($a.StageEvidenceAvailable)",
+        "- Stage counters: $(($a.StageCounters | ConvertTo-Json -Compress) -replace "`r?`n", '')",
         "- P50 latency marker: $($a.P50MarkerLatencyMs) ms",
         "- P95 latency marker: $($a.P95MarkerLatencyMs) ms",
         "- P50 capture -> decode: $($a.P50CaptureDecodeLatencyMs) ms",
