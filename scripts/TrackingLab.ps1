@@ -197,11 +197,25 @@ function Get-EntityKey($Entity, [string]$Endpoint, [long]$Generation = 1) {
     return "$Generation`:$Endpoint`:$kind`:$($Entity.TrackId)"
 }
 
-function Test-EligibleEntity($Entity) {
+function Get-EntityDistanceFromLocal($Entity, $Frame) {
+    if ($null -eq $Entity.Location -or $null -eq $Frame.LocalLocation) { return $null }
+    $dx = [double]$Entity.Location.X - [double]$Frame.LocalLocation.X
+    $dy = [double]$Entity.Location.Y - [double]$Frame.LocalLocation.Y
+    $dz = ([double]$(if ($null -eq $Entity.Location.Z) { 0 } else { $Entity.Location.Z })) -
+          ([double]$(if ($null -eq $Frame.LocalLocation.Z) { 0 } else { $Frame.LocalLocation.Z }))
+    return [Math]::Sqrt(($dx * $dx) + ($dy * $dy) + ($dz * $dz))
+}
+
+function Test-EligibleEntity($Entity, $Frame) {
     if ($null -eq $Entity -or [long]$Entity.TrackId -le 0) { return $false }
     $kind = $Entity.Kind.ToString().ToLowerInvariant()
     $location = $Entity.Location
     if ($null -eq $location -or $null -eq $location.X -or $null -eq $location.Y) { return $false }
+    # Keep the harness eligibility policy aligned with the merger's explicit
+    # distance gate.  An entity outside the visible tracking radius is not a
+    # missing marker; it is a verified rejection that must be reported as such.
+    $distance = Get-EntityDistanceFromLocal $Entity $Frame
+    if ($null -ne $distance -and $distance -gt 100000) { return $false }
     if ($kind -eq 'ai') {
         return -not [string]::IsNullOrWhiteSpace([string]$Entity.SpeciesId) -and
             -not [string]::IsNullOrWhiteSpace([string]$Entity.SpeciesShortName)
@@ -214,6 +228,17 @@ function Test-EligibleEntity($Entity) {
         return -not [string]::IsNullOrWhiteSpace([string]$Entity.PlayerProofName)
     }
     return $false
+}
+
+function Get-EntityRejectionReason($Entity, $Frame) {
+    if ($null -eq $Entity -or [long]$Entity.TrackId -le 0) { return 'InvalidTrackId' }
+    if ($null -eq $Entity.Location -or $null -eq $Entity.Location.X -or $null -eq $Entity.Location.Y) { return 'InvalidCoordinate' }
+    $distance = Get-EntityDistanceFromLocal $Entity $Frame
+    if ($null -ne $distance -and $distance -gt 100000) { return 'TooFarFromLocal' }
+    $kind = $Entity.Kind.ToString().ToLowerInvariant()
+    if ($kind -eq 'ai' -and ([string]::IsNullOrWhiteSpace([string]$Entity.SpeciesId) -or [string]::IsNullOrWhiteSpace([string]$Entity.SpeciesShortName))) { return 'MissingSpecies' }
+    if ($kind -eq 'player' -and -not [bool]$Entity.IsProvisional -and [string]::IsNullOrWhiteSpace([string]$Entity.PlayerProofName)) { return 'MissingPlayerProof' }
+    return 'ValidationOrProof'
 }
 
 function Get-RenderedKey($Marker) {
@@ -232,10 +257,14 @@ function Get-Percentile([double[]]$Values, [double]$Percentile) {
 }
 
 function Invoke-Analyze([string]$Path) {
-    $agentPath = Join-Path $Path 'agent-live-compare.jsonl'
-    $mapPath = Join-Path $Path 'map-diagnostics.jsonl'
-    if (-not (Test-Path -LiteralPath $agentPath)) { $agentPath = Join-Path $Path 'raw-capture\agent-live-compare.jsonl' }
-    if (-not (Test-Path -LiteralPath $mapPath)) { $mapPath = Join-Path $Path 'raw-capture\map-diagnostics.jsonl' }
+    # Analyze the immutable capture snapshot when one exists.  The launcher
+    # may remain open after `capture` returns, so reading the live files here
+    # would mix the requested session with later frames and create false
+    # lifecycle/missing-marker failures.
+    $agentPath = Join-Path $Path 'raw-capture\agent-live-compare.jsonl'
+    $mapPath = Join-Path $Path 'raw-capture\map-diagnostics.jsonl'
+    if (-not (Test-Path -LiteralPath $agentPath)) { $agentPath = Join-Path $Path 'agent-live-compare.jsonl' }
+    if (-not (Test-Path -LiteralPath $mapPath)) { $mapPath = Join-Path $Path 'map-diagnostics.jsonl' }
     $agent = @(Read-JsonLines $agentPath)
     $map = @(Read-JsonLines $mapPath)
     $renderRows = @($map | Where-Object { $_.stage -eq 'render-end' })
@@ -264,13 +293,23 @@ function Invoke-Analyze([string]$Path) {
         if (-not $seenByEndpoint.ContainsKey($endpoint)) { $seenByEndpoint[$endpoint] = 1 }
         $entities = @($frame.RemoteEntities)
         foreach ($entity in $entities) {
-            $eligible = Test-EligibleEntity $entity
+            $eligible = Test-EligibleEntity $entity $frame
             $key = Get-EntityKey $entity $endpoint $seenByEndpoint[$endpoint]
             $render = $null
             $identityPrefix = "pro-entity:$($entity.Kind.ToString().ToLowerInvariant()):$($entity.TrackId)"
             if ($eligible) {
+                # Rendered marker keys intentionally carry a visual namespace
+                # (currently `steam:pro-entity:...#slot`).  Ground truth keys
+                # must not depend on that namespace or a provisional slot: the
+                # stable identity for replay matching is entity kind + TrackId.
+                # The previous prefix check assumed the key started directly
+                # with `pro-entity`, so every valid marker was falsely reported
+                # as missing when the runtime added the `steam:` namespace.
+                $kindName = $entity.Kind.ToString().ToLowerInvariant()
+                $trackIdText = [regex]::Escape([string]$entity.TrackId)
+                $renderKeyPattern = "(^|:)pro-entity:$kindName`:$trackIdText(#|$)"
                 $candidates = @($renderIndex.Keys |
-                    Where-Object { $_ -eq $identityPrefix -or $_.StartsWith("$identityPrefix#", [StringComparison]::Ordinal) } |
+                    Where-Object { $_ -match $renderKeyPattern } |
                     ForEach-Object { $renderIndex[$_] })
                 if ($null -ne $frameAt) {
                     if ($candidates.Count -gt 0) {
@@ -294,7 +333,7 @@ function Invoke-Analyze([string]$Path) {
                 State = $state
                 RenderedAt = if ($render) { $render.At } else { $null }
                 LatencyMs = if ($render -and $frameAt) { [Math]::Round(($render.At - $frameAt).TotalMilliseconds, 2) } else { $null }
-                RejectionReason = if ($eligible) { $null } else { 'ValidationOrProof' }
+                RejectionReason = if ($eligible) { $null } else { Get-EntityRejectionReason $entity $frame }
             }
             $groundTruth.Add($line)
             if ($eligible) {
