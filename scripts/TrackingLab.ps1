@@ -189,7 +189,10 @@ function Read-JsonLines([string]$Path) {
     if (-not (Test-Path -LiteralPath $Path)) { return @() }
     Get-Content -LiteralPath $Path | ForEach-Object {
         if ([string]::IsNullOrWhiteSpace($_)) { return }
-        try { $_ | ConvertFrom-Json } catch { }
+        # Preserve ISO timestamps as strings. PowerShell's default JSON date
+        # conversion truncates fractional seconds to whole seconds, making
+        # capture/decode and Agent/UI latency appear as exactly 0 ms.
+        try { $_ | ConvertFrom-Json -DateKind String } catch { }
     }
 }
 
