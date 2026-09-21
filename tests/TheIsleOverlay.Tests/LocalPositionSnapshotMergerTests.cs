@@ -612,17 +612,16 @@ public sealed class LocalPositionSnapshotMergerTests
 
         var diagnostics = Assert.IsType<RemoteTrackingDiagnostics>(merged.ProTrackingDiagnostics);
         Assert.Equal(6, diagnostics.ReceivedCount);
-        Assert.Equal(1, diagnostics.RenderedCount);
-        Assert.Equal(5, diagnostics.RejectedCount);
+        Assert.Equal(2, diagnostics.RenderedCount);
+        Assert.Equal(4, diagnostics.RejectedCount);
         Assert.Equal(1, diagnostics.Rejections[RemoteEntityRejectionReason.InvalidTrackId]);
         Assert.Equal(1, diagnostics.Rejections[RemoteEntityRejectionReason.MissingSpecies]);
         Assert.Equal(1, diagnostics.Rejections[RemoteEntityRejectionReason.MissingPlayerProof]);
         Assert.Equal(1, diagnostics.Rejections[RemoteEntityRejectionReason.InvalidCoordinate]);
-        Assert.Equal(1, diagnostics.Rejections[RemoteEntityRejectionReason.TooFarFromLocal]);
     }
 
     [Fact]
-    public void Merge_ReportsDistanceUnavailableWhenRemoteFrameHasNoLocalReference()
+    public void Merge_AcceptsRemoteEntitiesWithoutLocalDistanceReference()
     {
         var entity = new VerifiedRemoteEntityTelemetry(
             99, RemoteEntityKind.Ai, null, "rex", "Rex", CreatureDiet.Carnivore,
@@ -634,11 +633,8 @@ public sealed class LocalPositionSnapshotMergerTests
             Now,
             remotePlayers: [entity]);
 
-        Assert.Equal(1, merged.ProTrackingDiagnostics?.RejectedCount);
-        Assert.Equal(
-            1,
-            merged.ProTrackingDiagnostics?.Rejections[
-                RemoteEntityRejectionReason.DistanceCheckUnavailable]);
+        Assert.Equal(1, merged.ProTrackingDiagnostics?.RenderedCount);
+        Assert.Equal(0, merged.ProTrackingDiagnostics?.RejectedCount);
     }
 
     [Fact]
@@ -784,7 +780,7 @@ public sealed class LocalPositionSnapshotMergerTests
     }
 
     [Fact]
-    public void Merge_CullsTransportedEntitiesUsingFreshHostGps()
+    public void Merge_PreservesTransportedEntitiesUsingFreshHostGps()
     {
         var local = Observation(100_000, -240_000, 30_000, 45);
         VerifiedRemoteEntityTelemetry[] entities =
@@ -834,9 +830,10 @@ public sealed class LocalPositionSnapshotMergerTests
             remotePlayers: entities);
 
         var markers = merged.Map!.Markers;
-        Assert.Equal(2, markers.Count);
+        Assert.Equal(3, markers.Count);
         Assert.Contains(markers, marker => marker.SteamId == "pro-entity:player:51");
         Assert.Contains(markers, marker => marker.SteamId == "pro-entity:ai:53");
+        Assert.Contains(markers, marker => marker.SteamId == "pro-entity:player:52");
     }
 
     private static LocalMovementObservation Observation(

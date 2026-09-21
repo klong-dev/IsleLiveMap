@@ -10,9 +10,6 @@ public static class LocalPositionSnapshotMerger
     // prevents this grace period from becoming a substitute for queueing the
     // newest position frame; diagnostics still expose the actual frame age.
     public static readonly TimeSpan RemotePlayerFreshness = TimeSpan.FromSeconds(6);
-    // Unreal coordinates are centimetres: 100,000 units = 1 kilometre.
-    public const double MaximumRemoteEntityDistance = 100_000d;
-
     public static TelemetrySnapshot Merge(
         TelemetrySnapshot? remote,
         LocalMovementObservation? local,
@@ -153,18 +150,10 @@ public static class LocalPositionSnapshotMerger
 
         var mergedRemote = remotePlayers is not null
                            && (hasFreshLocal || hasFreshVerifiedFallback || hasFreshRemoteFrame)
-            ? MergeRemotePlayers(
-                baseSnapshot.Map,
-                remotePlayers,
-                location!,
-                hasFreshLocal || hasFreshVerifiedFallback || hasFreshRemoteFrame)
+            ? MergeRemotePlayers(baseSnapshot.Map, remotePlayers)
             : remotePlayers is not null
-                ? MergeRemotePlayers(
-                    baseSnapshot.Map,
-                    remotePlayers,
-                    location ?? new WorldLocation(),
-                    hasDistanceReference: false)
-            : null;
+                ? MergeRemotePlayers(baseSnapshot.Map, remotePlayers)
+                : null;
 
         return baseSnapshot with
         {
@@ -275,9 +264,7 @@ public static class LocalPositionSnapshotMerger
 
     private static RemoteMergeResult MergeRemotePlayers(
         MapTelemetry? map,
-        IReadOnlyList<VerifiedRemoteEntityTelemetry>? remotePlayers,
-        WorldLocation localLocation,
-        bool hasDistanceReference)
+        IReadOnlyList<VerifiedRemoteEntityTelemetry>? remotePlayers)
     {
         if (remotePlayers is null)
         {
@@ -303,7 +290,7 @@ public static class LocalPositionSnapshotMerger
         var proMarkers = new List<MapMarkerTelemetry>();
         foreach (var entity in remotePlayers)
         {
-            if (!TryGetRejectionReason(entity, hasDistanceReference, localLocation, seen, out var reason))
+            if (!TryGetRejectionReason(entity, seen, out var reason))
             {
                 eligible++;
                 var speciesLabel = string.IsNullOrWhiteSpace(entity.SpeciesShortName)
@@ -351,8 +338,6 @@ public static class LocalPositionSnapshotMerger
 
     private static bool TryGetRejectionReason(
         VerifiedRemoteEntityTelemetry entity,
-        bool hasDistanceReference,
-        WorldLocation localLocation,
         HashSet<string> seen,
         out RemoteEntityRejectionReason reason)
     {
@@ -399,31 +384,8 @@ public static class LocalPositionSnapshotMerger
             return true;
         }
 
-        if (!hasDistanceReference)
-        {
-            reason = RemoteEntityRejectionReason.DistanceCheckUnavailable;
-            return true;
-        }
-
-        if (!IsWithinRemoteEntityDistance(entity.Location, localLocation))
-        {
-            reason = RemoteEntityRejectionReason.TooFarFromLocal;
-            return true;
-        }
-
         reason = default;
         return false;
-    }
-
-    private static bool IsWithinRemoteEntityDistance(
-        WorldLocation entity,
-        WorldLocation local)
-    {
-        var deltaX = entity.X - local.X;
-        var deltaY = entity.Y - local.Y;
-        var deltaZ = (entity.Z ?? 0d) - (local.Z ?? 0d);
-        return deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ
-               <= MaximumRemoteEntityDistance * MaximumRemoteEntityDistance;
     }
 
     private static bool IsFinite(WorldLocation location) =>

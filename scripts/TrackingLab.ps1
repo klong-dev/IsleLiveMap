@@ -203,25 +203,11 @@ function Get-EntityKey($Entity, [string]$Endpoint, [long]$Generation = 1) {
     return "$Generation`:$Endpoint`:$kind`:$($Entity.TrackId)"
 }
 
-function Get-EntityDistanceFromLocal($Entity, $Frame) {
-    if ($null -eq $Entity.Location -or $null -eq $Frame.LocalLocation) { return $null }
-    $dx = [double]$Entity.Location.X - [double]$Frame.LocalLocation.X
-    $dy = [double]$Entity.Location.Y - [double]$Frame.LocalLocation.Y
-    $dz = ([double]$(if ($null -eq $Entity.Location.Z) { 0 } else { $Entity.Location.Z })) -
-          ([double]$(if ($null -eq $Frame.LocalLocation.Z) { 0 } else { $Frame.LocalLocation.Z }))
-    return [Math]::Sqrt(($dx * $dx) + ($dy * $dy) + ($dz * $dz))
-}
-
 function Test-EligibleEntity($Entity, $Frame) {
     if ($null -eq $Entity -or [long]$Entity.TrackId -le 0) { return $false }
     $kind = $Entity.Kind.ToString().ToLowerInvariant()
     $location = $Entity.Location
     if ($null -eq $location -or $null -eq $location.X -or $null -eq $location.Y) { return $false }
-    # Keep the harness eligibility policy aligned with the merger's explicit
-    # distance gate.  An entity outside the visible tracking radius is not a
-    # missing marker; it is a verified rejection that must be reported as such.
-    $distance = Get-EntityDistanceFromLocal $Entity $Frame
-    if ($null -ne $distance -and $distance -gt 100000) { return $false }
     if ($kind -eq 'ai') {
         return -not [string]::IsNullOrWhiteSpace([string]$Entity.SpeciesId) -and
             -not [string]::IsNullOrWhiteSpace([string]$Entity.SpeciesShortName)
@@ -239,8 +225,6 @@ function Test-EligibleEntity($Entity, $Frame) {
 function Get-EntityRejectionReason($Entity, $Frame) {
     if ($null -eq $Entity -or [long]$Entity.TrackId -le 0) { return 'InvalidTrackId' }
     if ($null -eq $Entity.Location -or $null -eq $Entity.Location.X -or $null -eq $Entity.Location.Y) { return 'InvalidCoordinate' }
-    $distance = Get-EntityDistanceFromLocal $Entity $Frame
-    if ($null -ne $distance -and $distance -gt 100000) { return 'TooFarFromLocal' }
     $kind = $Entity.Kind.ToString().ToLowerInvariant()
     if ($kind -eq 'ai' -and ([string]::IsNullOrWhiteSpace([string]$Entity.SpeciesId) -or [string]::IsNullOrWhiteSpace([string]$Entity.SpeciesShortName))) { return 'MissingSpecies' }
     if ($kind -eq 'player' -and -not [bool]$Entity.IsProvisional -and [string]::IsNullOrWhiteSpace([string]$Entity.PlayerProofName)) { return 'MissingPlayerProof' }

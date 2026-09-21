@@ -63,12 +63,14 @@ public enum RemoteEntityRejectionReason
     InvalidCoordinate = 4,
     WrongServer = 5,
     SessionMismatch = 6,
+    [Obsolete("Distance is diagnostic-only; remote entities are no longer rejected by range.")]
     TooFarFromLocal = 7,
     Duplicate = 8,
     LocalCollision = 9,
     UnsupportedKind = 10,
     Stale = 11,
-    DistanceCheckUnavailable = 12
+    [Obsolete("Distance is diagnostic-only; remote entities are no longer rejected by range.")]
+    DistanceCheckUnavailable = 12,
 }
 
 public sealed record RemoteTrackingDiagnostics
