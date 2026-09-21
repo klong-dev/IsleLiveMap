@@ -39,8 +39,26 @@ function Test-Preflight {
         (Join-Path $env:SystemRoot 'System32\wpcap.dll'),
         (Join-Path $env:SystemRoot 'SysWOW64\wpcap.dll')
     ) | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
-    $credential = Join-Path $env:LOCALAPPDATA 'IsleLiveMap\islepilot-credentials.json'
-    $ready = $null -ne $game -and $null -ne $agent -and $null -ne $npcapDll -and (Test-Path -LiteralPath $credential)
+    $appRoot = Join-Path $env:LOCALAPPDATA 'KLongDev\IsleLiveMap'
+    $islePilotCredential = Join-Path $appRoot 'islepilot-overlay.credential'
+    $proCredential = Join-Path $appRoot 'pro-access.credential'
+    $proRoot = Join-Path $appRoot 'Pro'
+    $descriptorPath = Join-Path $proRoot 'current.json'
+    $agentVersion = $null
+    if (Test-Path -LiteralPath $descriptorPath) {
+        try { $agentVersion = (Get-Content -LiteralPath $descriptorPath -Raw | ConvertFrom-Json).version } catch { }
+    }
+    $agentExecutable = if ([string]::IsNullOrWhiteSpace([string]$agentVersion)) {
+        Join-Path $proRoot 'current\IsleLiveMap.Pro.Agent.exe'
+    } else {
+        Join-Path $proRoot "versions\$agentVersion\IsleLiveMap.Pro.Agent.exe"
+    }
+    $ready = $true
+    $ready = $ready -and ($null -ne $game)
+    $ready = $ready -and ($null -ne $agent)
+    $ready = $ready -and ($null -ne $npcapDll)
+    $ready = $ready -and (Test-Path -LiteralPath $proCredential)
+    $ready = $ready -and (Test-Path -LiteralPath $agentExecutable)
     [pscustomobject]@{
         CheckedAt = [DateTimeOffset]::UtcNow
         Ready = $ready
@@ -50,7 +68,13 @@ function Test-Preflight {
         ProAgentPid = if ($agent) { $agent.Id } else { $null }
         NpcapLibraryFound = $null -ne $npcapDll
         NpcapLibrary = $npcapDll
-        IslePilotCredentialFileFound = Test-Path -LiteralPath $credential
+        IslePilotCredentialFileFound = Test-Path -LiteralPath $islePilotCredential
+        IslePilotCredentialPath = $islePilotCredential
+        ProCredentialFileFound = Test-Path -LiteralPath $proCredential
+        ProCredentialPath = $proCredential
+        ProAgentExecutableFound = Test-Path -LiteralPath $agentExecutable
+        ProAgentExecutablePath = $agentExecutable
+        ProAgentVersion = $agentVersion
     }
 }
 
@@ -58,7 +82,9 @@ function Test-BasePreflight {
     $full = Test-Preflight
     [pscustomobject]@{
         CheckedAt = $full.CheckedAt
-        Ready = $full.NpcapLibraryFound -and $full.IslePilotCredentialFileFound
+        Ready = [bool]($full.NpcapLibraryFound -and
+                 $full.ProCredentialFileFound -and
+                 $full.ProAgentExecutableFound)
         GameProcessFound = $full.GameProcessFound
         GamePid = $full.GamePid
         ProAgentFound = $full.ProAgentFound
@@ -66,6 +92,12 @@ function Test-BasePreflight {
         NpcapLibraryFound = $full.NpcapLibraryFound
         NpcapLibrary = $full.NpcapLibrary
         IslePilotCredentialFileFound = $full.IslePilotCredentialFileFound
+        IslePilotCredentialPath = $full.IslePilotCredentialPath
+        ProCredentialFileFound = $full.ProCredentialFileFound
+        ProCredentialPath = $full.ProCredentialPath
+        ProAgentExecutableFound = $full.ProAgentExecutableFound
+        ProAgentExecutablePath = $full.ProAgentExecutablePath
+        ProAgentVersion = $full.ProAgentVersion
         LiveReady = $full.Ready
         PreflightScope = 'base'
     }
@@ -91,7 +123,7 @@ function New-Session {
     Write-Host "Session: $id"
     Write-Host "Artifacts: $path"
     if (-not $preflight.Ready) {
-        Write-Warning 'Base preflight failed: Npcap or credential is unavailable. No bypass; capture will stop.'
+        Write-Warning 'Base preflight failed: Npcap, Pro credential, or Pro Agent executable is unavailable. IslePilot credential is optional for Pro tracking.'
     }
     if ($LaunchInstalledApp) {
         $exe = Join-Path $env:LOCALAPPDATA 'IsleLiveMap\current\IsleLiveMap.exe'
@@ -112,7 +144,7 @@ function Invoke-Capture([string]$Path) {
         $manifest | Add-Member -NotePropertyName Status -NotePropertyValue 'NEED_DEVELOPER' -Force
         $manifest | Add-Member -NotePropertyName StoppedReason -NotePropertyValue 'Preflight failed; no bypass.' -Force
         Write-JsonFile $manifestPath $manifest
-        Write-Warning 'Capture stopped because live preflight is not ready. Start the game and Pro Agent, then retry capture.'
+        Write-Warning 'Capture stopped because live Pro preflight is not ready. Open Live Map to start the Agent, then retry capture.'
         return
     }
     $seconds = [Math]::Max(60, $DurationMinutes * 60)
