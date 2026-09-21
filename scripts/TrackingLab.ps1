@@ -187,13 +187,26 @@ function Invoke-Capture([string]$Path) {
 
 function Read-JsonLines([string]$Path) {
     if (-not (Test-Path -LiteralPath $Path)) { return @() }
-    Get-Content -LiteralPath $Path | ForEach-Object {
-        if ([string]::IsNullOrWhiteSpace($_)) { return }
+    $items = [System.Collections.Generic.List[object]]::new()
+    $contents = [System.IO.File]::ReadAllLines($Path)
+    foreach ($line in $contents) {
+        if ([string]::IsNullOrWhiteSpace($line)) { continue }
         # Preserve ISO timestamps as strings. PowerShell's default JSON date
         # conversion truncates fractional seconds to whole seconds, making
         # capture/decode and Agent/UI latency appear as exactly 0 ms.
-        try { $_ | ConvertFrom-Json -DateKind String } catch { }
+        try {
+            # Windows PowerShell 5.1 has no -DateKind parameter. Keep the
+            # raw ISO strings there; the analyzer parses timestamps explicitly
+            # and therefore does not need PowerShell's date conversion.
+            if ($PSVersionTable.PSVersion.Major -ge 6) {
+                $value = ConvertFrom-Json -InputObject $line -DateKind String
+            } else {
+                $value = ConvertFrom-Json -InputObject $line
+            }
+            $null = $items.Add($value)
+        } catch { }
     }
+    foreach ($item in $items) { Write-Output -NoEnumerate $item }
 }
 
 function Get-DateTimeOffsetOrNull($Value) {
@@ -310,7 +323,15 @@ function Invoke-Analyze([string]$Path) {
         $frameAt = Get-DateTimeOffsetOrNull $(if ($frame.ReceivedAt) { $frame.ReceivedAt } else { $frame.ObservedAt })
         $endpoint = if ([string]::IsNullOrWhiteSpace([string]$frame.ServerEndpoint)) { 'unknown' } else { [string]$frame.ServerEndpoint }
         if (-not $seenByEndpoint.ContainsKey($endpoint)) { $seenByEndpoint[$endpoint] = 1 }
-        $entities = @($frame.RemoteEntities)
+        # The live recorder stores the post-fusion output in separate player
+        # and AI lanes. Keep compatibility with older captures, but never
+        # silently treat a new-schema frame as an empty roster.
+        $entities = if ($null -ne $frame.mapOutputPlayers -or
+                        $null -ne $frame.mapOutputAi) {
+            @($frame.mapOutputPlayers) + @($frame.mapOutputAi)
+        } else {
+            @($frame.RemoteEntities)
+        }
         if ($null -ne $frame.evidence -or $null -ne $frame.ongoingCandidates) {
             $hasStageEvidence = $true
             if ($frame.evidence) {
