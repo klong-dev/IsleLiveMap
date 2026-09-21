@@ -51,12 +51,29 @@ function Test-Preflight {
     }
 }
 
+function Test-BasePreflight {
+    $full = Test-Preflight
+    [pscustomobject]@{
+        CheckedAt = $full.CheckedAt
+        Ready = $full.NpcapLibraryFound -and $full.IslePilotCredentialFileFound
+        GameProcessFound = $full.GameProcessFound
+        GamePid = $full.GamePid
+        ProAgentFound = $full.ProAgentFound
+        ProAgentPid = $full.ProAgentPid
+        NpcapLibraryFound = $full.NpcapLibraryFound
+        NpcapLibrary = $full.NpcapLibrary
+        IslePilotCredentialFileFound = $full.IslePilotCredentialFileFound
+        LiveReady = $full.Ready
+        PreflightScope = 'base'
+    }
+}
+
 function New-Session {
     New-Item -ItemType Directory -Force -Path $SessionRoot | Out-Null
     $id = if ($SessionId) { $SessionId } else { "session-{0:yyyyMMdd-HHmmss}-{1}" -f (Get-Date), ([Guid]::NewGuid().ToString('N').Substring(0, 6)) }
     $path = Join-Path $SessionRoot $id
     New-Item -ItemType Directory -Force -Path $path, (Join-Path $path 'raw-capture'), (Join-Path $path 'screenshots') | Out-Null
-    $preflight = Test-Preflight
+    $preflight = Test-BasePreflight
     Write-JsonFile (Join-Path $path 'preflight.json') $preflight
     Write-JsonFile (Join-Path $path 'session-manifest.json') ([pscustomobject]@{
         SessionId = $id
@@ -71,7 +88,7 @@ function New-Session {
     Write-Host "Session: $id"
     Write-Host "Artifacts: $path"
     if (-not $preflight.Ready) {
-        Write-Warning 'Preflight failed: Pro Agent, Npcap, game/Agent state, or credential is unavailable. No bypass; capture will stop.'
+        Write-Warning 'Base preflight failed: Npcap or credential is unavailable. No bypass; capture will stop.'
     }
     if ($LaunchInstalledApp) {
         $exe = Join-Path $env:LOCALAPPDATA 'IsleLiveMap\current\IsleLiveMap.exe'
@@ -92,7 +109,7 @@ function Invoke-Capture([string]$Path) {
         $manifest | Add-Member -NotePropertyName Status -NotePropertyValue 'NEED_DEVELOPER' -Force
         $manifest | Add-Member -NotePropertyName StoppedReason -NotePropertyValue 'Preflight failed; no bypass.' -Force
         Write-JsonFile $manifestPath $manifest
-        Write-Warning 'Capture stopped because preflight is not ready. Start the game and Pro Agent, then create a new session.'
+        Write-Warning 'Capture stopped because live preflight is not ready. Start the game and Pro Agent, then retry capture.'
         return
     }
     $seconds = [Math]::Max(60, $DurationMinutes * 60)
