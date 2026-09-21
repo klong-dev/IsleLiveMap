@@ -37,8 +37,10 @@ function Test-Preflight {
         (Join-Path $env:SystemRoot 'SysWOW64\wpcap.dll')
     ) | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
     $credential = Join-Path $env:LOCALAPPDATA 'IsleLiveMap\islepilot-credentials.json'
+    $ready = $null -ne $game -and $null -ne $agent -and $null -ne $npcapDll -and (Test-Path -LiteralPath $credential)
     [pscustomobject]@{
         CheckedAt = [DateTimeOffset]::UtcNow
+        Ready = $ready
         GameProcessFound = $null -ne $game
         GamePid = if ($game) { $game.Id } else { $null }
         ProAgentFound = $null -ne $agent
@@ -68,8 +70,8 @@ function New-Session {
     $env:ISLE_MAP_DIAGNOSTICS_PATH = Join-Path $path 'map-diagnostics.jsonl'
     Write-Host "Session: $id"
     Write-Host "Artifacts: $path"
-    if (-not $preflight.NpcapLibraryFound -or -not $preflight.IslePilotCredentialFileFound) {
-        Write-Warning 'Npcap or IslePilot credential not found. No bypass; live tracking may not start.'
+    if (-not $preflight.Ready) {
+        Write-Warning 'Preflight failed: Pro Agent, Npcap, game/Agent state, or credential is unavailable. No bypass; capture will stop.'
     }
     if ($LaunchInstalledApp) {
         $exe = Join-Path $env:LOCALAPPDATA 'IsleLiveMap\current\IsleLiveMap.exe'
@@ -81,6 +83,18 @@ function New-Session {
 }
 
 function Invoke-Capture([string]$Path) {
+    $preflightPath = Join-Path $Path 'preflight.json'
+    $preflight = Test-Preflight
+    Write-JsonFile $preflightPath $preflight
+    if (-not $preflight.Ready) {
+        $manifestPath = Join-Path $Path 'session-manifest.json'
+        $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+        $manifest | Add-Member -NotePropertyName Status -NotePropertyValue 'NEED_DEVELOPER' -Force
+        $manifest | Add-Member -NotePropertyName StoppedReason -NotePropertyValue 'Preflight failed; no bypass.' -Force
+        Write-JsonFile $manifestPath $manifest
+        Write-Warning 'Capture stopped because preflight is not ready. Start the game and Pro Agent, then create a new session.'
+        return
+    }
     $seconds = [Math]::Max(60, $DurationMinutes * 60)
     Write-Host "Capturing for $DurationMinutes minutes. No game input is sent."
     Start-Sleep -Seconds $seconds
@@ -90,6 +104,12 @@ function Invoke-Capture([string]$Path) {
     $manifest | Add-Member -NotePropertyName CaptureFiles -NotePropertyValue @(
         'agent-live-compare.jsonl', 'map-diagnostics.jsonl'
     ) -Force
+    foreach ($name in @('agent-live-compare.jsonl', 'map-diagnostics.jsonl')) {
+        $source = Join-Path $Path $name
+        if (Test-Path -LiteralPath $source) {
+            Copy-Item -LiteralPath $source -Destination (Join-Path $Path "raw-capture\$name") -Force
+        }
+    }
     Write-JsonFile $manifestPath $manifest
     Write-Host "Capture complete: $Path"
 }

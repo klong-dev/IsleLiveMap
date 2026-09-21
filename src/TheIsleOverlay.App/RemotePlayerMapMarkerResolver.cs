@@ -58,7 +58,8 @@ internal static class RemotePlayerMapMarkerResolver
                 resolvedPoint,
                 category,
                 entityKind,
-                marker.ProEntityIsProvisional));
+                marker.ProEntityIsProvisional,
+                marker.ProEntityIsStale));
         }
 
         return result;
@@ -157,7 +158,8 @@ internal readonly record struct RemotePlayerMapMarker(
     MapPoint Point,
     RemoteEntityMapCategory Category,
     RemoteEntityKind EntityKind,
-    bool IsProvisional);
+    bool IsProvisional,
+    bool IsStale);
 
 internal enum RemoteEntityMapCategory
 {

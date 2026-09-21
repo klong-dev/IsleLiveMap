@@ -33,6 +33,7 @@ public sealed record MapMarkerTelemetry
     public CreatureDiet? ProCreatureDiet { get; init; }
     public double? CreatureMassKg { get; init; }
     public bool ProEntityIsProvisional { get; init; }
+    public bool ProEntityIsStale { get; init; }
 }
 
 public sealed record MapPointOfInterestTelemetry

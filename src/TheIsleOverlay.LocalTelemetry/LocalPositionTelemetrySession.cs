@@ -188,8 +188,23 @@ public sealed class LocalPositionTelemetrySession : ITelemetrySession
                 {
                     merged = merged with
                     {
+                        Map = ApplyRemoteLifecycleToMap(merged.Map, lifecycle),
+                        ProPlayerTrackingActive = _remotePlayerSource is not null,
                         ProTrackingDiagnostics = trackingDiagnostics with
                         {
+                            Lifecycle = lifecycle
+                        }
+                    };
+                }
+                else if (_remotePlayerSource is not null)
+                {
+                    merged = merged with
+                    {
+                        Map = ApplyRemoteLifecycleToMap(merged.Map, lifecycle),
+                        ProPlayerTrackingActive = true,
+                        ProTrackingDiagnostics = new RemoteTrackingDiagnostics
+                        {
+                            FrameState = "no-frame",
                             Lifecycle = lifecycle
                         }
                     };
@@ -378,6 +393,62 @@ public sealed class LocalPositionTelemetrySession : ITelemetrySession
     private sealed record RemotePlayersAvailableEvent : SessionEvent
     {
         public static RemotePlayersAvailableEvent Instance { get; } = new();
+    }
+
+    private static MapTelemetry? ApplyRemoteLifecycleToMap(
+        MapTelemetry? map,
+        IReadOnlyList<RemoteEntityLifecycleSnapshot> lifecycle)
+    {
+        if (map is null || lifecycle.Count == 0)
+        {
+            return map;
+        }
+
+        var byTrack = lifecycle
+            .GroupBy(item => (item.Kind, item.TrackId))
+            .ToDictionary(group => group.Key, group => group.Last());
+        var markers = map.Markers
+            .Where(marker =>
+            {
+                if (marker.ProEntityKind is not { } kind
+                    || !TryGetTrackId(marker.SteamId, out var trackId))
+                {
+                    return true;
+                }
+
+                return !byTrack.TryGetValue((kind, trackId), out var state)
+                       || state.State != RemoteEntityLifecycleState.Removed;
+            })
+            .Select(marker =>
+            {
+                if (marker.ProEntityKind is not { } kind
+                    || !TryGetTrackId(marker.SteamId, out var trackId)
+                    || !byTrack.TryGetValue((kind, trackId), out var state))
+                {
+                    return marker;
+                }
+
+                return marker with
+                {
+                    ProEntityIsStale = state.State is RemoteEntityLifecycleState.Stale
+                        or RemoteEntityLifecycleState.TemporarilyMissing
+                };
+            })
+            .ToArray();
+        return map with { Markers = markers };
+    }
+
+    private static bool TryGetTrackId(string? steamId, out long trackId)
+    {
+        trackId = 0;
+        if (string.IsNullOrWhiteSpace(steamId))
+        {
+            return false;
+        }
+
+        var separator = steamId.LastIndexOf(':');
+        return separator >= 0
+               && long.TryParse(steamId[(separator + 1)..], out trackId);
     }
     private sealed record RemotePlayersFailureEvent(string Message) : SessionEvent;
     private sealed record TickEvent : SessionEvent

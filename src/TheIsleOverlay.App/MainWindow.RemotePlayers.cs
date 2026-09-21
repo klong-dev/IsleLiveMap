@@ -80,6 +80,9 @@ public partial class MainWindow
                 ApplyPalette(dot, marker.Category);
                 ApplyProvisionalStyle(dot, marker.IsProvisional);
             }
+            dot.Visual.Opacity = marker.IsStale
+                ? 0.42d
+                : marker.IsProvisional ? 0.82d : 1d;
         }
 
         foreach (var key in _remotePlayerMapDots.Keys
