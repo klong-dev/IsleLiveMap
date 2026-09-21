@@ -48,11 +48,13 @@ public static class LocalPositionSnapshotMerger
                                        && IsFinite(fallback.LocalLocation)
             && double.IsFinite(fallback.MapHeadingDegrees);
         var hasFreshRemoteFrame = hasFreshVerifiedFallback && remotePlayers is not null;
+        var hasRemoteInput = remotePlayers is not null;
         if (requireFreshLocalMovement
             && !hasFreshLocal
             && !hasFreshVerifiedFallback
             && !useLocalVitals
-            && !hasFreshRemoteFrame)
+            && !hasFreshRemoteFrame
+            && !hasRemoteInput)
         {
             return remote is null
                 ? Waiting(sourceName)
@@ -64,7 +66,7 @@ public static class LocalPositionSnapshotMerger
                     StatusMessage = "Đang chờ The Isle và dữ liệu movement cục bộ."
                 };
         }
-        if (!hasFreshLocal && !hasFreshVerifiedFallback && !useLocalVitals)
+        if (!hasFreshLocal && !hasFreshVerifiedFallback && !useLocalVitals && !hasRemoteInput)
         {
             if (remote?.Player is { } previousPlayer
                 && string.Equals(
@@ -149,6 +151,21 @@ public static class LocalPositionSnapshotMerger
         // look globally live. Preserve the remote stale marker until refresh.
         var preserveRemoteStaleness = baseSnapshot.LiveDataStale;
 
+        var mergedRemote = remotePlayers is not null
+                           && (hasFreshLocal || hasFreshVerifiedFallback || hasFreshRemoteFrame)
+            ? MergeRemotePlayers(
+                baseSnapshot.Map,
+                remotePlayers,
+                location!,
+                hasFreshLocal || hasFreshVerifiedFallback || hasFreshRemoteFrame)
+            : remotePlayers is not null
+                ? MergeRemotePlayers(
+                    baseSnapshot.Map,
+                    remotePlayers,
+                    location ?? new WorldLocation(),
+                    hasDistanceReference: false)
+            : null;
+
         return baseSnapshot with
         {
             Source = string.IsNullOrWhiteSpace(baseSnapshot.Source)
@@ -160,16 +177,11 @@ public static class LocalPositionSnapshotMerger
             PlayerOnline = true,
             UpdatedAt = observedAt,
             Player = player,
-            Map = remotePlayers is not null
-                  && (hasFreshLocal || hasFreshVerifiedFallback)
-                ? MergeRemotePlayers(
-                    baseSnapshot.Map,
-                    remotePlayers,
-                    location!)
-                : baseSnapshot.Map,
+            Map = mergedRemote?.Map ?? baseSnapshot.Map,
             ProPlayerTrackingActive = remotePlayers is not null,
             ProPlayerSequence = verifiedLocalFallback?.Sequence,
             ProPlayerSync = verifiedLocalFallback?.PlayerSync,
+            ProTrackingDiagnostics = mergedRemote?.Diagnostics ?? baseSnapshot.ProTrackingDiagnostics,
             SessionState = preserveRemoteStaleness
                 ? baseSnapshot.SessionState
                 : TelemetrySessionState.Live,
@@ -257,14 +269,17 @@ public static class LocalPositionSnapshotMerger
         return latest;
     }
 
-    private static MapTelemetry? MergeRemotePlayers(
+    private sealed record RemoteMergeResult(MapTelemetry? Map, RemoteTrackingDiagnostics Diagnostics);
+
+    private static RemoteMergeResult MergeRemotePlayers(
         MapTelemetry? map,
         IReadOnlyList<VerifiedRemoteEntityTelemetry>? remotePlayers,
-        WorldLocation localLocation)
+        WorldLocation localLocation,
+        bool hasDistanceReference)
     {
         if (remotePlayers is null)
         {
-            return map;
+            return new RemoteMergeResult(map, RemoteTrackingDiagnostics.NoFrame);
         }
 
         var providerMarkers = (map?.Markers ?? [])
@@ -280,16 +295,19 @@ public static class LocalPositionSnapshotMerger
         // markers here but is deliberately not copied into MapTelemetry or a
         // label. AI is accepted only when the signed Pro Agent classified an
         // exact non-player fauna archetype.
-        var proMarkers = remotePlayers
-            .Where(entity =>
-                IsMapReady(entity)
-                && IsWithinRemoteEntityDistance(entity.Location, localLocation))
-            .Select(entity =>
+        var rejectionCounts = new Dictionary<RemoteEntityRejectionReason, int>();
+        var eligible = 0;
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var proMarkers = new List<MapMarkerTelemetry>();
+        foreach (var entity in remotePlayers)
+        {
+            if (!TryGetRejectionReason(entity, hasDistanceReference, localLocation, seen, out var reason))
             {
+                eligible++;
                 var speciesLabel = string.IsNullOrWhiteSpace(entity.SpeciesShortName)
                     ? "Player ?"
                     : entity.SpeciesShortName;
-                return new MapMarkerTelemetry
+                proMarkers.Add(new MapMarkerTelemetry
                 {
                     SteamId = $"pro-entity:{entity.Kind.ToString().ToLowerInvariant()}:{entity.TrackId}",
                     Label = CreatureMarkerLabelFormatter.Format(
@@ -303,31 +321,97 @@ public static class LocalPositionSnapshotMerger
                     ProCreatureDiet = entity.Diet,
                     CreatureMassKg = entity.MassKg,
                     ProEntityIsProvisional = entity.IsProvisional
-                };
-            })
-            .ToArray();
-        if (map is null && proMarkers.Length == 0)
+                });
+                continue;
+            }
+
+            rejectionCounts[reason] = rejectionCounts.GetValueOrDefault(reason) + 1;
+        }
+        var diagnostics = new RemoteTrackingDiagnostics
         {
-            return null;
+            ReceivedCount = remotePlayers.Count,
+            EligibleCount = eligible,
+            RenderedCount = proMarkers.Count,
+            RejectedCount = remotePlayers.Count - proMarkers.Count,
+            Rejections = rejectionCounts,
+            FrameState = "frame"
+        };
+        if (map is null && proMarkers.Count == 0)
+        {
+            return new RemoteMergeResult(null, diagnostics);
         }
 
-        return (map ?? new MapTelemetry()) with
+        return new RemoteMergeResult((map ?? new MapTelemetry()) with
         {
             Markers = [.. providerMarkers, .. proMarkers]
-        };
+        }, diagnostics);
     }
 
-    private static bool IsMapReady(VerifiedRemoteEntityTelemetry entity) =>
-        entity.TrackId > 0
-        && (entity.Kind == RemoteEntityKind.Ai
-            && !string.IsNullOrWhiteSpace(entity.SpeciesId)
-            && !string.IsNullOrWhiteSpace(entity.SpeciesShortName)
-            || entity.Kind == RemoteEntityKind.Player
+    private static bool TryGetRejectionReason(
+        VerifiedRemoteEntityTelemetry entity,
+        bool hasDistanceReference,
+        WorldLocation localLocation,
+        HashSet<string> seen,
+        out RemoteEntityRejectionReason reason)
+    {
+        if (entity.TrackId <= 0)
+        {
+            reason = RemoteEntityRejectionReason.InvalidTrackId;
+            return true;
+        }
+
+        if (entity.Kind is not RemoteEntityKind.Player and not RemoteEntityKind.Ai)
+        {
+            reason = RemoteEntityRejectionReason.UnsupportedKind;
+            return true;
+        }
+
+        if (!IsFinite(entity.Location))
+        {
+            reason = RemoteEntityRejectionReason.InvalidCoordinate;
+            return true;
+        }
+
+        if (entity.Kind == RemoteEntityKind.Ai
+            && (string.IsNullOrWhiteSpace(entity.SpeciesId)
+                || string.IsNullOrWhiteSpace(entity.SpeciesShortName)))
+        {
+            reason = RemoteEntityRejectionReason.MissingSpecies;
+            return true;
+        }
+
+        if (entity.Kind == RemoteEntityKind.Player
             && (entity.IsProvisional
-                && !string.IsNullOrWhiteSpace(entity.SpeciesId)
-                && !string.IsNullOrWhiteSpace(entity.SpeciesShortName)
-                || !entity.IsProvisional
-                && !string.IsNullOrWhiteSpace(entity.PlayerProofName)));
+                ? string.IsNullOrWhiteSpace(entity.SpeciesId)
+                  || string.IsNullOrWhiteSpace(entity.SpeciesShortName)
+                : string.IsNullOrWhiteSpace(entity.PlayerProofName)))
+        {
+            reason = RemoteEntityRejectionReason.MissingPlayerProof;
+            return true;
+        }
+
+        var key = $"{entity.Kind}:{entity.TrackId}";
+        if (!seen.Add(key))
+        {
+            reason = RemoteEntityRejectionReason.Duplicate;
+            return true;
+        }
+
+        if (!hasDistanceReference)
+        {
+            reason = RemoteEntityRejectionReason.DistanceCheckUnavailable;
+            return true;
+        }
+
+        if (!IsWithinRemoteEntityDistance(entity.Location, localLocation))
+        {
+            reason = RemoteEntityRejectionReason.TooFarFromLocal;
+            return true;
+        }
+
+        reason = default;
+        return false;
+    }
 
     private static bool IsWithinRemoteEntityDistance(
         WorldLocation entity,

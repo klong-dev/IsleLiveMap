@@ -55,6 +55,39 @@ public sealed record RemotePlayerTelemetryFrame(
     DateTimeOffset? ReceivedAt = null,
     RemotePlayerSyncState? PlayerSync = null);
 
+public enum RemoteEntityRejectionReason
+{
+    InvalidTrackId = 1,
+    MissingPlayerProof = 2,
+    MissingSpecies = 3,
+    InvalidCoordinate = 4,
+    WrongServer = 5,
+    SessionMismatch = 6,
+    TooFarFromLocal = 7,
+    Duplicate = 8,
+    LocalCollision = 9,
+    UnsupportedKind = 10,
+    Stale = 11,
+    DistanceCheckUnavailable = 12
+}
+
+public sealed record RemoteTrackingDiagnostics
+{
+    public int ReceivedCount { get; init; }
+    public int EligibleCount { get; init; }
+    public int RenderedCount { get; init; }
+    public int RejectedCount { get; init; }
+    public IReadOnlyDictionary<RemoteEntityRejectionReason, int> Rejections { get; init; } =
+        new Dictionary<RemoteEntityRejectionReason, int>();
+    public string? FrameState { get; init; }
+    public IReadOnlyList<RemoteEntityLifecycleSnapshot> Lifecycle { get; init; } = [];
+
+    public static RemoteTrackingDiagnostics NoFrame { get; } = new()
+    {
+        FrameState = "no-frame"
+    };
+}
+
 public sealed record RemotePlayerSyncState(
     bool IsSynchronizing,
     int VerifiedPlayers,

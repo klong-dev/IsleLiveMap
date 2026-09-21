@@ -19,6 +19,7 @@ public sealed record TelemetrySnapshot
     public long? ProPlayerSequence { get; init; }
     public RemotePlayerSyncState? ProPlayerSync { get; init; }
     public RemotePlayerCaptureHealth? ProPlayerCaptureHealth { get; init; }
+    public RemoteTrackingDiagnostics? ProTrackingDiagnostics { get; init; }
 }
 
 public sealed record PlayerTelemetry

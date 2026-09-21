@@ -583,6 +583,62 @@ public sealed class LocalPositionSnapshotMergerTests
         var marker = Assert.Single(merged.Map!.Markers);
         Assert.Equal("pro-entity:player:91", marker.SteamId);
         Assert.True(merged.ProPlayerTrackingActive);
+        Assert.Equal(1, merged.ProTrackingDiagnostics?.RenderedCount);
+        Assert.Equal(0, merged.ProTrackingDiagnostics?.RejectedCount);
+    }
+
+    [Fact]
+    public void Merge_ReportsRejectedRemoteEntitiesInsteadOfDroppingSilently()
+    {
+        var local = Observation(0, 0, 0, 0);
+        VerifiedRemoteEntityTelemetry[] entities =
+        [
+            new(0, RemoteEntityKind.Player, "proof", "rex", "Rex", CreatureDiet.Carnivore,
+                null, new WorldLocation { X = 1, Y = 1 }, 1, 1, Now),
+            new(12, RemoteEntityKind.Ai, null, "", "", CreatureDiet.Unknown,
+                null, new WorldLocation { X = 1, Y = 1 }, 1, 1, Now),
+            new(13, RemoteEntityKind.Player, null, "rex", "Rex", CreatureDiet.Carnivore,
+                null, new WorldLocation { X = 1, Y = 1 }, 1, 1, Now),
+            new(14, RemoteEntityKind.Player, "proof", "rex", "Rex", CreatureDiet.Carnivore,
+                null, new WorldLocation { X = double.NaN, Y = 1 }, 1, 1, Now),
+            new(15, RemoteEntityKind.Player, "proof", "rex", "Rex", CreatureDiet.Carnivore,
+                null, new WorldLocation { X = 300_000, Y = 1 }, 1, 1, Now),
+            new(16, RemoteEntityKind.Player, "proof", "rex", "Rex", CreatureDiet.Carnivore,
+                null, new WorldLocation { X = 1, Y = 1 }, 1, 1, Now)
+        ];
+
+        var merged = LocalPositionSnapshotMerger.Merge(
+            null, local, Now, remotePlayers: entities);
+
+        var diagnostics = Assert.IsType<RemoteTrackingDiagnostics>(merged.ProTrackingDiagnostics);
+        Assert.Equal(6, diagnostics.ReceivedCount);
+        Assert.Equal(1, diagnostics.RenderedCount);
+        Assert.Equal(5, diagnostics.RejectedCount);
+        Assert.Equal(1, diagnostics.Rejections[RemoteEntityRejectionReason.InvalidTrackId]);
+        Assert.Equal(1, diagnostics.Rejections[RemoteEntityRejectionReason.MissingSpecies]);
+        Assert.Equal(1, diagnostics.Rejections[RemoteEntityRejectionReason.MissingPlayerProof]);
+        Assert.Equal(1, diagnostics.Rejections[RemoteEntityRejectionReason.InvalidCoordinate]);
+        Assert.Equal(1, diagnostics.Rejections[RemoteEntityRejectionReason.TooFarFromLocal]);
+    }
+
+    [Fact]
+    public void Merge_ReportsDistanceUnavailableWhenRemoteFrameHasNoLocalReference()
+    {
+        var entity = new VerifiedRemoteEntityTelemetry(
+            99, RemoteEntityKind.Ai, null, "rex", "Rex", CreatureDiet.Carnivore,
+            null, new WorldLocation { X = 10, Y = 10 }, 0, 1, Now);
+
+        var merged = LocalPositionSnapshotMerger.Merge(
+            new TelemetrySnapshot { Map = new MapTelemetry() },
+            null,
+            Now,
+            remotePlayers: [entity]);
+
+        Assert.Equal(1, merged.ProTrackingDiagnostics?.RejectedCount);
+        Assert.Equal(
+            1,
+            merged.ProTrackingDiagnostics?.Rejections[
+                RemoteEntityRejectionReason.DistanceCheckUnavailable]);
     }
 
     [Fact]

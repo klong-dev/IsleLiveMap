@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.IO.Pipes;
+using System.Text.Json;
 using TheIsleOverlay.Core;
 
 namespace TheIsleOverlay.ProClient;
@@ -19,6 +20,8 @@ public sealed class ProAgentRemotePlayerSource :
     private readonly string _steamId64;
     private readonly string _offlineLicenseToken;
     private readonly CancellationTokenSource _disposeCancellation = new();
+    private readonly object _compareGate = new();
+    private StreamWriter? _compareWriter;
     private int _watchStarted;
     private int _disposed;
     private RemotePlayerCaptureHealth _captureHealth = RemotePlayerCaptureHealth.Starting;
@@ -202,6 +205,7 @@ public sealed class ProAgentRemotePlayerSource :
                         Message = null
                     });
                 }
+                WriteLiveCompare(telemetry);
                 yield return MapFrame(telemetry);
             }
         }
@@ -217,9 +221,82 @@ public sealed class ProAgentRemotePlayerSource :
         {
             _disposeCancellation.Cancel();
             _disposeCancellation.Dispose();
+            lock (_compareGate)
+            {
+                _compareWriter?.Dispose();
+                _compareWriter = null;
+            }
         }
 
         return ValueTask.CompletedTask;
+    }
+
+    private void WriteLiveCompare(ProTelemetryFrame frame)
+    {
+        var configuredPath = Environment.GetEnvironmentVariable(
+            "ISLELIVEMAP_PRO_LIVE_COMPARE_PATH");
+        if (string.IsNullOrWhiteSpace(configuredPath))
+        {
+            return;
+        }
+
+        try
+        {
+            lock (_compareGate)
+            {
+                if (_compareWriter is null)
+                {
+                    var path = Path.GetFullPath(configuredPath);
+                    Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+                    _compareWriter = new StreamWriter(
+                        new FileStream(path, FileMode.Append, FileAccess.Write, FileShare.ReadWrite),
+                        new System.Text.UTF8Encoding(false))
+                    {
+                        AutoFlush = true
+                    };
+                }
+
+                var record = new
+                {
+                    ReceivedAt = DateTimeOffset.UtcNow,
+                    frame.Sequence,
+                    frame.ObservedAt,
+                    FrameReceivedAt = DateTimeOffset.UtcNow,
+                    frame.ServerEndpoint,
+                    frame.LocalLocation,
+                    frame.PlayerSync,
+                    RemoteEntities = (frame.RemoteEntities ?? []).Select(entity => new
+                    {
+                        entity.TrackId,
+                        Kind = entity.Kind.ToString(),
+                        entity.PlayerProofName,
+                        entity.SpeciesId,
+                        entity.SpeciesShortName,
+                        entity.Diet,
+                        entity.Location,
+                        entity.ObservedAt,
+                        entity.IsProvisional
+                    }).ToArray()
+                };
+                _compareWriter.WriteLine(JsonSerializer.Serialize(record));
+            }
+        }
+        catch (IOException)
+        {
+            lock (_compareGate)
+            {
+                _compareWriter?.Dispose();
+                _compareWriter = null;
+            }
+        }
+        catch (UnauthorizedAccessException)
+        {
+            lock (_compareGate)
+            {
+                _compareWriter?.Dispose();
+                _compareWriter = null;
+            }
+        }
     }
 
     private Process StartAgent(string pipeName)

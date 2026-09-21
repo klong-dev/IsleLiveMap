@@ -102,14 +102,125 @@ function Read-JsonLines([string]$Path) {
     }
 }
 
+function Get-DateTimeOffsetOrNull($Value) {
+    if ($null -eq $Value) { return $null }
+    try { return [DateTimeOffset]::Parse($Value.ToString()) } catch { return $null }
+}
+
+function Get-EntityKey($Entity, [string]$Endpoint, [long]$Generation = 1) {
+    $kind = $Entity.Kind.ToString().ToLowerInvariant()
+    return "$Generation`:$Endpoint`:$kind`:$($Entity.TrackId)"
+}
+
+function Test-EligibleEntity($Entity) {
+    if ($null -eq $Entity -or [long]$Entity.TrackId -le 0) { return $false }
+    $kind = $Entity.Kind.ToString().ToLowerInvariant()
+    $location = $Entity.Location
+    if ($null -eq $location -or $null -eq $location.X -or $null -eq $location.Y) { return $false }
+    if ($kind -eq 'ai') {
+        return -not [string]::IsNullOrWhiteSpace([string]$Entity.SpeciesId) -and
+            -not [string]::IsNullOrWhiteSpace([string]$Entity.SpeciesShortName)
+    }
+    if ($kind -eq 'player') {
+        if ([bool]$Entity.IsProvisional) {
+            return -not [string]::IsNullOrWhiteSpace([string]$Entity.SpeciesId) -and
+                -not [string]::IsNullOrWhiteSpace([string]$Entity.SpeciesShortName)
+        }
+        return -not [string]::IsNullOrWhiteSpace([string]$Entity.PlayerProofName)
+    }
+    return $false
+}
+
+function Get-RenderedKey($Marker) {
+    if ($null -eq $Marker) { return $null }
+    if (-not [string]::IsNullOrWhiteSpace([string]$Marker.Key)) { return [string]$Marker.Key }
+    if (-not [string]::IsNullOrWhiteSpace([string]$Marker.SteamId)) { return [string]$Marker.SteamId }
+    return $null
+}
+
+function Get-Percentile([double[]]$Values, [double]$Percentile) {
+    if ($null -eq $Values -or $Values.Count -eq 0) { return $null }
+    $ordered = @($Values | Sort-Object)
+    $index = [Math]::Ceiling(($ordered.Count * $Percentile)) - 1
+    $index = [Math]::Max(0, [Math]::Min($ordered.Count - 1, $index))
+    return [Math]::Round([double]$ordered[$index], 2)
+}
+
 function Invoke-Analyze([string]$Path) {
     $agent = @(Read-JsonLines (Join-Path $Path 'agent-live-compare.jsonl'))
     $map = @(Read-JsonLines (Join-Path $Path 'map-diagnostics.jsonl'))
     $renderRows = @($map | Where-Object { $_.stage -eq 'render-end' })
     $rendered = @($renderRows | ForEach-Object { @($_.RenderedMarkers) } | Where-Object { $_ })
+    $renderIndex = @{}
+    foreach ($row in $renderRows) {
+        $rowAt = Get-DateTimeOffsetOrNull $row.ReceivedAt
+        foreach ($marker in @($row.RenderedMarkers)) {
+            $key = Get-RenderedKey $marker
+            if ([string]::IsNullOrWhiteSpace($key) -or $null -eq $rowAt) { continue }
+            if (-not $renderIndex.ContainsKey($key)) { $renderIndex[$key] = [System.Collections.Generic.List[object]]::new() }
+            $renderIndex[$key].Add([pscustomobject]@{ At = $rowAt; Marker = $marker })
+        }
+    }
+    $groundTruth = [System.Collections.Generic.List[object]]::new()
+    $eligibleEntities = [System.Collections.Generic.List[object]]::new()
+    $seenByEndpoint = @{}
+    $renderLatencies = [System.Collections.Generic.List[double]]::new()
+    $missing = [System.Collections.Generic.List[object]]::new()
+    $entityStates = @{}
+    foreach ($frame in $agent) {
+        $frameAt = Get-DateTimeOffsetOrNull $(if ($frame.ReceivedAt) { $frame.ReceivedAt } else { $frame.ObservedAt })
+        $endpoint = if ([string]::IsNullOrWhiteSpace([string]$frame.ServerEndpoint)) { 'unknown' } else { [string]$frame.ServerEndpoint }
+        if (-not $seenByEndpoint.ContainsKey($endpoint)) { $seenByEndpoint[$endpoint] = 1 }
+        $entities = @($frame.RemoteEntities)
+        foreach ($entity in $entities) {
+            $eligible = Test-EligibleEntity $entity
+            $key = Get-EntityKey $entity $endpoint $seenByEndpoint[$endpoint]
+            $render = $null
+            if ($eligible -and $renderIndex.ContainsKey("pro-entity:$($entity.Kind.ToString().ToLowerInvariant()):$($entity.TrackId)")) {
+                $candidates = $renderIndex["pro-entity:$($entity.Kind.ToString().ToLowerInvariant()):$($entity.TrackId)"]
+                if ($null -ne $frameAt) {
+                    $render = @($candidates | Where-Object { $_.At -ge $frameAt } | Select-Object -First 1)
+                    if ($render.Count -eq 0) { $render = @($candidates | Select-Object -Last 1) }
+                    if ($render.Count -gt 0) { $render = $render[0] }
+                }
+            }
+            $renderedNow = $null -ne $render
+            $state = if (-not $eligible) { 'Rejected' } elseif ($renderedNow) { 'Visible' } else { 'TemporarilyMissing' }
+            $line = [pscustomobject]@{
+                ReceivedAt = $frameAt
+                Sequence = $frame.Sequence
+                Key = $key
+                TrackId = $entity.TrackId
+                Kind = $entity.Kind
+                Eligible = $eligible
+                Rendered = $renderedNow
+                State = $state
+                RenderedAt = if ($render) { $render.At } else { $null }
+                LatencyMs = if ($render -and $frameAt) { [Math]::Round(($render.At - $frameAt).TotalMilliseconds, 2) } else { $null }
+                RejectionReason = if ($eligible) { $null } else { 'ValidationOrProof' }
+            }
+            $groundTruth.Add($line)
+            if ($eligible) {
+                $eligibleEntities.Add($line)
+                if ($render) { $renderLatencies.Add([double]$line.LatencyMs) } else { $missing.Add($line) }
+            }
+            $entityStates[$key] = $state
+        }
+    }
+    $groundTruth | ForEach-Object { $_ | ConvertTo-Json -Depth 16 -Compress } |
+        Set-Content -LiteralPath (Join-Path $Path 'replay-ground-truth.jsonl') -Encoding UTF8
     $sequences = @($agent | Where-Object { $null -ne $_.Sequence } | ForEach-Object { [long]$_.Sequence })
     $gaps = 0
     for ($i = 1; $i -lt $sequences.Count; $i++) { if ($sequences[$i] -gt ($sequences[$i - 1] + 1)) { $gaps += $sequences[$i] - $sequences[$i - 1] - 1 } }
+    $diagnosticRejections = @{}
+    foreach ($row in $renderRows) {
+        $diagnostic = $row.ProTrackingDiagnostics
+        if ($null -eq $diagnostic) { continue }
+        foreach ($property in $diagnostic.Rejections.PSObject.Properties) {
+            $current = if ($diagnosticRejections.ContainsKey($property.Name)) { [int]$diagnosticRejections[$property.Name] } else { 0 }
+            $diagnosticRejections[$property.Name] = $current + [int]$property.Value
+        }
+    }
     $result = [pscustomobject]@{
         SessionId = (Split-Path $Path -Leaf)
         AnalyzedAt = [DateTimeOffset]::UtcNow
@@ -121,8 +232,18 @@ function Invoke-Analyze([string]$Path) {
         MaxUiQueueDelayMs = if ($renderRows) { ($renderRows | Measure-Object UiQueueDelayMs -Maximum).Maximum } else { $null }
         MaxSnapshotAgeMs = if ($renderRows) { ($renderRows | Measure-Object SnapshotAgeMs -Maximum).Maximum } else { $null }
         ProTrackingActiveRows = @($renderRows | Where-Object ProPlayerTrackingActive).Count
-        Status = if ($agent.Count -eq 0 -or $renderRows.Count -eq 0) { 'CẦN DEVELOPER' } else { 'ĐÃ THU THẬP' }
-        MissingMarkerProof = 'Cần agent-live-compare và map diagnostics cùng timestamp để kết luận eligible entity bị mất.'
+        CapturedPackets = $agent.Count
+        EligibleEntityObservations = $eligibleEntities.Count
+        RenderedEligibleObservations = @($eligibleEntities | Where-Object Rendered).Count
+        MissingEligibleObservations = $missing.Count
+        RejectedEntityObservations = @($groundTruth | Where-Object { -not $_.Eligible }).Count
+        RejectionReasons = $diagnosticRejections
+        P50MarkerLatencyMs = Get-Percentile $renderLatencies.ToArray() 0.50
+        P95MarkerLatencyMs = Get-Percentile $renderLatencies.ToArray() 0.95
+        MissingEntities = $missing
+        GroundTruthPath = (Join-Path $Path 'replay-ground-truth.jsonl')
+        Status = if ($agent.Count -eq 0 -or $renderRows.Count -eq 0) { 'CẦN DEVELOPER' } elseif ($missing.Count -gt 0) { 'FAIL' } else { 'PASS' }
+        MissingMarkerProof = if ($missing.Count -gt 0) { 'Có entity đủ điều kiện nhưng không tìm thấy marker tương ứng trong log render.' } else { 'Mỗi entity eligible trong replay đã có marker trong khoảng quan sát.' }
     }
     Write-JsonFile (Join-Path $Path 'tracking-analysis.json') $result
     return $result
@@ -143,6 +264,13 @@ function Invoke-Report([string]$Path) {
         "- UI queue delay tối đa: $($a.MaxUiQueueDelayMs) ms",
         "- Snapshot age tối đa: $($a.MaxSnapshotAgeMs) ms",
         "- Pro tracking active rows: $($a.ProTrackingActiveRows)",
+        "- Entity hợp lệ: $($a.EligibleEntityObservations)",
+        "- Entity hiển thị đủ: $($a.RenderedEligibleObservations)",
+        "- Entity thiếu marker: $($a.MissingEligibleObservations)",
+        "- Entity bị loại: $($a.RejectedEntityObservations)",
+        "- P50 latency marker: $($a.P50MarkerLatencyMs) ms",
+        "- P95 latency marker: $($a.P95MarkerLatencyMs) ms",
+        "- Ground truth: $($a.GroundTruthPath)",
         "- Trạng thái: $($a.Status)",
         '',
         $a.MissingMarkerProof
@@ -150,6 +278,21 @@ function Invoke-Report([string]$Path) {
     $reportPath = Join-Path $Path 'tracking-report.md'
     $lines | Set-Content -LiteralPath $reportPath -Encoding UTF8
     Write-Host ($lines -join [Environment]::NewLine)
+}
+
+function New-RegressionFixture([string]$Path, $Analysis) {
+    $fixtureRoot = Join-Path $Path 'fixtures'
+    New-Item -ItemType Directory -Force -Path $fixtureRoot | Out-Null
+    $fixturePath = Join-Path $fixtureRoot 'tracking-regression.json'
+    Write-JsonFile $fixturePath ([pscustomobject]@{
+        CreatedAt = [DateTimeOffset]::UtcNow
+        SourceSession = (Split-Path $Path -Leaf)
+        RootCause = if ($Analysis.MissingEligibleObservations -gt 0) { 'eligible-marker-missing' } else { 'no-replay-divergence' }
+        Acceptance = 'Every eligible ground-truth observation must resolve to a rendered marker or an explicit rejection/TTL reason.'
+        MissingEntities = $Analysis.MissingEntities
+        GroundTruthPath = $Analysis.GroundTruthPath
+    })
+    return $fixturePath
 }
 
 function Remove-PassedRawArtifacts {
@@ -193,7 +336,14 @@ switch ($Command) {
     'fix-loop' {
         $path = Resolve-Session
         $analysis = Invoke-Analyze $path
+        $fixturePath = New-RegressionFixture $path $analysis
         Invoke-Report $path
-        Write-Host 'fix-loop hiện dừng sau baseline/analyze: chỉ tiếp tục sửa khi analysis có fixture tái hiện được root cause.'
+        if ($analysis.Status -eq 'CẦN DEVELOPER') {
+            Write-Host "fix-loop: CẦN DEVELOPER; fixture đã lưu tại $fixturePath"
+        } elseif ($analysis.Status -eq 'PASS') {
+            Write-Host "fix-loop: replay baseline PASS; fixture đã lưu tại $fixturePath. Live smoke 3 phiên vẫn bắt buộc trước commit."
+        } else {
+            Write-Host "fix-loop: divergence được tái hiện; fixture đã lưu tại $fixturePath. Không tự sửa nhiều root cause trong cùng vòng."
+        }
     }
 }

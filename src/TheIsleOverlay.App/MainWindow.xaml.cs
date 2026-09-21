@@ -283,6 +283,7 @@ public partial class MainWindow : Window
             snapshot?.ProPlayerSequence,
             snapshot?.ProPlayerSync,
             snapshot?.ProPlayerCaptureHealth,
+            snapshot?.ProTrackingDiagnostics,
             PlayerIdentity = snapshot?.Player is { } diagnosticPlayer
                 ? new
                 {

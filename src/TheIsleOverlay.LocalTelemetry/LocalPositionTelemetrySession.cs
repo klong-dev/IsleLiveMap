@@ -14,7 +14,9 @@ public sealed class LocalPositionTelemetrySession : ITelemetrySession
     private readonly bool _enableLocalVitals;
     private readonly CancellationTokenSource _disposeCancellation = new();
     private readonly object _latestRemoteFrameGate = new();
+    private readonly RemoteEntityLifecycleTracker _remoteLifecycle = new();
     private RemotePlayerTelemetryFrame? _latestRemoteFrame;
+    private long? _lastLifecycleSequence;
     private int _watchStarted;
     private int _disposed;
 
@@ -159,7 +161,7 @@ public sealed class LocalPositionTelemetrySession : ITelemetrySession
                         ? null
                         : usableRemotePlayerFrame is { } frame
                             ? frame.RemoteEntities
-                            : [];
+                            : null;
                 var verifiedLocalSpeciesId = usableRemotePlayerFrame is { } localSpeciesFrame
                     ? localSpeciesFrame.LocalSpeciesId
                     : null;
@@ -173,6 +175,25 @@ public sealed class LocalPositionTelemetrySession : ITelemetrySession
                     usableRemotePlayerFrame,
                     allowLocalVitals: _enableLocalVitals,
                     requireFreshLocalMovement: true);
+
+                var lifecycle = usableRemotePlayerFrame is { } lifecycleFrame
+                                && lifecycleFrame.Sequence != _lastLifecycleSequence
+                    ? _remoteLifecycle.ApplyFrame(lifecycleFrame, now)
+                    : _remoteLifecycle.AdvanceWithoutFrame(now);
+                if (usableRemotePlayerFrame is { } appliedFrame)
+                {
+                    _lastLifecycleSequence = appliedFrame.Sequence;
+                }
+                if (merged.ProTrackingDiagnostics is { } trackingDiagnostics)
+                {
+                    merged = merged with
+                    {
+                        ProTrackingDiagnostics = trackingDiagnostics with
+                        {
+                            Lifecycle = lifecycle
+                        }
+                    };
+                }
                 if (remote is null
                     && local is null
                     && !string.IsNullOrWhiteSpace(localError))
