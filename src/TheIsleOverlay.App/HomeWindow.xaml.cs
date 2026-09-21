@@ -37,6 +37,7 @@ public partial class HomeWindow : Window
     private readonly ShortcutSettingsStore _shortcutStore = new();
     private ProAccessSnapshot _pro = ProAccessSnapshot.SignedOut;
     private HomeProPresentationState _proPresentation;
+    private Task? _proLoadTask;
     private TextBlock? _status;
     private static Brush B(string color) => new SolidColorBrush((Color)ColorConverter.ConvertFromString(color));
     private static TextBlock T(string text, double size = 14, Brush? foreground = null, FontWeight? weight = null) => new() { Text = text, FontSize = size, Foreground = foreground ?? B("#EAF4F0"), FontWeight = weight ?? FontWeights.Normal, TextWrapping = TextWrapping.Wrap };
@@ -342,6 +343,12 @@ public partial class HomeWindow : Window
             return;
         }
 
+        // Startup loads Pro access in the background. Do not create the
+        // overlay while that task is still pending, otherwise MainWindow
+        // receives the initial SignedOut grant and all Pro-only features are
+        // disabled for that session.
+        await LoadProAsync();
+
         var store = new IslePilotCredentialStore(AppPaths.IslePilotCredential);
         var credentials = await store.LoadAsync(_shutdown.Token);
         if (credentials is null)
@@ -364,10 +371,16 @@ public partial class HomeWindow : Window
                     PlayerCookie = credentials.PlayerCookie
                 }),
                 store.Clear);
+            // The Pro grant controls entitlement-gated UI, while the Agent
+            // source carries the actual Player/AI telemetry. Both must be
+            // supplied to the overlay; passing only the grant leaves Pro
+            // users looking premium while tracking remains permanently off.
+            var proPlayerSource = _proService.CreateRemotePlayerSource();
             var local = new LocalPositionTelemetrySession(
                 session,
                 App.CurrentApp.TakeLocalTelemetrySource(),
-                "ISLEPILOT");
+                "ISLEPILOT",
+                proPlayerSource);
             var overlay = new MainWindow(
                 local,
                 "ISLEPILOT",
@@ -705,7 +718,18 @@ public partial class HomeWindow : Window
         row.Children.Add(copy);
         return new Border { Child = row, BorderBrush = B("#5B4931"), BorderThickness = new Thickness(0, 0, 1, 0), Padding = new Thickness(0, 0, 10, 0), Margin = new Thickness(0, 0, 10, 0) };
     }
-    private async Task LoadProAsync()
+    private Task LoadProAsync()
+    {
+        if (_proLoadTask is { IsCompleted: false })
+        {
+            return _proLoadTask;
+        }
+
+        _proLoadTask = LoadProCoreAsync();
+        return _proLoadTask;
+    }
+
+    private async Task LoadProCoreAsync()
     {
         try { _pro = await _proService.InitializeAsync(CurrentVersion(), _shutdown.Token); }
         catch { _pro = ProAccessSnapshot.SignedOut with { StatusCode = "license_service_unavailable" }; }

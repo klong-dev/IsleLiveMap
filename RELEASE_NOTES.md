@@ -1,3 +1,11 @@
+# Isle Live Map 2.3.3
+
+## Pro Agent và Live Map
+
+- Sửa luồng mở map để chờ hoàn tất việc đọc quyền Pro trước khi tạo overlay, tránh phiên map nhận nhầm trạng thái Free khi launcher vẫn đang khởi tạo.
+- Truyền nguồn Pro Agent thực tế vào phiên telemetry cùng với quyền Pro, khôi phục Player/AI tracking và phân loại marker trên overlay cho tài khoản Pro.
+- Giữ nguyên cơ chế báo trạng thái Agent khi Agent chưa sẵn sàng; không thay đổi logic tracking trong đợt phát hành này.
+
 # Isle Live Map 2.3.2
 
 ## Launcher và Npcap
