@@ -166,6 +166,7 @@ public sealed class LocalPositionTelemetrySession : ITelemetrySession
                 var verifiedLocalSpeciesId = usableRemotePlayerFrame is { } localSpeciesFrame
                     ? localSpeciesFrame.LocalSpeciesId
                     : null;
+                var previousMap = lastMergedSnapshot?.Map;
                 var merged = LocalPositionSnapshotMerger.Merge(
                     remote ?? lastMergedSnapshot,
                     local,
@@ -189,7 +190,11 @@ public sealed class LocalPositionTelemetrySession : ITelemetrySession
                 {
                     merged = merged with
                     {
-                        Map = ApplyRemoteLifecycleToMap(merged.Map, lifecycle),
+                        Map = ApplyRemoteLifecycleToMap(
+                            merged.Map,
+                            lifecycle,
+                            previousMap,
+                            preserveMissingFromNonEmptyFrame: remotePlayers is { Count: > 0 }),
                         ProPlayerTrackingActive = _remotePlayerSource is not null,
                         ProTrackingDiagnostics = trackingDiagnostics with
                         {
@@ -201,7 +206,11 @@ public sealed class LocalPositionTelemetrySession : ITelemetrySession
                 {
                     merged = merged with
                     {
-                        Map = ApplyRemoteLifecycleToMap(merged.Map, lifecycle),
+                        Map = ApplyRemoteLifecycleToMap(
+                            merged.Map,
+                            lifecycle,
+                            previousMap,
+                            preserveMissingFromNonEmptyFrame: remotePlayers is { Count: > 0 }),
                         ProPlayerTrackingActive = true,
                         ProTrackingDiagnostics = new RemoteTrackingDiagnostics
                         {
@@ -401,7 +410,9 @@ public sealed class LocalPositionTelemetrySession : ITelemetrySession
 
     private static MapTelemetry? ApplyRemoteLifecycleToMap(
         MapTelemetry? map,
-        IReadOnlyList<RemoteEntityLifecycleSnapshot> lifecycle)
+        IReadOnlyList<RemoteEntityLifecycleSnapshot> lifecycle,
+        MapTelemetry? previousMap,
+        bool preserveMissingFromNonEmptyFrame)
     {
         if (map is null || lifecycle.Count == 0)
         {
@@ -439,6 +450,27 @@ public sealed class LocalPositionTelemetrySession : ITelemetrySession
                 };
             })
             .ToArray();
+
+        if (preserveMissingFromNonEmptyFrame && previousMap is not null)
+        {
+            var currentKeys = markers
+                .Select(marker => marker.SteamId)
+                .Where(key => !string.IsNullOrWhiteSpace(key))
+                .ToHashSet(StringComparer.Ordinal);
+            var retained = previousMap.Markers
+                .Where(marker =>
+                    marker.SteamId is not null
+                    && marker.SteamId.StartsWith("pro-entity:", StringComparison.Ordinal)
+                    && !currentKeys.Contains(marker.SteamId)
+                    && marker.ProEntityKind is { } kind
+                    && TryGetTrackId(marker.SteamId, out var trackId)
+                    && byTrack.TryGetValue((kind, trackId), out var state)
+                    && state.State is RemoteEntityLifecycleState.TemporarilyMissing
+                        or RemoteEntityLifecycleState.Stale)
+                .Select(marker => marker with { ProEntityIsStale = true });
+            markers = [.. markers, .. retained];
+        }
+
         return map with { Markers = markers };
     }
 
