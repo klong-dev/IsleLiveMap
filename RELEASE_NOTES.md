@@ -1,3 +1,11 @@
+# Isle Live Map 2.3.1
+
+## Nhóm sinh tồn và hỗ trợ cộng đồng
+
+- Phát hành workspace nhóm sinh tồn với phòng Free tối đa 7 người và phòng Pro tối đa 21 người.
+- Relay xác thực entitlement Pro bằng JWT đã ký trước khi cấp dung lượng 21 người; request tự khai Pro không thể nâng giới hạn.
+- Thêm tab liên hệ/báo lỗi, QR Zalo và luồng đăng nhập/đăng ký Pro inline trong launcher.
+
 # Isle Live Map 2.3.0
 
 ## Nhóm sinh tồn và hỗ trợ cộng đồng
