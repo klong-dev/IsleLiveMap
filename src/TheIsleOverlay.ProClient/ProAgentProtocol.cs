@@ -69,7 +69,8 @@ internal sealed record VerifiedMapEntity(
     double DistanceFromLocal,
     int ConfirmationHits,
     DateTimeOffset ObservedAt,
-    bool IsProvisional = false);
+    bool IsProvisional = false,
+    DateTimeOffset? LocationObservedAt = null);
 
 internal sealed record PlayerSyncState(
     bool IsSynchronizing,

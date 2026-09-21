@@ -638,6 +638,35 @@ public sealed class LocalPositionSnapshotMergerTests
     }
 
     [Fact]
+    public void Merge_RejectsPresenceRefreshWhenLocationIsStale()
+    {
+        var entity = new VerifiedRemoteEntityTelemetry(
+            100,
+            RemoteEntityKind.Player,
+            "verified-player",
+            "rex",
+            "Rex",
+            CreatureDiet.Carnivore,
+            null,
+            new WorldLocation { X = 10, Y = 10 },
+            0,
+            3,
+            Now,
+            IsProvisional: false,
+            LocationObservedAt: Now - RemoteEntityLifecycleTracker.PositionFreshness - TimeSpan.FromMilliseconds(1));
+
+        var merged = LocalPositionSnapshotMerger.Merge(
+            new TelemetrySnapshot { Map = new MapTelemetry() },
+            null,
+            Now,
+            remotePlayers: [entity]);
+
+        Assert.Equal(0, merged.ProTrackingDiagnostics?.RenderedCount);
+        Assert.Equal(1, merged.ProTrackingDiagnostics?.RejectedCount);
+        Assert.Equal(1, merged.ProTrackingDiagnostics?.Rejections[RemoteEntityRejectionReason.StaleLocation]);
+    }
+
+    [Fact]
     public void Merge_DoesNotPresentUnnamedMovingActorsAsPlayers()
     {
         var providerMarker = new MapMarkerTelemetry

@@ -150,9 +150,9 @@ public static class LocalPositionSnapshotMerger
 
         var mergedRemote = remotePlayers is not null
                            && (hasFreshLocal || hasFreshVerifiedFallback || hasFreshRemoteFrame)
-            ? MergeRemotePlayers(baseSnapshot.Map, remotePlayers)
-            : remotePlayers is not null
-                ? MergeRemotePlayers(baseSnapshot.Map, remotePlayers)
+                           ? MergeRemotePlayers(baseSnapshot.Map, remotePlayers, now)
+                           : remotePlayers is not null
+                ? MergeRemotePlayers(baseSnapshot.Map, remotePlayers, now)
                 : null;
 
         return baseSnapshot with
@@ -264,7 +264,8 @@ public static class LocalPositionSnapshotMerger
 
     private static RemoteMergeResult MergeRemotePlayers(
         MapTelemetry? map,
-        IReadOnlyList<VerifiedRemoteEntityTelemetry>? remotePlayers)
+        IReadOnlyList<VerifiedRemoteEntityTelemetry>? remotePlayers,
+        DateTimeOffset now)
     {
         if (remotePlayers is null)
         {
@@ -290,7 +291,7 @@ public static class LocalPositionSnapshotMerger
         var proMarkers = new List<MapMarkerTelemetry>();
         foreach (var entity in remotePlayers)
         {
-            if (!TryGetRejectionReason(entity, seen, out var reason))
+            if (!TryGetRejectionReason(entity, seen, now, out var reason))
             {
                 eligible++;
                 var speciesLabel = string.IsNullOrWhiteSpace(entity.SpeciesShortName)
@@ -339,6 +340,7 @@ public static class LocalPositionSnapshotMerger
     private static bool TryGetRejectionReason(
         VerifiedRemoteEntityTelemetry entity,
         HashSet<string> seen,
+        DateTimeOffset now,
         out RemoteEntityRejectionReason reason)
     {
         if (entity.TrackId <= 0)
@@ -356,6 +358,19 @@ public static class LocalPositionSnapshotMerger
         if (!IsFinite(entity.Location))
         {
             reason = RemoteEntityRejectionReason.InvalidCoordinate;
+            return true;
+        }
+
+        // Older Pro Agent frames did not carry a separate location timestamp.
+        // Keep those fixtures/backward-compatible agents valid by treating the
+        // entity observation as the location observation. New agents always
+        // provide LocationObservedAt, which prevents presence refreshes from
+        // making an old coordinate look live.
+        var locationObservedAt = entity.LocationObservedAt ?? entity.ObservedAt;
+        if (locationObservedAt > now
+            || now - locationObservedAt > RemoteEntityLifecycleTracker.PositionFreshness)
+        {
+            reason = RemoteEntityRejectionReason.StaleLocation;
             return true;
         }
 

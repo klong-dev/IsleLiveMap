@@ -61,6 +61,8 @@ public enum RemoteEntityRejectionReason
     MissingPlayerProof = 2,
     MissingSpecies = 3,
     InvalidCoordinate = 4,
+    StaleLocation = 13,
+    LocationUnavailable = 14,
     WrongServer = 5,
     SessionMismatch = 6,
     [Obsolete("Distance is diagnostic-only; remote entities are no longer rejected by range.")]
@@ -127,4 +129,11 @@ public sealed record VerifiedRemoteEntityTelemetry(
     double DistanceFromLocal,
     int ConfirmationHits,
     DateTimeOffset ObservedAt,
-    bool IsProvisional = false);
+    bool IsProvisional = false,
+    DateTimeOffset? LocationObservedAt = null)
+{
+    public TimeSpan? LocationAgeAt(DateTimeOffset now) =>
+        LocationObservedAt is { } observed && now >= observed
+            ? now - observed
+            : null;
+}

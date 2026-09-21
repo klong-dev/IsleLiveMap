@@ -275,6 +275,7 @@ public sealed class ProAgentRemotePlayerSource :
                         entity.Diet,
                         entity.Location,
                         entity.ObservedAt,
+                        entity.LocationObservedAt,
                         entity.IsProvisional
                     }).ToArray()
                 };
@@ -365,7 +366,8 @@ public sealed class ProAgentRemotePlayerSource :
                 entity.DistanceFromLocal,
                 entity.ConfirmationHits,
                 entity.ObservedAt,
-                entity.IsProvisional))
+                entity.IsProvisional,
+                entity.LocationObservedAt))
             .ToArray();
 
         return new RemotePlayerTelemetryFrame(
