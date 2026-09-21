@@ -117,7 +117,7 @@ public partial class HomeWindow : Window
         hero.Children.Add(new Image { Source = new BitmapImage(new Uri("/IsleLiveMap;component/Assets/GatewayMapWater.jpg", UriKind.Relative)), Stretch = Stretch.UniformToFill, Opacity = .82 });
         hero.Children.Add(new Border { Background = B("#C90A1917") });
         var copy = new StackPanel { VerticalAlignment = VerticalAlignment.Center, MaxWidth = 500, Margin = new Thickness(26) };
-        copy.Children.Add(T(_proPresentation.HasCurrentProAccess ? "THEO DÕI NGƯỜI CHƠI + AI" : "CỔNG · LỚP NƯỚC", 13, B(_proPresentation.HasCurrentProAccess ? "#E6C477" : "#49D5C3"), FontWeights.Bold));
+        copy.Children.Add(T(_proPresentation.HasCurrentProAccess ? "THEO DÕI NGƯỜI CHƠI + AI" : "SỬ DỤNG NGAY", 13, B(_proPresentation.HasCurrentProAccess ? "#E6C477" : "#49D5C3"), FontWeights.Bold));
         // The page header already owns the title and description. Do not render
         // the same "MỞ TRÌNH THEO DÕI" copy again inside the hero; the hero's job
         // is to hold the primary action and the supported-server actions.
@@ -136,8 +136,8 @@ public partial class HomeWindow : Window
         var servers = new WrapPanel { Margin = new Thickness(0, 10, 0, 0) };
         // Muted pastel surfaces: intentionally opaque and soft, rather than alpha-transparent
         // overlays that let the map bleed through and make the server labels harder to read.
-        servers.Children.Add(ServerButton("Assets/GachaLogo.png", "GACHA", "GachaStatsButton_Click", "#E6F1E6", "#FF82AA82"));
-        servers.Children.Add(ServerButton("Assets/OriginLogo.png", "ORIGIN 5x", "OriginStatsButton_Click", "#E6EEF8", "#FF86A9D2"));
+        servers.Children.Add(ServerButton("Assets/GachaLogo.png", "GACHA", "GachaStatsButton_Click", "#6F9C79", "#B9E0C0"));
+        servers.Children.Add(ServerButton("Assets/OriginLogo.png", "ORIGIN 5x", "OriginStatsButton_Click", "#7198C4", "#C2D9F3"));
         copy.Children.Add(servers);
         hero.Children.Add(copy);
         p.Children.Add(new Border { Child = hero, CornerRadius = new CornerRadius(10), ClipToBounds = true, BorderBrush = B(_proPresentation.HasCurrentProAccess ? "#6B5434" : "#294943"), BorderThickness = new Thickness(1) });
@@ -159,7 +159,7 @@ public partial class HomeWindow : Window
         var logoImage = new Image { Source = new BitmapImage(new Uri($"/IsleLiveMap;component/{logo}", UriKind.Relative)), Width = 30, Height = 30, Stretch = Stretch.Uniform, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
         Grid.SetColumn(logoImage, 0);
         content.Children.Add(logoImage);
-        var name = T(label, 13, B(_proPresentation.HasCurrentProAccess ? "#5B431D" : "#17352F"), FontWeights.Bold);
+        var name = T(label, 13, B("#FFFFFF"), FontWeights.Bold);
         name.HorizontalAlignment = HorizontalAlignment.Center;
         name.VerticalAlignment = VerticalAlignment.Center;
         name.TextAlignment = TextAlignment.Center;
@@ -209,22 +209,68 @@ public partial class HomeWindow : Window
         form.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         var create = new StackPanel { Margin = new Thickness(0, 0, 14, 0) };
         create.Children.Add(T("TẠO PHÒNG", 11, B("#49D5C3"), FontWeights.Bold));
-        var name = new TextBox { Text = "Survivor", Style = (Style)FindResource("Field"), ToolTip = "Tên hiển thị trong nhóm", Margin = new Thickness(0, 10, 0, 10) };
-        create.Children.Add(name);
-        var createButton = Action("TẠO PHÒNG", async (_, _) => { try { await App.CurrentTeam.CreateAsync(name.Text.Trim(), tier, _shutdown.Token); ReplacePage(BuildTeam); } catch (Exception ex) { SetStatus(FriendlyTeamErrorText(ex)); } });
+        var createButton = Action("TẠO PHÒNG", async (_, _) =>
+        {
+            var displayName = PromptTeamName("TẠO PHÒNG");
+            if (displayName is null) return;
+            try { await App.CurrentTeam.CreateAsync(displayName, tier, _shutdown.Token); ReplacePage(BuildTeam); }
+            catch (Exception ex) { SetStatus(FriendlyTeamErrorText(ex)); }
+        });
         create.Children.Add(createButton);
         Grid.SetColumn(create, 0); form.Children.Add(create);
 
         var join = new StackPanel { Margin = new Thickness(14, 0, 0, 0) };
-        join.Children.Add(T("VÀO PHÒNG", 11, B("#49D5C3"), FontWeights.Bold));
+        join.Children.Add(T("CODE PHÒNG", 11, B("#49D5C3"), FontWeights.Bold));
         var invite = new TextBox { Style = (Style)FindResource("Field"), ToolTip = "Nhập mã mời 6 ký tự", Margin = new Thickness(0, 10, 0, 10), MaxLength = 6 };
         join.Children.Add(invite);
-        var joinButton = Action("VÀO PHÒNG", async (_, _) => { try { await App.CurrentTeam.JoinAsync(invite.Text.Trim(), name.Text.Trim(), tier, _shutdown.Token); ReplacePage(BuildTeam); } catch (Exception ex) { SetStatus(FriendlyTeamErrorText(ex)); } });
+        var joinButton = Action("VÀO PHÒNG", async (_, _) =>
+        {
+            var displayName = PromptTeamName("VÀO PHÒNG");
+            if (displayName is null) return;
+            try { await App.CurrentTeam.JoinAsync(invite.Text.Trim(), displayName, tier, _shutdown.Token); ReplacePage(BuildTeam); }
+            catch (Exception ex) { SetStatus(FriendlyTeamErrorText(ex)); }
+        });
         join.Children.Add(joinButton);
         Grid.SetColumn(join, 1); form.Children.Add(join);
         p.Children.Add(form);
         if (state.ConnectionState is TeamRelayConnectionState.Error or TeamRelayConnectionState.Expired)
             p.Children.Add(T(state.Message ?? "Phiên nhóm đã kết thúc. Hãy tạo hoặc nhập mã lại.", 13, B("#E77A68"), FontWeights.SemiBold));
+    }
+
+    private string? PromptTeamName(string action)
+    {
+        var dialog = new Window
+        {
+            Owner = this,
+            Title = action,
+            Width = 360,
+            Height = 220,
+            MinWidth = 360,
+            MinHeight = 190,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            ResizeMode = ResizeMode.NoResize,
+            WindowStyle = WindowStyle.None,
+            AllowsTransparency = true,
+            Background = Brushes.Transparent,
+            ShowInTaskbar = false
+        };
+        var shell = new Border { Background = B("#F20D1B1A"), BorderBrush = B("#49665F"), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(10), Padding = new Thickness(22) };
+        var layout = new Grid();
+        layout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        layout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        layout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        layout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        layout.Children.Add(T(action, 17, B("#EAF4F0"), FontWeights.Bold));
+        var label = T("Tên của bạn:", 12, B("#91AAA3"), FontWeights.SemiBold);
+        label.Margin = new Thickness(0, 14, 0, 5); Grid.SetRow(label, 1); layout.Children.Add(label);
+        var input = new TextBox { Style = (Style)FindResource("Field"), MinHeight = 38, MaxLength = 32, Text = "" };
+        input.Margin = new Thickness(0, 0, 0, 14); Grid.SetRow(input, 2); layout.Children.Add(input);
+        var actions = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
+        var cancel = Action("HỦY", (_, _) => dialog.DialogResult = false, false); cancel.MinWidth = 82;
+        var confirm = Action("XÁC NHẬN", (_, _) => { if (!string.IsNullOrWhiteSpace(input.Text)) dialog.DialogResult = true; }, true); confirm.MinWidth = 100;
+        actions.Children.Add(cancel); actions.Children.Add(confirm); Grid.SetRow(actions, 3); layout.Children.Add(actions);
+        shell.Child = layout; dialog.Content = shell; dialog.Loaded += (_, _) => input.Focus();
+        return dialog.ShowDialog() == true ? input.Text.Trim() : null;
     }
     private static string TeamStateText(TeamRelayConnectionState state) => state switch
     {
@@ -245,7 +291,7 @@ public partial class HomeWindow : Window
         var p = Page("HỖ TRỢ CỘNG ĐỒNG", "LIÊN HỆ & BÁO LỖI", "Gửi góp ý, báo lỗi hoặc nhận hỗ trợ trực tiếp từ Hoàng Kim Long.");
         var columns = new Grid { Margin = new Thickness(0, 6, 0, 0) };
         columns.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        columns.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(210) });
+        columns.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(300) });
         var links = new StackPanel { Margin = new Thickness(0, 0, 24, 0) };
         links.Children.Add(ContactLine("FACEBOOK", "Hoàng Kim Long", "MỞ FACEBOOK", "https://www.facebook.com/klong.dev/"));
         links.Children.Add(ContactLine("ZALO", "Hoàng Kim Long · 0705 8787 81", "SAO CHÉP SỐ ZALO", null));
@@ -253,7 +299,7 @@ public partial class HomeWindow : Window
         Grid.SetColumn(links, 0); columns.Children.Add(links);
         var qrStack = new StackPanel { HorizontalAlignment = HorizontalAlignment.Center };
         qrStack.Children.Add(T("NHÓM GÓP Ý · BÁO LỖI", 11, B("#49D5C3"), FontWeights.Bold));
-        qrStack.Children.Add(new Image { Source = new BitmapImage(new Uri("/IsleLiveMap;component/Assets/ZaloTeamQr.jpg", UriKind.Relative)), Width = 180, Height = 180, Stretch = Stretch.Uniform, Margin = new Thickness(0, 10, 0, 6) });
+        qrStack.Children.Add(new Image { Source = new BitmapImage(new Uri("/IsleLiveMap;component/Assets/ZaloTeamQr.jpg", UriKind.Relative)), Width = 270, Height = 270, Stretch = Stretch.Uniform, Margin = new Thickness(0, 10, 0, 6) });
         qrStack.Children.Add(T("Quét mã để tham gia Zalo", 12, B("#91AAA3")));
         Grid.SetColumn(qrStack, 1); columns.Children.Add(qrStack);
         p.Children.Add(columns);
@@ -285,7 +331,82 @@ public partial class HomeWindow : Window
         tile.CornerRadius = new CornerRadius(6);
         return tile;
     }
-    private async void OpenMap_Click(object? sender, RoutedEventArgs e) { var store = new IslePilotCredentialStore(AppPaths.IslePilotCredential); var credentials = await store.LoadAsync(_shutdown.Token); if (credentials is null) { var login = new IslePilotSteamLoginWindow { Owner = this }; if (login.ShowDialog() != true || login.Credentials is null) return; credentials = login.Credentials; } try { var session = new AuthenticationInvalidatingTelemetrySession(IslePilotRealtimeSession.Create(new IslePilotOverlayOptions { OverlayToken = credentials.OverlayToken, PlayerCookie = credentials.PlayerCookie }), store.Clear); var local = new LocalPositionTelemetrySession(session, App.CurrentApp.TakeLocalTelemetrySource(), "ISLEPILOT"); var overlay = new MainWindow(local, "ISLEPILOT", ProFeatureAccessGrant.FromSnapshot(_pro, DateTimeOffset.UtcNow)); Application.Current.MainWindow = overlay; overlay.Show(); Close(); } catch (Exception ex) { SetStatus($"Không mở được phiên: {ex.Message}"); } }
+    private async void OpenMap_Click(object? sender, RoutedEventArgs e)
+    {
+        // Npcap is required by the local GPS/telemetry source. Keep this gate
+        // in the launcher entry point so every map launch (including the new
+        // Home/Pro hero action) restores the setup dialog before credentials
+        // or a network session are opened.
+        if (!EnsureNpcapReady())
+        {
+            return;
+        }
+
+        var store = new IslePilotCredentialStore(AppPaths.IslePilotCredential);
+        var credentials = await store.LoadAsync(_shutdown.Token);
+        if (credentials is null)
+        {
+            var login = new IslePilotSteamLoginWindow { Owner = this };
+            if (login.ShowDialog() != true || login.Credentials is null)
+            {
+                return;
+            }
+
+            credentials = login.Credentials;
+        }
+
+        try
+        {
+            var session = new AuthenticationInvalidatingTelemetrySession(
+                IslePilotRealtimeSession.Create(new IslePilotOverlayOptions
+                {
+                    OverlayToken = credentials.OverlayToken,
+                    PlayerCookie = credentials.PlayerCookie
+                }),
+                store.Clear);
+            var local = new LocalPositionTelemetrySession(
+                session,
+                App.CurrentApp.TakeLocalTelemetrySource(),
+                "ISLEPILOT");
+            var overlay = new MainWindow(
+                local,
+                "ISLEPILOT",
+                ProFeatureAccessGrant.FromSnapshot(_pro, DateTimeOffset.UtcNow));
+            Application.Current.MainWindow = overlay;
+            overlay.Show();
+            Close();
+        }
+        catch (Exception ex)
+        {
+            SetStatus($"Không mở được phiên: {ex.Message}");
+        }
+    }
+
+    private bool EnsureNpcapReady()
+    {
+        var availability = NpcapAvailabilityProbe.Check(refresh: true);
+        if (availability.IsAvailable)
+        {
+            return true;
+        }
+
+        var setup = new NpcapRequiredWindow { Owner = this };
+        if (setup.ShowDialog() != true)
+        {
+            SetStatus("Chưa có Npcap. Hãy cài Npcap để mở Live Map.");
+            return false;
+        }
+
+        // The setup window re-checks after installation, but refresh once more
+        // here because SharpPcap can cache the native resolver state per process.
+        var ready = NpcapAvailabilityProbe.Check(refresh: true).IsAvailable;
+        if (!ready)
+        {
+            SetStatus("Npcap chưa sẵn sàng sau khi cài đặt. Hãy thử lại.");
+        }
+
+        return ready;
+    }
     private void BuildInfo()
     {
         var p = Page("TỔNG QUAN DỮ LIỆU", "THÔNG TIN PHIÊN", "Bản đồ và thông tin dino của phiên gần nhất — không phải bản sao HUD overlay.");
@@ -358,6 +479,7 @@ public partial class HomeWindow : Window
         var settings = _shortcutStore.Load();
         var rows = new StackPanel { Margin = new Thickness(0, 18, 0, 0) };
         var statusLabels = new Dictionary<OverlayShortcutAction, TextBlock>();
+        Button? saveButton = null;
         foreach (var d in ShortcutSettingsManager.Definitions(true))
         {
             var surface = new Border
@@ -378,7 +500,14 @@ public partial class HomeWindow : Window
 
             var field = new TextBox { Text = settings.For(d.Action), Style = (Style)FindResource("Field"), ToolTip = "Bấm vào đây rồi nhấn tổ hợp phím", Margin = new Thickness(0, 0, 8, 0) };
             field.PreviewKeyDown += ShortcutField_PreviewKeyDown;
-            field.TextChanged += (_, _) => RefreshShortcutStatus(d.Action, statusLabels);
+            field.TextChanged += (_, _) =>
+            {
+                RefreshShortcutStatus(d.Action, statusLabels);
+                if (saveButton is not null)
+                {
+                    saveButton.IsEnabled = _shortcutFields.Any(pair => !string.Equals(pair.Value.Text.Trim(), settings.For(pair.Key).Trim(), StringComparison.OrdinalIgnoreCase));
+                }
+            };
             _shortcutFields[d.Action] = field; Grid.SetColumn(field, 1); row.Children.Add(field);
 
             var status = T("HỢP LỆ", 10, B("#68D7A6"), FontWeights.Bold);
@@ -393,18 +522,18 @@ public partial class HomeWindow : Window
             surface.Child = row;
             rows.Children.Add(surface);
         }
-        p.Children.Add(rows);
         var footer = new Border { Background = B("#52152D28"), BorderBrush = B("#3B645A"), BorderThickness = new Thickness(1, 1, 1, 0), Padding = new Thickness(14, 12, 14, 12), Margin = new Thickness(0, 2, 0, 0), CornerRadius = new CornerRadius(7, 7, 0, 0) };
         var footerGrid = new Grid();
         footerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         var footerHint = T("Thay đổi chỉ có hiệu lực sau khi lưu.", 11, B("#91AAA3"));
         footerHint.VerticalAlignment = VerticalAlignment.Center;
         footerGrid.Children.Add(footerHint);
-        var save = new Button { Content = "LƯU THAY ĐỔI", Style = (Style)FindResource("Action"), Height = 38, MinWidth = 142, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(12, 0, 0, 0) };
-        save.Click += SaveShortcuts;
-        Grid.SetColumn(save, 1); footerGrid.Children.Add(save);
+        saveButton = new Button { Content = "LƯU THAY ĐỔI", Style = (Style)FindResource("Action"), Height = 38, MinWidth = 142, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(12, 0, 0, 0), IsEnabled = false };
+        saveButton.Click += SaveShortcuts;
+        Grid.SetColumn(saveButton, 1); footerGrid.Children.Add(saveButton);
         footer.Child = footerGrid;
         p.Children.Add(footer);
+        p.Children.Add(rows);
         foreach (var action in statusLabels.Keys.ToArray()) RefreshShortcutStatus(action, statusLabels);
     }
     private void RefreshShortcutStatus(OverlayShortcutAction action, IReadOnlyDictionary<OverlayShortcutAction, TextBlock> labels)
@@ -450,7 +579,27 @@ public partial class HomeWindow : Window
         field.Text = string.Join('+', parts);
         field.CaretIndex = field.Text.Length;
     }
-    private void SaveShortcuts(object? sender, RoutedEventArgs e) { var current = _shortcutStore.Load(); var next = current with { EditMode = Value(OverlayShortcutAction.EditMode), ToggleMissions = Value(OverlayShortcutAction.ToggleMissions), ToggleHud = Value(OverlayShortcutAction.ToggleHud), MapNotes = Value(OverlayShortcutAction.MapNotes), MutationGuide = Value(OverlayShortcutAction.MutationGuide) }; var errors = ShortcutSettingsManager.Validate(next); SetStatus(errors.Count == 0 && _shortcutStore.TrySave(next, out _) ? "Đã lưu phím tắt." : string.Join(" ", errors)); }
+    private void SaveShortcuts(object? sender, RoutedEventArgs e)
+    {
+        var current = _shortcutStore.Load();
+        var next = current with
+        {
+            EditMode = Value(OverlayShortcutAction.EditMode),
+            ToggleMissions = Value(OverlayShortcutAction.ToggleMissions),
+            ToggleHud = Value(OverlayShortcutAction.ToggleHud),
+            MapNotes = Value(OverlayShortcutAction.MapNotes),
+            MutationGuide = Value(OverlayShortcutAction.MutationGuide)
+        };
+        var errors = ShortcutSettingsManager.Validate(next);
+        if (errors.Count == 0 && _shortcutStore.TrySave(next, out _))
+        {
+            if (sender is Button button) button.IsEnabled = false;
+            SetStatus("Đã lưu phím tắt.");
+            return;
+        }
+
+        SetStatus(string.Join(" ", errors));
+    }
     private string Value(OverlayShortcutAction action) => _shortcutFields.TryGetValue(action, out var field) ? field.Text : "";
     private void BuildSettings()
     {
@@ -479,11 +628,17 @@ public partial class HomeWindow : Window
         var telemetryStack = (StackPanel)telemetrySection.Child;
         telemetryStack.Children.Add(T(NpcapAvailabilityProbe.Check().IsAvailable ? "Npcap / GPS: Sẵn sàng" : "Npcap / GPS: Chưa sẵn sàng", 14, B("#91AAA3")));
         var clearCredentials = Action("XÓA THÔNG TIN ĐĂNG NHẬP", (_, _) => { new IslePilotCredentialStore(AppPaths.IslePilotCredential).Clear(); _snapshots.Clear(); SetStatus("Đã xóa thông tin đăng nhập và dữ liệu phiên hiện tại."); }, false);
-        clearCredentials.MinHeight = 22;
-        clearCredentials.Height = 22;
-        clearCredentials.FontSize = 11;
-        clearCredentials.Margin = new Thickness(0, 2, 10, 0);
+        clearCredentials.MinWidth = 250;
+        clearCredentials.MinHeight = 48;
+        clearCredentials.Height = 48;
+        clearCredentials.FontSize = 13;
+        clearCredentials.Padding = new Thickness(18, 0, 18, 0);
+        clearCredentials.Foreground = B("#FFFFFF");
+        clearCredentials.Background = B("#B83D42");
+        clearCredentials.BorderBrush = B("#F08A8A");
+        clearCredentials.Margin = new Thickness(0, 12, 10, 0);
         telemetryStack.Children.Add(clearCredentials);
+        telemetryStack.Children.Add(T("Đăng xuất khỏi tài khoản đang chơi để đổi tài khoản khác tránh lấy sai chỉ số dino", 12, B("#C9AAA5")));
         p.Children.Add(telemetrySection);
     }
     private void SaveLayer(MapLayerGroup group, bool value) { _layers.SetEnabled(group, value); _layers.Version = MapLayerPreferences.CurrentVersion; _layerStore.TrySave(_layers, out _); }

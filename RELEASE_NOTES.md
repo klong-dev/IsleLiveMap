@@ -1,3 +1,12 @@
+# Isle Live Map 2.3.2
+
+## Launcher và Npcap
+
+- Khôi phục bước kiểm tra Npcap trước khi mở Live Map; nếu thiếu hoặc chưa sẵn sàng, launcher mở lại cửa sổ hỗ trợ cài đặt thay vì đi thẳng vào đăng nhập.
+- Kiểm tra lại Npcap sau khi cài trong cùng phiên, chỉ tiếp tục mở map khi thư viện và adapter đã sẵn sàng.
+- Cập nhật launcher workspace: nút server riêng có nền pastel rõ ràng, QR hỗ trợ cộng đồng lớn hơn, nhập tên nhóm qua hộp thoại riêng và nút lưu phím tắt chỉ bật khi có thay đổi.
+- Sửa hiển thị phiên bản trên title bar để khớp với bản phát hành.
+
 # Isle Live Map 2.3.1
 
 ## Nhóm sinh tồn và hỗ trợ cộng đồng
