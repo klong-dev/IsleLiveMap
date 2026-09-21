@@ -12,6 +12,8 @@ public sealed class GitHubUpdateService
     private UpdateManager? _manager;
     private UpdateInfo? _pendingUpdate;
 
+    public string? PendingVersion => _pendingUpdate?.TargetFullRelease.Version.ToString();
+
     public async Task<UpdatePreparationResult> PrepareUpdateAsync(
         Action<int>? progress = null,
         CancellationToken cancellationToken = default)

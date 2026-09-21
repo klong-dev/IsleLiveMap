@@ -35,6 +35,21 @@ public sealed class LauncherWorkspaceTests
     }
 
     [Fact]
+    public void Home_UsesUpdateProgressLabelsAndServerChoiceVisuals()
+    {
+        var code = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "TestAssets", "HomeWindow.xaml.cs"));
+        var xaml = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "TestAssets", "HomeWindow.xaml"));
+
+        Assert.Contains("ĐANG KIỂM TRA CẬP NHẬT", code, StringComparison.Ordinal);
+        Assert.Contains("ĐANG CẬP NHẬT v", code, StringComparison.Ordinal);
+        Assert.Contains("MỞ MAP PRO  →", code, StringComparison.Ordinal);
+        Assert.Contains("GachaLogo.png", code, StringComparison.Ordinal);
+        Assert.Contains("OriginLogo.png", code, StringComparison.Ordinal);
+        Assert.Contains("Columns = 2", code, StringComparison.Ordinal);
+        Assert.Contains("ServerAction", xaml, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void SnapshotStore_RepresentsEmptyAndLatestState()
     {
         var store = new LatestTelemetrySnapshotStore();

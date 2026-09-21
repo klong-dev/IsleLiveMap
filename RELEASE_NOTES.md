@@ -1,3 +1,11 @@
+# Isle Live Map 2.3.6
+
+## Auto update và server riêng trong Pro
+
+- Khi đang kiểm tra phiên bản, nút `MỞ MAP PRO` chuyển thành `ĐANG KIỂM TRA CẬP NHẬT` và bị khóa để không mở map trước khi có kết quả.
+- Trong lúc tải bản mới, nút hiển thị `ĐANG CẬP NHẬT v<version>`; sau khi tải xong, text trở lại `MỞ MAP PRO` nhưng map vẫn chờ khởi động lại nếu bản cập nhật yêu cầu áp dụng.
+- Làm lại cụm nút GACHA và ORIGIN 5x trong Pro: cùng lưới, logo lớn hơn, tên trắng căn giữa, nền pastel đặc theo nhận diện server và vùng bấm cân đối hơn.
+
 # Isle Live Map 2.3.5
 
 ## Auto update và GPS local

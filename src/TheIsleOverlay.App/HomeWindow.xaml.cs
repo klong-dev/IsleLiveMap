@@ -137,6 +137,8 @@ public partial class HomeWindow : Window
             ? new Button { Content = _proPresentation.MapAction, Style = (Style)FindResource("PrimaryMapAction"), HorizontalAlignment = HorizontalAlignment.Left, CommandParameter = "basic" }
             : Action(_proPresentation.MapAction, OpenMap_Click);
         if (_proPresentation.HasCurrentProAccess) mapButton.Click += OpenMap_Click;
+        if (_mapLaunchGateState == MapLaunchGateState.Checking)
+            mapButton.Content = _proPresentation.HasCurrentProAccess ? "ĐANG KIỂM TRA CẬP NHẬT" : "ĐANG KIỂM TRA CẬP NHẬT";
         mapButton.IsEnabled = MapLaunchGatePolicy.AllowsMap(_mapLaunchGateState);
         _mapActionButton = mapButton;
         primary.Children.Add(mapButton);
@@ -145,11 +147,11 @@ public partial class HomeWindow : Window
         var supportedLabel = T("Hoặc các server được hỗ trợ riêng:", 13, B("#A9BAB4"), FontWeights.SemiBold);
         supportedLabel.Margin = new Thickness(0, 10, 0, 0);
         copy.Children.Add(supportedLabel);
-        var servers = new WrapPanel { Margin = new Thickness(0, 10, 0, 0) };
-        // Muted pastel surfaces: intentionally opaque and soft, rather than alpha-transparent
-        // overlays that let the map bleed through and make the server labels harder to read.
-        servers.Children.Add(ServerButton("Assets/GachaLogo.png", "GACHA", "GachaStatsButton_Click", "#6F9C79", "#B9E0C0"));
-        servers.Children.Add(ServerButton("Assets/OriginLogo.png", "ORIGIN 5x", "OriginStatsButton_Click", "#7198C4", "#C2D9F3"));
+        var servers = new UniformGrid { Columns = 2, Margin = new Thickness(0, 10, 0, 0), MaxWidth = 430 };
+        // Opaque, low-saturation surfaces keep the two server choices legible
+        // over the map and make them read as a deliberate pair in Pro mode.
+        servers.Children.Add(ServerButton("Assets/GachaLogo.png", "GACHA", "GachaStatsButton_Click", _proPresentation.HasCurrentProAccess ? "#536F4D" : "#A7C9AE", _proPresentation.HasCurrentProAccess ? "#A8D17A" : "#D8F0DB"));
+        servers.Children.Add(ServerButton("Assets/OriginLogo.png", "ORIGIN 5x", "OriginStatsButton_Click", _proPresentation.HasCurrentProAccess ? "#405F86" : "#A8C1DE", _proPresentation.HasCurrentProAccess ? "#9CC8FF" : "#DCEBFA"));
         copy.Children.Add(servers);
         hero.Children.Add(copy);
         p.Children.Add(new Border { Child = hero, CornerRadius = new CornerRadius(10), ClipToBounds = true, BorderBrush = B(_proPresentation.HasCurrentProAccess ? "#6B5434" : "#294943"), BorderThickness = new Thickness(1) });
@@ -173,12 +175,12 @@ public partial class HomeWindow : Window
         AutomationProperties.SetName(button, $"Mở server {label}");
         AutomationProperties.SetHelpText(button, $"Mở {label} trong workspace riêng");
         var content = new Grid { VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Stretch };
-        content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(38) });
+        content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(44) });
         content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        var logoImage = new Image { Source = new BitmapImage(new Uri($"/IsleLiveMap;component/{logo}", UriKind.Relative)), Width = 30, Height = 30, Stretch = Stretch.Uniform, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+        var logoImage = new Image { Source = new BitmapImage(new Uri($"/IsleLiveMap;component/{logo}", UriKind.Relative)), Width = 36, Height = 36, Stretch = Stretch.Uniform, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
         Grid.SetColumn(logoImage, 0);
         content.Children.Add(logoImage);
-        var name = T(label, 13, B("#FFFFFF"), FontWeights.Bold);
+        var name = T(label, 13, B("#FFFFFF"), FontWeights.Black);
         name.HorizontalAlignment = HorizontalAlignment.Center;
         name.VerticalAlignment = VerticalAlignment.Center;
         name.TextAlignment = TextAlignment.Center;
@@ -487,7 +489,14 @@ public partial class HomeWindow : Window
         UpdatePreparationResult result;
         try
         {
-            result = await _updateService.PrepareUpdateAsync(cancellationToken: _shutdown.Token);
+            result = await _updateService.PrepareUpdateAsync(
+                progress: _ =>
+                {
+                    var version = _updateService.PendingVersion;
+                    if (version is not null)
+                        Dispatcher.InvokeAsync(() => SetMapActionText($"ĐANG CẬP NHẬT v{version}"));
+                },
+                cancellationToken: _shutdown.Token);
         }
         catch (OperationCanceledException) when (_shutdown.IsCancellationRequested)
         {
@@ -505,17 +514,21 @@ public partial class HomeWindow : Window
             switch (result.State)
             {
                 case UpdatePreparationState.Ready:
+                    SetMapActionText(_proPresentation.HasCurrentProAccess ? "MỞ MAP PRO  →" : "MỞ MAP  →");
                     SetUpdateStatus($"Đã tải bản cập nhật v{result.Version}. Khởi động lại để hoàn tất trước khi mở map.", "#F0C36A");
                     break;
                 case UpdatePreparationState.Current:
+                    SetMapActionText(_proPresentation.HasCurrentProAccess ? "MỞ MAP PRO  →" : "MỞ MAP  →");
                     SetUpdateStatus("Bản cập nhật đã kiểm tra · phiên bản hiện tại", "#79D5B0");
                     break;
                 case UpdatePreparationState.DevelopmentBuild:
+                    SetMapActionText(_proPresentation.HasCurrentProAccess ? "MỞ MAP PRO  →" : "MỞ MAP  →");
                     SetUpdateStatus("Bản phát triển · bỏ qua kiểm tra cập nhật", "#91AAA3");
                     break;
                 default:
                     // Network/update service failures are deliberately
                     // non-blocking, as requested. Users can still open map.
+                    SetMapActionText(_proPresentation.HasCurrentProAccess ? "MỞ MAP PRO  →" : "MỞ MAP  →");
                     SetUpdateStatus("Không kiểm tra được cập nhật · vẫn cho phép mở map", "#E7B74E");
                     break;
             }
@@ -527,6 +540,12 @@ public partial class HomeWindow : Window
         if (_updateStatus is null) return;
         _updateStatus.Text = text;
         _updateStatus.Foreground = B(color);
+    }
+
+    private void SetMapActionText(string text)
+    {
+        if (_mapActionButton is not null)
+            _mapActionButton.Content = text;
     }
     private void BuildInfo()
     {
