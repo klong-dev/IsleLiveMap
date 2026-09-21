@@ -28,6 +28,7 @@ public partial class HomeWindow : Window
     private readonly CancellationTokenSource _shutdown = new();
     private readonly LatestTelemetrySnapshotStore _snapshots = LatestTelemetrySnapshotStore.Shared;
     private readonly GitHubReleaseNotesService _releaseService = new();
+    private readonly GitHubUpdateService _updateService = new();
     private readonly ProAccessService _proService = new();
     private readonly Dictionary<OverlayShortcutAction, TextBox> _shortcutFields = new();
     private string _page = "home";
@@ -38,6 +39,11 @@ public partial class HomeWindow : Window
     private ProAccessSnapshot _pro = ProAccessSnapshot.SignedOut;
     private HomeProPresentationState _proPresentation;
     private Task? _proLoadTask;
+    private Task? _updateTask;
+    private MapLaunchGateState _mapLaunchGateState = MapLaunchGateState.Checking;
+    private Button? _mapActionButton;
+    private TextBlock? _updateStatus;
+    private Button? _restartForUpdateButton;
     private TextBlock? _status;
     private static Brush B(string color) => new SolidColorBrush((Color)ColorConverter.ConvertFromString(color));
     private static TextBlock T(string text, double size = 14, Brush? foreground = null, FontWeight? weight = null) => new() { Text = text, FontSize = size, Foreground = foreground ?? B("#EAF4F0"), FontWeight = weight ?? FontWeights.Normal, TextWrapping = TextWrapping.Wrap };
@@ -49,7 +55,10 @@ public partial class HomeWindow : Window
         ApplyProPresentation(_pro, rebuildCurrentPage: false);
         BuildHome();
         UpdateNavigationVisuals();
-        _ = LoadReleasesAsync(); _ = LoadProAsync();
+        _ = LoadReleasesAsync();
+        _ = LoadProAsync();
+        _ = PrepareUpdateAtStartupAsync();
+        WarmupLocalTelemetryIfReady();
     }
     private void EnsureWindowVisible()
     {
@@ -128,6 +137,8 @@ public partial class HomeWindow : Window
             ? new Button { Content = _proPresentation.MapAction, Style = (Style)FindResource("PrimaryMapAction"), HorizontalAlignment = HorizontalAlignment.Left, CommandParameter = "basic" }
             : Action(_proPresentation.MapAction, OpenMap_Click);
         if (_proPresentation.HasCurrentProAccess) mapButton.Click += OpenMap_Click;
+        mapButton.IsEnabled = MapLaunchGatePolicy.AllowsMap(_mapLaunchGateState);
+        _mapActionButton = mapButton;
         primary.Children.Add(mapButton);
         copy.Children.Add(primary);
 
@@ -147,6 +158,13 @@ public partial class HomeWindow : Window
         row.Children.Add(StatusLine("NPCAP / GPS", NpcapAvailabilityProbe.Check().IsAvailable ? "Sẵn sàng" : "Chưa sẵn sàng"));
         row.Children.Add(StatusLine("PHIÊN", _snapshots.Current is null ? "Chưa có phiên" : "Có dữ liệu gần nhất"));
         p.Children.Add(row);
+        _updateStatus = T("ĐANG KIỂM TRA BẢN CẬP NHẬT…", 12, B("#E7B74E"), FontWeights.SemiBold);
+        _updateStatus.Margin = new Thickness(0, 12, 0, 0);
+        p.Children.Add(_updateStatus);
+        _restartForUpdateButton = Action("KHỞI ĐỘNG LẠI ĐỂ CẬP NHẬT", (_, _) => _updateService.ApplyAndRestart(), true);
+        _restartForUpdateButton.Visibility = _mapLaunchGateState == MapLaunchGateState.UpdateRequired ? Visibility.Visible : Visibility.Collapsed;
+        _restartForUpdateButton.Margin = new Thickness(0, 8, 0, 0);
+        p.Children.Add(_restartForUpdateButton);
     }
 
     private Button ServerButton(string logo, string label, string action, string surface, string border)
@@ -334,6 +352,21 @@ public partial class HomeWindow : Window
     }
     private async void OpenMap_Click(object? sender, RoutedEventArgs e)
     {
+        if (_mapLaunchGateState == MapLaunchGateState.Checking)
+        {
+            SetUpdateStatus("Đang kiểm tra bản cập nhật. Vui lòng chờ một chút…", "#E7B74E");
+            if (_updateTask is not null)
+            {
+                try { await _updateTask; } catch (OperationCanceledException) when (_shutdown.IsCancellationRequested) { return; }
+            }
+        }
+
+        if (!MapLaunchGatePolicy.AllowsMap(_mapLaunchGateState))
+        {
+            SetUpdateStatus("Có bản cập nhật mới. Hãy khởi động lại để hoàn tất cập nhật trước khi mở map.", "#F0C36A");
+            return;
+        }
+
         // Npcap is required by the local GPS/telemetry source. Keep this gate
         // in the launcher entry point so every map launch (including the new
         // Home/Pro hero action) restores the setup dialog before credentials
@@ -419,6 +452,81 @@ public partial class HomeWindow : Window
         }
 
         return ready;
+    }
+
+    private void WarmupLocalTelemetryIfReady()
+    {
+        try
+        {
+            if (NpcapAvailabilityProbe.Check().IsAvailable)
+            {
+                // Start capture before the game/session is opened so the first
+                // handshake and movement packet are not lost. The merger still
+                // requires fresh movement; warmup only makes that packet
+                // available sooner and never reuses stale coordinates.
+                App.CurrentApp.EnsureLocalTelemetryWarmup();
+            }
+        }
+        catch
+        {
+            // Npcap is optional until the user opens the map. The existing
+            // setup dialog remains the authoritative recovery path.
+        }
+    }
+
+    private async Task PrepareUpdateAtStartupAsync()
+    {
+        if (_updateTask is { IsCompleted: false }) return;
+        _updateTask = PrepareUpdateCoreAsync();
+        try { await _updateTask; }
+        catch (OperationCanceledException) when (_shutdown.IsCancellationRequested) { }
+    }
+
+    private async Task PrepareUpdateCoreAsync()
+    {
+        UpdatePreparationResult result;
+        try
+        {
+            result = await _updateService.PrepareUpdateAsync(cancellationToken: _shutdown.Token);
+        }
+        catch (OperationCanceledException) when (_shutdown.IsCancellationRequested)
+        {
+            return;
+        }
+
+        await Dispatcher.InvokeAsync(() =>
+        {
+            _mapLaunchGateState = MapLaunchGatePolicy.FromUpdate(result.State);
+            if (_mapActionButton is not null)
+                _mapActionButton.IsEnabled = MapLaunchGatePolicy.AllowsMap(_mapLaunchGateState);
+            if (_restartForUpdateButton is not null)
+                _restartForUpdateButton.Visibility = _mapLaunchGateState == MapLaunchGateState.UpdateRequired ? Visibility.Visible : Visibility.Collapsed;
+
+            switch (result.State)
+            {
+                case UpdatePreparationState.Ready:
+                    SetUpdateStatus($"Đã tải bản cập nhật v{result.Version}. Khởi động lại để hoàn tất trước khi mở map.", "#F0C36A");
+                    break;
+                case UpdatePreparationState.Current:
+                    SetUpdateStatus("Bản cập nhật đã kiểm tra · phiên bản hiện tại", "#79D5B0");
+                    break;
+                case UpdatePreparationState.DevelopmentBuild:
+                    SetUpdateStatus("Bản phát triển · bỏ qua kiểm tra cập nhật", "#91AAA3");
+                    break;
+                default:
+                    // Network/update service failures are deliberately
+                    // non-blocking, as requested. Users can still open map.
+                    SetUpdateStatus("Không kiểm tra được cập nhật · vẫn cho phép mở map", "#E7B74E");
+                    break;
+            }
+        });
+    }
+
+    private void SetUpdateStatus(string text, string color)
+    {
+        if (_updateStatus is null) return;
+        _updateStatus.Text = text;
+        _updateStatus.Foreground = B(color);
     }
     private void BuildInfo()
     {

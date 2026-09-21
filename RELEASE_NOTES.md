@@ -1,3 +1,11 @@
+# Isle Live Map 2.3.5
+
+## Auto update và GPS local
+
+- Launcher kiểm tra bản cập nhật trước khi cho mở Live Map. Nếu kiểm tra mạng thất bại, app báo rõ nhưng vẫn cho người dùng tiếp tục sử dụng; nếu tải được bản mới, map chỉ mở sau khi khởi động lại hoàn tất cập nhật.
+- Khôi phục prewarm Npcap ngay khi launcher khởi động và probe Npcap đã sẵn sàng, giúp bắt process, adapter, UDP handshake và movement packet trước khi người dùng bấm mở map.
+- Giữ yêu cầu movement local phải mới để không hiển thị vị trí cũ như vị trí hiện tại; khi đang chờ packet, launcher/telemetry hiển thị trạng thái chờ thay vì giả dữ liệu live.
+
 # Isle Live Map 2.3.3
 
 ## Pro Agent và Live Map
