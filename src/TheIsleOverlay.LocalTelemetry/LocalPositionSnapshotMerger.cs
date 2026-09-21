@@ -180,6 +180,8 @@ public static class LocalPositionSnapshotMerger
             Map = mergedRemote?.Map ?? baseSnapshot.Map,
             ProPlayerTrackingActive = remotePlayers is not null,
             ProPlayerSequence = verifiedLocalFallback?.Sequence,
+            ProPlayerFrameObservedAt = verifiedLocalFallback?.ObservedAt,
+            ProPlayerFrameReceivedAt = verifiedLocalFallback?.ReceivedAt,
             ProPlayerSync = verifiedLocalFallback?.PlayerSync,
             ProTrackingDiagnostics = mergedRemote?.Diagnostics ?? baseSnapshot.ProTrackingDiagnostics,
             SessionState = preserveRemoteStaleness

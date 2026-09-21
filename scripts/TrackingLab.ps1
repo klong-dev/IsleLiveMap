@@ -165,6 +165,8 @@ function Invoke-Analyze([string]$Path) {
     $eligibleEntities = [System.Collections.Generic.List[object]]::new()
     $seenByEndpoint = @{}
     $renderLatencies = [System.Collections.Generic.List[double]]::new()
+    $captureDecodeLatencies = [System.Collections.Generic.List[double]]::new()
+    $agentUiLatencies = [System.Collections.Generic.List[double]]::new()
     $missing = [System.Collections.Generic.List[object]]::new()
     $entityStates = @{}
     foreach ($frame in $agent) {
@@ -204,6 +206,12 @@ function Invoke-Analyze([string]$Path) {
                 $eligibleEntities.Add($line)
                 if ($render) { $renderLatencies.Add([double]$line.LatencyMs) } else { $missing.Add($line) }
             }
+            if ($render -and $frameAt) {
+                $receivedAt = Get-DateTimeOffsetOrNull $frame.ReceivedAt
+                $observedAt = Get-DateTimeOffsetOrNull $frame.ObservedAt
+                if ($receivedAt -and $observedAt) { $captureDecodeLatencies.Add([Math]::Max(0, ($receivedAt - $observedAt).TotalMilliseconds)) }
+                $agentUiLatencies.Add([Math]::Max(0, ($render.At - $frameAt).TotalMilliseconds))
+            }
             $entityStates[$key] = $state
         }
     }
@@ -211,7 +219,13 @@ function Invoke-Analyze([string]$Path) {
         Set-Content -LiteralPath (Join-Path $Path 'replay-ground-truth.jsonl') -Encoding UTF8
     $sequences = @($agent | Where-Object { $null -ne $_.Sequence } | ForEach-Object { [long]$_.Sequence })
     $gaps = 0
-    for ($i = 1; $i -lt $sequences.Count; $i++) { if ($sequences[$i] -gt ($sequences[$i - 1] + 1)) { $gaps += $sequences[$i] - $sequences[$i - 1] - 1 } }
+    $duplicates = 0
+    $reorders = 0
+    for ($i = 1; $i -lt $sequences.Count; $i++) {
+        if ($sequences[$i] -gt ($sequences[$i - 1] + 1)) { $gaps += $sequences[$i] - $sequences[$i - 1] - 1 }
+        if ($sequences[$i] -eq $sequences[$i - 1]) { $duplicates++ }
+        if ($sequences[$i] -lt $sequences[$i - 1]) { $reorders++ }
+    }
     $diagnosticRejections = @{}
     foreach ($row in $renderRows) {
         $diagnostic = $row.ProTrackingDiagnostics
@@ -229,6 +243,8 @@ function Invoke-Analyze([string]$Path) {
         RenderedMarkerSamples = $rendered.Count
         DistinctRenderedMarkerKeys = @($rendered | ForEach-Object Key | Sort-Object -Unique).Count
         SequenceGapEstimate = $gaps
+        DuplicateSequenceCount = $duplicates
+        ReorderedSequenceCount = $reorders
         MaxUiQueueDelayMs = if ($renderRows) { ($renderRows | Measure-Object UiQueueDelayMs -Maximum).Maximum } else { $null }
         MaxSnapshotAgeMs = if ($renderRows) { ($renderRows | Measure-Object SnapshotAgeMs -Maximum).Maximum } else { $null }
         ProTrackingActiveRows = @($renderRows | Where-Object ProPlayerTrackingActive).Count
@@ -240,6 +256,10 @@ function Invoke-Analyze([string]$Path) {
         RejectionReasons = $diagnosticRejections
         P50MarkerLatencyMs = Get-Percentile $renderLatencies.ToArray() 0.50
         P95MarkerLatencyMs = Get-Percentile $renderLatencies.ToArray() 0.95
+        P50CaptureDecodeLatencyMs = Get-Percentile $captureDecodeLatencies.ToArray() 0.50
+        P95CaptureDecodeLatencyMs = Get-Percentile $captureDecodeLatencies.ToArray() 0.95
+        P50AgentToUiLatencyMs = Get-Percentile $agentUiLatencies.ToArray() 0.50
+        P95AgentToUiLatencyMs = Get-Percentile $agentUiLatencies.ToArray() 0.95
         MissingEntities = $missing
         GroundTruthPath = (Join-Path $Path 'replay-ground-truth.jsonl')
         Status = if ($agent.Count -eq 0 -or $renderRows.Count -eq 0) { 'NEED_DEVELOPER' } elseif ($missing.Count -gt 0) { 'FAIL' } else { 'PASS' }
@@ -270,6 +290,10 @@ function Invoke-Report([string]$Path) {
         "- Rejected entity observations: $($a.RejectedEntityObservations)",
         "- P50 latency marker: $($a.P50MarkerLatencyMs) ms",
         "- P95 latency marker: $($a.P95MarkerLatencyMs) ms",
+        "- P50 capture -> decode: $($a.P50CaptureDecodeLatencyMs) ms",
+        "- P95 capture -> decode: $($a.P95CaptureDecodeLatencyMs) ms",
+        "- P50 Agent -> UI: $($a.P50AgentToUiLatencyMs) ms",
+        "- P95 Agent -> UI: $($a.P95AgentToUiLatencyMs) ms",
         "- Ground truth: $($a.GroundTruthPath)",
         "- Status: $($a.Status)",
         '',

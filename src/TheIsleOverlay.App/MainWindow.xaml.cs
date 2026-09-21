@@ -281,6 +281,8 @@ public partial class MainWindow : Window
             snapshot?.UpdatedAt,
             snapshot?.ProPlayerTrackingActive,
             snapshot?.ProPlayerSequence,
+            snapshot?.ProPlayerFrameObservedAt,
+            snapshot?.ProPlayerFrameReceivedAt,
             snapshot?.ProPlayerSync,
             snapshot?.ProPlayerCaptureHealth,
             snapshot?.ProTrackingDiagnostics,

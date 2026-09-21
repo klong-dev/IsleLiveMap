@@ -17,6 +17,8 @@ public sealed record TelemetrySnapshot
     // snapshot. It is diagnostic metadata only; consumers should not use it
     // as a gameplay timestamp.
     public long? ProPlayerSequence { get; init; }
+    public DateTimeOffset? ProPlayerFrameObservedAt { get; init; }
+    public DateTimeOffset? ProPlayerFrameReceivedAt { get; init; }
     public RemotePlayerSyncState? ProPlayerSync { get; init; }
     public RemotePlayerCaptureHealth? ProPlayerCaptureHealth { get; init; }
     public RemoteTrackingDiagnostics? ProTrackingDiagnostics { get; init; }
