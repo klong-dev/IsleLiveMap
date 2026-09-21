@@ -160,6 +160,12 @@ function Invoke-Capture([string]$Path) {
         Write-Warning 'Capture stopped because live Pro preflight is not ready. Open Live Map to start the Agent, then retry capture.'
         return
     }
+    foreach ($name in @('agent-live-compare.jsonl', 'map-diagnostics.jsonl')) {
+        $target = Join-Path $Path $name
+        if (-not (Test-Path -LiteralPath $target)) {
+            New-Item -ItemType File -Force -Path $target | Out-Null
+        }
+    }
     $seconds = [Math]::Max(60, $DurationMinutes * 60)
     Write-Host "Capturing for $DurationMinutes minutes. No game input is sent."
     Start-Sleep -Seconds $seconds
@@ -525,6 +531,10 @@ function Invoke-Round {
     $modes = @('stable', 'restart-or-reconnect', 'crowded-area')
     foreach ($mode in $modes) {
         $script:SessionId = "$round-$mode"
+        # New-Session owns the process environment and must launch/restart the
+        # app in that same process.  A later `capture` PowerShell invocation
+        # cannot retroactively pass diagnostics paths to an already running
+        # launcher.
         $path = New-Session
         $manifestPath = Join-Path $path 'session-manifest.json'
         $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
