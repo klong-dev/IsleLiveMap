@@ -4,8 +4,6 @@ namespace TheIsleOverlay.App;
 
 internal static class RemotePlayerMapMarkerResolver
 {
-    private const double SamePointTolerance = 1e-9;
-
     public static IReadOnlyList<RemotePlayerMapMarker> Resolve(
         MapTelemetry? map,
         PlayerTelemetry? localPlayer)
@@ -15,9 +13,6 @@ internal static class RemotePlayerMapMarkerResolver
             return [];
         }
 
-        var localPoint = GatewayMapProjection.ResolveForBundledTexture(
-            localPlayer?.Location,
-            localPlayer?.MapLocation);
         var duplicateCounts = new Dictionary<string, int>(StringComparer.Ordinal);
         var result = new List<RemotePlayerMapMarker>(markers.Count);
 
@@ -44,7 +39,7 @@ internal static class RemotePlayerMapMarkerResolver
                 marker.Location,
                 marker.MapLocation);
             if (point is not { } resolvedPoint
-                || IsLocalMarker(marker, localPlayer, localPoint, resolvedPoint))
+                || IsExplicitlyLocalMarker(marker, localPlayer))
             {
                 continue;
             }
@@ -112,11 +107,9 @@ internal static class RemotePlayerMapMarkerResolver
         }
     }
 
-    private static bool IsLocalMarker(
+    private static bool IsExplicitlyLocalMarker(
         MapMarkerTelemetry marker,
-        PlayerTelemetry? localPlayer,
-        MapPoint? localPoint,
-        MapPoint markerPoint)
+        PlayerTelemetry? localPlayer)
     {
         if (marker.Self)
         {
@@ -133,12 +126,12 @@ internal static class RemotePlayerMapMarkerResolver
             return true;
         }
 
-        // Legacy map responses did not always mark the local entry as Self.
-        // An exactly overlapping marker would be hidden under the local arrow
-        // anyway, so omit it to avoid presenting the player as a remote dot.
-        return localPoint is { } selfPoint
-               && Math.Abs(selfPoint.Left - markerPoint.Left) <= SamePointTolerance
-               && Math.Abs(selfPoint.Top - markerPoint.Top) <= SamePointTolerance;
+        // Never infer local identity from coordinate overlap. Several real
+        // remote actors can occupy the same projected point as the local
+        // player, and hiding them here creates a silent missing-marker bug.
+        // A marker is local only when the upstream pipeline explicitly marks
+        // it Self or supplies the same authoritative identity.
+        return false;
     }
 
     private static string MarkerBaseKey(MapMarkerTelemetry marker, MapPoint point)

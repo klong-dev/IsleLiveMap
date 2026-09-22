@@ -137,7 +137,9 @@ public sealed class ProAccessService : IDisposable
                 _installation.ExecutablePath,
                 _currentHostVersion,
                 _session.SteamId64,
-                _session.OfflineLicenseToken!);
+                _session.OfflineLicenseToken!,
+                Environment.GetEnvironmentVariable(
+                    "ISLELIVEMAP_PRO_LIVE_COMPARE_PATH"));
         }
     }
 

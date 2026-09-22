@@ -19,6 +19,7 @@ public sealed class ProAgentRemotePlayerSource :
     private readonly string _hostVersion;
     private readonly string _steamId64;
     private readonly string _offlineLicenseToken;
+    private readonly string? _liveComparePath;
     private readonly CancellationTokenSource _disposeCancellation = new();
     private readonly object _compareGate = new();
     private StreamWriter? _compareWriter;
@@ -33,7 +34,8 @@ public sealed class ProAgentRemotePlayerSource :
         string agentExecutablePath,
         string hostVersion,
         string steamId64,
-        string offlineLicenseToken)
+        string offlineLicenseToken,
+        string? liveComparePath = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(agentExecutablePath);
         ArgumentException.ThrowIfNullOrWhiteSpace(hostVersion);
@@ -43,6 +45,9 @@ public sealed class ProAgentRemotePlayerSource :
         _hostVersion = hostVersion;
         _steamId64 = steamId64;
         _offlineLicenseToken = offlineLicenseToken;
+        _liveComparePath = string.IsNullOrWhiteSpace(liveComparePath)
+            ? null
+            : Path.GetFullPath(liveComparePath.Trim());
     }
 
     public async IAsyncEnumerable<RemotePlayerTelemetryFrame> WatchAsync(
@@ -233,7 +238,7 @@ public sealed class ProAgentRemotePlayerSource :
 
     private void WriteLiveCompare(ProTelemetryFrame frame)
     {
-        var configuredPath = Environment.GetEnvironmentVariable(
+        var configuredPath = _liveComparePath ?? Environment.GetEnvironmentVariable(
             "ISLELIVEMAP_PRO_LIVE_COMPARE_PATH");
         if (string.IsNullOrWhiteSpace(configuredPath))
         {
@@ -276,18 +281,32 @@ public sealed class ProAgentRemotePlayerSource :
                         entity.Location,
                         entity.ObservedAt,
                         entity.LocationObservedAt,
+                        entity.ActorNetRefHandle,
+                        entity.PlayerStateNetRefHandle,
+                        entity.PawnNetRefHandle,
                         entity.IsProvisional
                     }).ToArray()
                 };
                 _compareWriter.WriteLine(JsonSerializer.Serialize(record));
             }
         }
-        catch (IOException)
+        catch (Exception exception) when (
+            exception is IOException or UnauthorizedAccessException or JsonException)
         {
             lock (_compareGate)
             {
                 _compareWriter?.Dispose();
                 _compareWriter = null;
+            }
+
+            try
+            {
+                File.AppendAllText(
+                    configuredPath + ".error.log",
+                    $"{DateTimeOffset.UtcNow:O} {exception}{Environment.NewLine}");
+            }
+            catch
+            {
             }
         }
         catch (UnauthorizedAccessException)
@@ -367,7 +386,10 @@ public sealed class ProAgentRemotePlayerSource :
                 entity.ConfirmationHits,
                 entity.ObservedAt,
                 entity.IsProvisional,
-                entity.LocationObservedAt))
+                entity.LocationObservedAt,
+                entity.ActorNetRefHandle,
+                entity.PlayerStateNetRefHandle,
+                entity.PawnNetRefHandle))
             .ToArray();
 
         return new RemotePlayerTelemetryFrame(
@@ -458,20 +480,21 @@ public sealed class ProAgentRemotePlayerSource :
         && (entity.Kind == MapEntityKind.Ai
             && HasValidSpecies(entity)
             || entity.Kind == MapEntityKind.Player
+            // Names are optional metadata. Structural Iris identity is
+            // mandatory for both verified and provisional players.
+            && HasStableActorIdentity(entity)
             && (entity.IsProvisional
-                && !HasValidPlayerProof(entity)
-                && HasValidSpecies(entity)
-                || !entity.IsProvisional
-                && HasValidPlayerProof(entity)
-                && HasValidOptionalSpecies(entity)))
+                ? HasValidSpecies(entity)
+                : HasValidOptionalSpecies(entity)))
         && entity.ConfirmationHits > 0
         && double.IsFinite(entity.DistanceFromLocal)
         && entity.DistanceFromLocal >= 0
         && IsFinite(entity.Location);
 
-    private static bool HasValidPlayerProof(VerifiedMapEntity entity) =>
-        entity.PlayerProofName is { Length: > 0 and <= 64 }
-        && !string.IsNullOrWhiteSpace(entity.PlayerProofName);
+    private static bool HasStableActorIdentity(VerifiedMapEntity entity) =>
+        entity.ActorNetRefHandle > 0
+        || entity.PlayerStateNetRefHandle > 0
+        || entity.PawnNetRefHandle > 0;
 
     private static bool HasValidSpecies(VerifiedMapEntity entity) =>
         HasValidSpeciesIdentity(entity.SpeciesId, entity.SpeciesShortName);

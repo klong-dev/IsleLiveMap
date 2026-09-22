@@ -225,7 +225,7 @@ public partial class MainWindow
         if (snapshot.ProTrackingDiagnostics is { } diagnostics)
         {
             RemoteTrackingDiagnosticsLabel.Text =
-                $"REMOTE FRAME · NHẬN {diagnostics.ReceivedCount} · ĐỦ ĐK {diagnostics.EligibleCount} · HIỆN {diagnostics.RenderedCount} · LOẠI {diagnostics.RejectedCount}";
+                $"REMOTE FRAME · NHẬN {diagnostics.ReceivedCount} · ĐỦ ĐK {diagnostics.EligibleCount} · HIỆN {diagnostics.RenderedCount} · CŨ {diagnostics.StaleCount} · LOẠI {diagnostics.RejectedCount}";
             RemoteTrackingDiagnosticsLabel.ToolTip = diagnostics.Rejections.Count == 0
                 ? diagnostics.FrameState
                 : string.Join(", ", diagnostics.Rejections.Select(pair => $"{pair.Key}: {pair.Value}"));

@@ -70,7 +70,10 @@ internal sealed record VerifiedMapEntity(
     int ConfirmationHits,
     DateTimeOffset ObservedAt,
     bool IsProvisional = false,
-    DateTimeOffset? LocationObservedAt = null);
+    DateTimeOffset? LocationObservedAt = null,
+    ulong ActorNetRefHandle = 0,
+    ulong PlayerStateNetRefHandle = 0,
+    ulong PawnNetRefHandle = 0);
 
 internal sealed record PlayerSyncState(
     bool IsSynchronizing,

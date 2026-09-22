@@ -206,55 +206,122 @@ function Read-JsonLines([string]$Path) {
             $null = $items.Add($value)
         } catch { }
     }
-    foreach ($item in $items) { Write-Output -NoEnumerate $item }
+    # ConvertFrom-Json returns a PSCustomObject for each JSONL line. Do not
+    # emit with -NoEnumerate here: Windows PowerShell 5.1 can preserve the
+    # internal List wrapper as the pipeline item, making every later field
+    # lookup appear null and producing false missing-marker failures.
+    foreach ($item in $items) { Write-Output $item }
 }
 
 function Get-DateTimeOffsetOrNull($Value) {
     if ($null -eq $Value) { return $null }
+    if ($Value -is [DateTimeOffset]) { return $Value }
+    if ($Value -is [DateTime]) { return [DateTimeOffset]$Value }
     try { return [DateTimeOffset]::Parse($Value.ToString()) } catch { return $null }
 }
 
+function Get-FrameTimestamp($Frame) {
+    return Get-DateTimeOffsetOrNull (Get-Field $Frame @(
+        'ReceivedAt', 'receivedAt',
+        'FrameObservedAt', 'frameObservedAt',
+        'ObservedAt', 'observedAt',
+        'RecordedAt', 'recordedAt'
+    ))
+}
+
+function Get-Field($Object, [string[]]$Names) {
+    if ($null -eq $Object) { return $null }
+    foreach ($name in $Names) {
+        $property = $Object.PSObject.Properties[$name]
+        if ($null -ne $property) { return $property.Value }
+    }
+    return $null
+}
+
+function Get-EntityProvisional($Entity) {
+    return [bool](Get-Field $Entity @('IsProvisional', 'isProvisional', 'Provisional', 'provisional'))
+}
+
+function Get-EntityName($Entity) {
+    return [string](Get-Field $Entity @('PlayerProofName', 'playerProofName', 'IngameName', 'ingameName'))
+}
+
+function Get-EntitySpeciesId($Entity) {
+    return [string](Get-Field $Entity @('SpeciesId', 'speciesId'))
+}
+
+function Get-EntitySpeciesName($Entity) {
+    return [string](Get-Field $Entity @('SpeciesShortName', 'speciesShortName', 'Species', 'species'))
+}
+
+function Get-EntityKind($Entity) {
+    $value = Get-Field $Entity @('Kind', 'kind', 'EntityKind', 'entityKind', 'Type', 'type')
+    if ($null -eq $value -or [string]::IsNullOrWhiteSpace([string]$value)) { return 'unknown' }
+    return ([string]$value).ToLowerInvariant()
+}
+
+function Get-EntityHandle($Entity, [string[]]$Names) {
+    $value = Get-Field $Entity $Names
+    if ($null -eq $value) { return [uint64]0 }
+    try { return [uint64]$value } catch { return [uint64]0 }
+}
+
 function Get-EntityKey($Entity, [string]$Endpoint, [long]$Generation = 1) {
-    $kind = $Entity.Kind.ToString().ToLowerInvariant()
-    return "$Generation`:$Endpoint`:$kind`:$($Entity.TrackId)"
+    $kind = Get-EntityKind $Entity
+    $trackId = Get-Field $Entity @('TrackId', 'trackId', 'Id', 'id')
+    return "$Generation`:$Endpoint`:$kind`:$trackId"
 }
 
 function Test-EligibleEntity($Entity, $Frame) {
-    if ($null -eq $Entity -or [long]$Entity.TrackId -le 0) { return $false }
-    $kind = $Entity.Kind.ToString().ToLowerInvariant()
-    $location = $Entity.Location
+    $trackId = Get-Field $Entity @('TrackId', 'trackId', 'Id', 'id')
+    if ($null -eq $Entity -or $null -eq $trackId -or [long]$trackId -le 0) { return $false }
+    $kind = Get-EntityKind $Entity
+    $location = Get-Field $Entity @('Location', 'location', 'Position', 'position')
     if ($null -eq $location -or $null -eq $location.X -or $null -eq $location.Y) { return $false }
     # Presence can refresh while a stationary actor keeps its last safe
     # coordinate. That is valid for a short stationary window, but an old
     # coordinate must not be treated as ground truth for marker accuracy.
     $locationAt = Get-DateTimeOffsetOrNull $Entity.LocationObservedAt
-    $frameAt = Get-DateTimeOffsetOrNull $(if ($Entity.ObservedAt) { $Entity.ObservedAt } else { $Frame.ObservedAt })
+    $frameAt = Get-FrameTimestamp $Frame
+    if ($null -eq $frameAt) { $frameAt = Get-DateTimeOffsetOrNull (Get-Field $Entity @('ObservedAt', 'observedAt')) }
     if ($null -ne $locationAt -and $null -ne $frameAt -and
         (($locationAt -gt $frameAt) -or
          (($frameAt - $locationAt).TotalSeconds -gt 90))) { return $false }
     if ($kind -eq 'ai') {
-        return -not [string]::IsNullOrWhiteSpace([string]$Entity.SpeciesId) -and
-            -not [string]::IsNullOrWhiteSpace([string]$Entity.SpeciesShortName)
+        return -not [string]::IsNullOrWhiteSpace((Get-EntitySpeciesId $Entity)) -and
+            -not [string]::IsNullOrWhiteSpace((Get-EntitySpeciesName $Entity))
     }
     if ($kind -eq 'player') {
-        if ([bool]$Entity.IsProvisional) {
-            return -not [string]::IsNullOrWhiteSpace([string]$Entity.SpeciesId) -and
-                -not [string]::IsNullOrWhiteSpace([string]$Entity.SpeciesShortName)
+        if (Get-EntityProvisional $Entity) {
+            return -not [string]::IsNullOrWhiteSpace((Get-EntitySpeciesId $Entity)) -and
+                -not [string]::IsNullOrWhiteSpace((Get-EntitySpeciesName $Entity))
         }
-        return -not [string]::IsNullOrWhiteSpace([string]$Entity.PlayerProofName)
+        # A verified Iris actor can legitimately arrive without a player name.
+        # Identity handles are authoritative; names are presentation metadata.
+        return -not [string]::IsNullOrWhiteSpace((Get-EntityName $Entity)) -or
+            (Get-EntityHandle $Entity @('ActorNetRefHandle', 'actorNetRefHandle')) -gt 0 -or
+            (Get-EntityHandle $Entity @('PlayerStateNetRefHandle', 'playerStateNetRefHandle')) -gt 0 -or
+            (Get-EntityHandle $Entity @('PawnNetRefHandle', 'pawnNetRefHandle')) -gt 0
     }
     return $false
 }
 
 function Get-EntityRejectionReason($Entity, $Frame) {
-    if ($null -eq $Entity -or [long]$Entity.TrackId -le 0) { return 'InvalidTrackId' }
-    if ($null -eq $Entity.Location -or $null -eq $Entity.Location.X -or $null -eq $Entity.Location.Y) { return 'InvalidCoordinate' }
+    $trackId = Get-Field $Entity @('TrackId', 'trackId', 'Id', 'id')
+    $location = Get-Field $Entity @('Location', 'location', 'Position', 'position')
+    if ($null -eq $Entity -or $null -eq $trackId -or [long]$trackId -le 0) { return 'InvalidTrackId' }
+    if ($null -eq $location -or $null -eq $location.X -or $null -eq $location.Y) { return 'InvalidCoordinate' }
     $locationAt = Get-DateTimeOffsetOrNull $Entity.LocationObservedAt
-    $frameAt = Get-DateTimeOffsetOrNull $(if ($Entity.ObservedAt) { $Entity.ObservedAt } else { $Frame.ObservedAt })
+    $frameAt = Get-FrameTimestamp $Frame
+    if ($null -eq $frameAt) { $frameAt = Get-DateTimeOffsetOrNull (Get-Field $Entity @('ObservedAt', 'observedAt')) }
     if ($null -ne $locationAt -and $null -ne $frameAt -and ($frameAt - $locationAt).TotalSeconds -gt 90) { return 'StaleLocation' }
-    $kind = $Entity.Kind.ToString().ToLowerInvariant()
-    if ($kind -eq 'ai' -and ([string]::IsNullOrWhiteSpace([string]$Entity.SpeciesId) -or [string]::IsNullOrWhiteSpace([string]$Entity.SpeciesShortName))) { return 'MissingSpecies' }
-    if ($kind -eq 'player' -and -not [bool]$Entity.IsProvisional -and [string]::IsNullOrWhiteSpace([string]$Entity.PlayerProofName)) { return 'MissingPlayerProof' }
+    $kind = Get-EntityKind $Entity
+    if ($kind -eq 'ai' -and ([string]::IsNullOrWhiteSpace((Get-EntitySpeciesId $Entity)) -or [string]::IsNullOrWhiteSpace((Get-EntitySpeciesName $Entity)))) { return 'MissingSpecies' }
+    if ($kind -eq 'player' -and -not (Get-EntityProvisional $Entity) -and
+        [string]::IsNullOrWhiteSpace((Get-EntityName $Entity)) -and
+        (Get-EntityHandle $Entity @('ActorNetRefHandle', 'actorNetRefHandle')) -eq 0 -and
+        (Get-EntityHandle $Entity @('PlayerStateNetRefHandle', 'playerStateNetRefHandle')) -eq 0 -and
+        (Get-EntityHandle $Entity @('PawnNetRefHandle', 'pawnNetRefHandle')) -eq 0) { return 'MissingPlayerProof' }
     return 'ValidationOrProof'
 }
 
@@ -284,6 +351,15 @@ function Invoke-Analyze([string]$Path) {
     if (-not (Test-Path -LiteralPath $mapPath)) { $mapPath = Join-Path $Path 'map-diagnostics.jsonl' }
     $agent = @(Read-JsonLines $agentPath)
     $map = @(Read-JsonLines $mapPath)
+    # Older captures only contain RemoteEntities, which is Agent output and
+    # not proof that the host renderer received/rendered the entity. Do not
+    # turn that schema gap into a false missing-marker failure.
+    $stageEvidenceAvailable = @($agent | Where-Object {
+        $null -ne $_.evidence -or
+        $null -ne $_.ongoingCandidates -or
+        $null -ne $_.mapOutputPlayers -or
+        $null -ne $_.mapOutputAi
+    }).Count -gt 0
     $renderRows = @($map | Where-Object { $_.stage -eq 'render-end' })
     $rendered = @($renderRows | ForEach-Object { @($_.RenderedMarkers) } | Where-Object { $_ })
     $renderIndex = @{}
@@ -316,11 +392,28 @@ function Invoke-Analyze([string]$Path) {
         UnmatchedInbound = 0
         UnmatchedPresence = 0
         BlockedNoProof = 0
+        MovementOnlyNoPlayerProof = 0
         BlockedFusionOrValidation = 0
+        PublishedStructuralAnonymous = 0
     }
+    $candidateDiagnostics = [ordered]@{
+        TotalObservations = 0
+        DistinctHandles = 0
+        AlreadyVerifiedOrGraphProvisional = 0
+        PublishedExactActorSpecies = 0
+        PublishedStructuralAnonymousPlayer = 0
+        PublishedIslePilotCorroborated = 0
+        MovementOnlyNoPlayerProof = 0
+        BlockedByFusionOrValidation = 0
+        HandlesLaterRenderedAsPlayer = @()
+        LateProofUpgradedHandles = @()
+    }
+    $candidateHandlesByDecision = @{}
+    $allCandidateHandles = [System.Collections.Generic.HashSet[string]]::new()
+    $candidateRenderedPlayerHandles = [System.Collections.Generic.HashSet[string]]::new()
     $hasStageEvidence = $false
     foreach ($frame in $agent) {
-        $frameAt = Get-DateTimeOffsetOrNull $(if ($frame.ReceivedAt) { $frame.ReceivedAt } else { $frame.ObservedAt })
+        $frameAt = Get-FrameTimestamp $frame
         $endpoint = if ([string]::IsNullOrWhiteSpace([string]$frame.ServerEndpoint)) { 'unknown' } else { [string]$frame.ServerEndpoint }
         if (-not $seenByEndpoint.ContainsKey($endpoint)) { $seenByEndpoint[$endpoint] = 1 }
         # The live recorder stores the post-fusion output in separate player
@@ -347,15 +440,25 @@ function Invoke-Analyze([string]$Path) {
             $stageCounters.UnmatchedInbound += @($frame.fusion.unmatchedInboundTrackIds).Count
             $stageCounters.UnmatchedPresence += @($frame.fusion.unmatchedPresenceTrackIds).Count
             foreach ($candidate in @($frame.ongoingCandidates)) {
-                if ([string]$candidate.decision -eq 'blocked-no-exact-player-proof') { $stageCounters.BlockedNoProof++ }
+                $decision = [string]$candidate.decision
+                $candidateDiagnostics.TotalObservations++
+                if (-not $candidateHandlesByDecision.ContainsKey($decision)) {
+                    $candidateHandlesByDecision[$decision] =
+                        [System.Collections.Generic.HashSet[string]]::new()
+                }
+                $null = $candidateHandlesByDecision[$decision].Add(
+                    [string]$candidate.actorHandle)
+                $null = $allCandidateHandles.Add([string]$candidate.actorHandle)
+                if ([string]$candidate.decision -in @('blocked-no-exact-player-proof', 'movement-only-no-player-proof')) { $stageCounters.BlockedNoProof++ }
+                if ([string]$candidate.decision -eq 'movement-only-no-player-proof') { $stageCounters.MovementOnlyNoPlayerProof++ }
                 if ([string]$candidate.decision -eq 'blocked-by-fusion-or-validation') { $stageCounters.BlockedFusionOrValidation++ }
+                if ([string]$candidate.decision -eq 'published-structural-anonymous-player') { $stageCounters.PublishedStructuralAnonymous++ }
             }
         }
         foreach ($entity in $entities) {
             $eligible = Test-EligibleEntity $entity $frame
             $key = Get-EntityKey $entity $endpoint $seenByEndpoint[$endpoint]
             $render = $null
-            $identityPrefix = "pro-entity:$($entity.Kind.ToString().ToLowerInvariant()):$($entity.TrackId)"
             if ($eligible) {
                 # Rendered marker keys intentionally carry a visual namespace
                 # (currently `steam:pro-entity:...#slot`).  Ground truth keys
@@ -364,8 +467,9 @@ function Invoke-Analyze([string]$Path) {
                 # The previous prefix check assumed the key started directly
                 # with `pro-entity`, so every valid marker was falsely reported
                 # as missing when the runtime added the `steam:` namespace.
-                $kindName = $entity.Kind.ToString().ToLowerInvariant()
-                $trackIdText = [regex]::Escape([string]$entity.TrackId)
+                $kindName = Get-EntityKind $entity
+                $trackIdValue = Get-Field $entity @('TrackId', 'trackId', 'Id', 'id')
+                $trackIdText = [regex]::Escape([string]$trackIdValue)
                 $renderKeyPattern = "(^|:)pro-entity:$kindName`:$trackIdText(#|$)"
                 $candidates = @($renderIndex.Keys |
                     Where-Object { $_ -match $renderKeyPattern } |
@@ -380,13 +484,16 @@ function Invoke-Analyze([string]$Path) {
                 }
             }
             $renderedNow = $null -ne $render
-            $state = if (-not $eligible) { 'Rejected' } elseif ($renderedNow) { 'Visible' } else { 'TemporarilyMissing' }
+            $state = if (-not $eligible) { 'Rejected' }
+                     elseif (-not $stageEvidenceAvailable) { 'ObservedBeforeRender' }
+                     elseif ($renderedNow) { 'Visible' }
+                     else { 'TemporarilyMissing' }
             $line = [pscustomobject]@{
                 ReceivedAt = $frameAt
                 Sequence = $frame.Sequence
                 Key = $key
-                TrackId = $entity.TrackId
-                Kind = $entity.Kind
+                TrackId = Get-Field $entity @('TrackId', 'trackId', 'Id', 'id')
+                Kind = Get-EntityKind $entity
                 Eligible = $eligible
                 Rendered = $renderedNow
                 State = $state
@@ -397,7 +504,9 @@ function Invoke-Analyze([string]$Path) {
             $groundTruth.Add($line)
             if ($eligible) {
                 $eligibleEntities.Add($line)
-                if ($render) { $renderLatencies.Add([double]$line.LatencyMs) } else { $missing.Add($line) }
+                if ($stageEvidenceAvailable) {
+                    if ($render) { $renderLatencies.Add([double]$line.LatencyMs) } else { $missing.Add($line) }
+                }
             }
             if ($render -and $frameAt) {
                 $receivedAt = Get-DateTimeOffsetOrNull $frame.ReceivedAt
@@ -407,7 +516,54 @@ function Invoke-Analyze([string]$Path) {
             }
             $entityStates[$key] = $state
         }
+        foreach ($entity in $entities | Where-Object {
+            (Get-EntityKind $_) -eq 'player'
+        }) {
+            $trackId = Get-Field $entity @('TrackId', 'trackId', 'Id', 'id')
+            if ($null -ne $trackId) {
+                $null = $candidateRenderedPlayerHandles.Add([string]$trackId)
+            }
+        }
     }
+    $candidateDiagnostics.DistinctHandles = $allCandidateHandles.Count
+    foreach ($decision in @('already-verified-or-graph-provisional',
+                            'published-exact-player-species',
+                            'published-exact-actor-species',
+                            'published-structural-anonymous-player',
+                            'published-islepilot-corroborated',
+                            'movement-only-no-player-proof',
+                            'blocked-no-exact-player-proof',
+                            'blocked-by-fusion-or-validation')) {
+        $count = if ($candidateHandlesByDecision.ContainsKey($decision)) {
+            $candidateHandlesByDecision[$decision].Count
+        } else { 0 }
+        switch ($decision) {
+            'already-verified-or-graph-provisional' { $candidateDiagnostics.AlreadyVerifiedOrGraphProvisional = $count }
+            'published-exact-player-species' { $candidateDiagnostics.PublishedExactActorSpecies += $count }
+            'published-exact-actor-species' { $candidateDiagnostics.PublishedExactActorSpecies += $count }
+            'published-structural-anonymous-player' { $candidateDiagnostics.PublishedStructuralAnonymousPlayer = $count }
+            'published-islepilot-corroborated' { $candidateDiagnostics.PublishedIslePilotCorroborated = $count }
+            'movement-only-no-player-proof' { $candidateDiagnostics.MovementOnlyNoPlayerProof = $count }
+            'blocked-no-exact-player-proof' { $candidateDiagnostics.MovementOnlyNoPlayerProof += $count }
+            'blocked-by-fusion-or-validation' { $candidateDiagnostics.BlockedByFusionOrValidation = $count }
+        }
+    }
+    $candidateDiagnostics.HandlesLaterRenderedAsPlayer = @(
+        $allCandidateHandles |
+            Where-Object { $candidateRenderedPlayerHandles.Contains([string]$_) }
+    )
+    $movementOnlyHandles = [System.Collections.Generic.HashSet[string]]::new()
+    foreach ($decision in @('movement-only-no-player-proof', 'blocked-no-exact-player-proof')) {
+        if ($candidateHandlesByDecision.ContainsKey($decision)) {
+            foreach ($handle in $candidateHandlesByDecision[$decision]) {
+                $null = $movementOnlyHandles.Add([string]$handle)
+            }
+        }
+    }
+    $candidateDiagnostics.LateProofUpgradedHandles = @(
+        $movementOnlyHandles |
+            Where-Object { $candidateRenderedPlayerHandles.Contains([string]$_) }
+    )
     $groundTruth | ForEach-Object { $_ | ConvertTo-Json -Depth 16 -Compress } |
         Set-Content -LiteralPath (Join-Path $Path 'replay-ground-truth.jsonl') -Encoding UTF8
     $sequences = @($agent | Where-Object { $null -ne $_.Sequence } | ForEach-Object { [long]$_.Sequence })
@@ -455,8 +611,9 @@ function Invoke-Analyze([string]$Path) {
         P95AgentToUiLatencyMs = Get-Percentile $agentUiLatencies.ToArray() 0.95
         MissingEntities = $missing
         GroundTruthPath = (Join-Path $Path 'replay-ground-truth.jsonl')
-        StageEvidenceAvailable = $hasStageEvidence
+        StageEvidenceAvailable = $hasStageEvidence -or $stageEvidenceAvailable
         StageCounters = $stageCounters
+        CandidateDiagnostics = $candidateDiagnostics
         Status = if ($agent.Count -eq 0 -or $renderRows.Count -eq 0) { 'NEED_DEVELOPER' } elseif (-not $hasStageEvidence) { 'NEED_STAGE_EVIDENCE' } elseif ($missing.Count -gt 0) { 'FAIL' } else { 'PASS' }
         MissingMarkerProof = if (-not $hasStageEvidence) { 'Capture predates stage-level recorder schema; no claim about audio/candidate loss is allowed.' } elseif ($missing.Count -gt 0) { 'Eligible entity has no matching marker in render log.' } else { 'Every eligible replay entity has a marker in the observed render window.' }
     }
@@ -507,6 +664,7 @@ function Invoke-Report([string]$Path) {
         "- Rejected entity observations: $($a.RejectedEntityObservations)",
         "- Stage evidence available: $($a.StageEvidenceAvailable)",
         "- Stage counters: $(($a.StageCounters | ConvertTo-Json -Compress) -replace "`r?`n", '')",
+        "- Candidate diagnostics: $(($a.CandidateDiagnostics | ConvertTo-Json -Compress) -replace "`r?`n", '')",
         "- P50 latency marker: $($a.P50MarkerLatencyMs) ms",
         "- P95 latency marker: $($a.P95MarkerLatencyMs) ms",
         "- P50 capture -> decode: $($a.P50CaptureDecodeLatencyMs) ms",

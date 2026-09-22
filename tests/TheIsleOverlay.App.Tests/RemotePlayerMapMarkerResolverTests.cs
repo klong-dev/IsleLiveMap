@@ -131,7 +131,7 @@ public sealed class RemotePlayerMapMarkerResolverTests
     }
 
     [Fact]
-    public void Resolve_ExcludesSelfFlagAndMarkerAtLocalPoint()
+    public void Resolve_ExcludesOnlyExplicitSelfAndKeepsRemoteMarkerAtLocalPoint()
     {
         var local = new PlayerTelemetry
         {
@@ -167,10 +167,12 @@ public sealed class RemotePlayerMapMarkerResolverTests
             ]
         };
 
-        var marker = Assert.Single(RemotePlayerMapMarkerResolver.Resolve(map, local));
+        var result = RemotePlayerMapMarkerResolver.Resolve(map, local);
 
-        Assert.Equal("Carno 1.2T", marker.Label);
-        Assert.Equal(RemoteEntityMapCategory.SameSpecies, marker.Category);
+        Assert.Equal(2, result.Count);
+        Assert.Contains(result, marker => marker.Label == "Carno 1T");
+        Assert.Contains(result, marker => marker.Label == "Carno 1.2T");
+        Assert.All(result, marker => Assert.Equal(RemoteEntityMapCategory.SameSpecies, marker.Category));
     }
 
     [Fact]

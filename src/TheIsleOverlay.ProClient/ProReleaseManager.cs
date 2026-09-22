@@ -7,6 +7,8 @@ namespace TheIsleOverlay.ProClient;
 public sealed class ProReleaseManager : IDisposable
 {
     public const int IpcApiMajor = 2;
+    public const string LocalDebugManifestEnvironmentVariable =
+        "ISLELIVEMAP_PRO_LOCAL_RELEASE_MANIFEST";
 
     private const long MaximumArtifactBytes = 128L * 1024L * 1024L;
     private const long MaximumExtractedBytes = 256L * 1024L * 1024L;
@@ -49,6 +51,13 @@ public sealed class ProReleaseManager : IDisposable
         }
 
         var installed = await LoadInstalledAsync(hostVersion, cancellationToken).ConfigureAwait(false);
+        var local = await TryInstallLocalDebugReleaseAsync(hostVersion, cancellationToken)
+            .ConfigureAwait(false);
+        if (local is not null)
+        {
+            return local;
+        }
+
         var manifest = await _apiClient.GetManifestAsync(
                 hostVersion,
                 IpcApiMajor,
@@ -73,7 +82,6 @@ public sealed class ProReleaseManager : IDisposable
         Directory.CreateDirectory(_installationRoot);
         Directory.CreateDirectory(_versionsRoot);
         var temporaryZip = Path.Combine(_installationRoot, $".download-{Guid.NewGuid():N}.zip");
-        var staging = Path.Combine(_versionsRoot, $".{manifest.Version}.{Guid.NewGuid():N}.tmp");
         try
         {
             await using (var destination = new FileStream(
@@ -94,10 +102,32 @@ public sealed class ProReleaseManager : IDisposable
             }
 
             await VerifyArtifactAsync(temporaryZip, manifest, cancellationToken).ConfigureAwait(false);
+            return await InstallVerifiedArtifactAsync(temporaryZip, manifest, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        finally
+        {
+            if (File.Exists(temporaryZip))
+            {
+                File.Delete(temporaryZip);
+            }
+
+        }
+    }
+
+    private async Task<ProAgentInstallation> InstallVerifiedArtifactAsync(
+        string artifactPath,
+        ProReleaseManifest manifest,
+        CancellationToken cancellationToken)
+    {
+        Directory.CreateDirectory(_installationRoot);
+        Directory.CreateDirectory(_versionsRoot);
+        var staging = Path.Combine(_versionsRoot, $".{manifest.Version}.{Guid.NewGuid():N}.tmp");
+        try
+        {
             Directory.CreateDirectory(staging);
-            ExtractSafely(temporaryZip, staging);
-            var stagedExecutable = Path.Combine(staging, AgentExecutableName);
-            if (!File.Exists(stagedExecutable))
+            ExtractSafely(artifactPath, staging);
+            if (!File.Exists(Path.Combine(staging, AgentExecutableName)))
             {
                 throw new InvalidDataException("The signed Pro archive does not contain the agent executable.");
             }
@@ -113,8 +143,10 @@ public sealed class ProReleaseManager : IDisposable
             try
             {
                 Directory.Move(staging, target);
-                var descriptor = ReleaseDescriptor.FromManifest(manifest);
-                await SaveDescriptorAsync(descriptor, cancellationToken).ConfigureAwait(false);
+                await SaveDescriptorAsync(
+                        ReleaseDescriptor.FromManifest(manifest),
+                        cancellationToken)
+                    .ConfigureAwait(false);
                 if (backup is not null)
                 {
                     SafeDeleteDirectory(backup);
@@ -134,11 +166,6 @@ public sealed class ProReleaseManager : IDisposable
         }
         finally
         {
-            if (File.Exists(temporaryZip))
-            {
-                File.Delete(temporaryZip);
-            }
-
             if (Directory.Exists(staging))
             {
                 SafeDeleteDirectory(staging);
@@ -189,6 +216,48 @@ public sealed class ProReleaseManager : IDisposable
     }
 
     public void Dispose() => _signatureVerifier.Dispose();
+
+    private async Task<ProAgentInstallation?> TryInstallLocalDebugReleaseAsync(
+        string hostVersion,
+        CancellationToken cancellationToken)
+    {
+        var configured = Environment.GetEnvironmentVariable(
+            LocalDebugManifestEnvironmentVariable);
+        if (string.IsNullOrWhiteSpace(configured))
+        {
+            return null;
+        }
+
+        var manifestPath = Path.GetFullPath(configured.Trim());
+        if (!File.Exists(manifestPath))
+        {
+            throw new FileNotFoundException("Local Pro release manifest was not found.", manifestPath);
+        }
+
+        var metadata = JsonSerializer.Deserialize<LocalReleaseMetadata>(
+            await File.ReadAllTextAsync(manifestPath, cancellationToken).ConfigureAwait(false),
+            JsonOptions)
+            ?? throw new InvalidDataException("Local Pro release manifest is empty.");
+        var manifest = new ProReleaseManifest(
+            metadata.Version,
+            metadata.IpcApiMajor,
+            metadata.MinHostVersion,
+            metadata.MaxHostVersionExclusive,
+            metadata.Size,
+            metadata.Sha256,
+            metadata.Signature,
+            "https://local-debug.invalid/artifact.zip",
+            DateTimeOffset.UtcNow);
+        ValidateManifest(manifest, hostVersion);
+
+        var artifactPath = Path.GetFullPath(
+            Path.IsPathRooted(metadata.ArtifactPath)
+                ? metadata.ArtifactPath
+                : Path.Combine(Path.GetDirectoryName(manifestPath)!, metadata.ArtifactPath));
+        await VerifyArtifactAsync(artifactPath, manifest, cancellationToken).ConfigureAwait(false);
+        return await InstallVerifiedArtifactAsync(artifactPath, manifest, cancellationToken)
+            .ConfigureAwait(false);
+    }
 
     private void ValidateManifest(ProReleaseManifest manifest, string hostVersion)
     {
@@ -337,4 +406,14 @@ public sealed class ProReleaseManager : IDisposable
             manifest.Sha256,
             manifest.Signature);
     }
+
+    private sealed record LocalReleaseMetadata(
+        string Version,
+        int IpcApiMajor,
+        string MinHostVersion,
+        string MaxHostVersionExclusive,
+        long Size,
+        string Sha256,
+        string Signature,
+        string ArtifactPath);
 }

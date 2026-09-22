@@ -221,7 +221,10 @@ public sealed class LocalPositionTelemetrySessionHealthTests
                     new WorldLocation { X = 100, Y = 100, Z = 0 },
                     100,
                     1,
-                    DateTimeOffset.UtcNow)]);
+                    DateTimeOffset.UtcNow,
+                    ActorNetRefHandle: 77,
+                    PlayerStateNetRefHandle: 78,
+                    PawnNetRefHandle: 79)]);
             await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
         }
 

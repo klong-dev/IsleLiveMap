@@ -58,7 +58,10 @@ public sealed class IpcJsonStreamTests
                     28.28,
                     1,
                     observedAt,
-                    IsProvisional: true)
+                    IsProvisional: true,
+                    ActorNetRefHandle: 9012,
+                    PlayerStateNetRefHandle: 9014,
+                    PawnNetRefHandle: 9016)
             ],
             "carnotaurus",
             "Carno",
@@ -79,6 +82,55 @@ public sealed class IpcJsonStreamTests
         Assert.Equal(expected.LocalSpeciesShortName, actual.LocalSpeciesShortName);
         Assert.Equal(expected.PlayerSync, actual.PlayerSync);
         Assert.True(actual.RemoteEntities[1].IsProvisional);
+        Assert.Equal((ulong)9012, actual.RemoteEntities[1].ActorNetRefHandle);
+        Assert.Equal((ulong)9014, actual.RemoteEntities[1].PlayerStateNetRefHandle);
+        Assert.Equal((ulong)9016, actual.RemoteEntities[1].PawnNetRefHandle);
+    }
+
+    [Fact]
+    public async Task RoundTrip_PreservesAnonymousStructuralPlayerProof()
+    {
+        await using var memory = new MemoryStream();
+        await using var ipc = new IpcJsonStream(memory);
+        var observedAt = DateTimeOffset.Parse("2026-09-22T07:00:00Z");
+        var expected = new ProTelemetryFrame(
+            43,
+            observedAt,
+            "127.0.0.1:7777",
+            new WorldPosition(100, 200, 30),
+            0,
+            [
+                new VerifiedMapEntity(
+                    112854,
+                    MapEntityKind.Player,
+                    null,
+                    "rex",
+                    "T-Rex",
+                    MapCreatureDiet.Carnivore,
+                    null,
+                    new WorldPosition(101, 201, 30),
+                    1.41,
+                    4,
+                    observedAt,
+                    IsProvisional: false,
+                    LocationObservedAt: observedAt,
+                    ActorNetRefHandle: 112854,
+                    PlayerStateNetRefHandle: 53328,
+                    PawnNetRefHandle: 53330)
+            ]);
+
+        await ipc.WriteAsync(expected, TestContext.Current.CancellationToken);
+        memory.Position = 0;
+        var actual = await ipc.ReadAsync<ProTelemetryFrame>(
+            TestContext.Current.CancellationToken);
+
+        var player = Assert.Single(actual.RemoteEntities);
+        Assert.Equal(MapEntityKind.Player, player.Kind);
+        Assert.Null(player.PlayerProofName);
+        Assert.Equal((ulong)112854, player.ActorNetRefHandle);
+        Assert.Equal((ulong)53328, player.PlayerStateNetRefHandle);
+        Assert.Equal((ulong)53330, player.PawnNetRefHandle);
+        Assert.Equal("T-Rex", player.SpeciesShortName);
     }
 
     [Fact]

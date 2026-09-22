@@ -445,8 +445,12 @@ public sealed class LocalPositionTelemetrySession : ITelemetrySession
 
                 return marker with
                 {
-                    ProEntityIsStale = state.State is RemoteEntityLifecycleState.Stale
-                        or RemoteEntityLifecycleState.TemporarilyMissing
+                    // Preserve freshness loss reported by the merger even if
+                    // the Agent presence frame itself is still arriving.
+                    // Presence and location freshness are separate signals.
+                    ProEntityIsStale = marker.ProEntityIsStale
+                        || state.State is RemoteEntityLifecycleState.Stale
+                            or RemoteEntityLifecycleState.TemporarilyMissing
                 };
             })
             .ToArray();

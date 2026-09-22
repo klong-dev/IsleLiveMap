@@ -58,6 +58,8 @@ public sealed record RemotePlayerTelemetryFrame(
 public enum RemoteEntityRejectionReason
 {
     InvalidTrackId = 1,
+    // Kept for IPC/backward compatibility. In the name-free protocol this
+    // means missing structural player proof, not merely a missing name.
     MissingPlayerProof = 2,
     MissingSpecies = 3,
     InvalidCoordinate = 4,
@@ -80,6 +82,12 @@ public sealed record RemoteTrackingDiagnostics
     public int ReceivedCount { get; init; }
     public int EligibleCount { get; init; }
     public int RenderedCount { get; init; }
+    /// <summary>
+    /// Verified entities whose last known coordinate is retained for display
+    /// but is outside the live freshness window. These are rendered as stale,
+    /// not rejected entities.
+    /// </summary>
+    public int StaleCount { get; init; }
     public int RejectedCount { get; init; }
     public IReadOnlyDictionary<RemoteEntityRejectionReason, int> Rejections { get; init; } =
         new Dictionary<RemoteEntityRejectionReason, int>();
@@ -130,7 +138,10 @@ public sealed record VerifiedRemoteEntityTelemetry(
     int ConfirmationHits,
     DateTimeOffset ObservedAt,
     bool IsProvisional = false,
-    DateTimeOffset? LocationObservedAt = null)
+    DateTimeOffset? LocationObservedAt = null,
+    ulong ActorNetRefHandle = 0,
+    ulong PlayerStateNetRefHandle = 0,
+    ulong PawnNetRefHandle = 0)
 {
     public static readonly TimeSpan LocationFreshness = TimeSpan.FromSeconds(90);
 
