@@ -987,6 +987,78 @@ public sealed class LocalPositionSnapshotMergerTests
     }
 
     [Fact]
+    public void Merge_PresentsAnonymousPlayerWithoutSpeciesUsingFallbackLabel()
+    {
+        VerifiedRemoteEntityTelemetry[] remotePlayers =
+        [
+            new VerifiedRemoteEntityTelemetry(
+                71438,
+                RemoteEntityKind.Player,
+                null,
+                "",
+                "",
+                CreatureDiet.Unknown,
+                null,
+                new WorldLocation { X = 89_280, Y = -277_806, Z = 28_145 },
+                270.5,
+                66,
+                Now,
+                IsProvisional: false,
+                LocationObservedAt: Now,
+                ActorNetRefHandle: 71438,
+                PlayerStateNetRefHandle: 71439,
+                PawnNetRefHandle: 71440)
+        ];
+
+        var merged = LocalPositionSnapshotMerger.Merge(
+            null,
+            Observation(80_548, -252_203, 28_061, 45),
+            Now,
+            remotePlayers: remotePlayers);
+
+        var marker = Assert.Single(merged.Map!.Markers);
+        Assert.Equal("pro-entity:player:71438", marker.SteamId);
+        Assert.Equal("Player ?", marker.Label);
+        Assert.Equal(RemoteEntityKind.Player, marker.ProEntityKind);
+    }
+
+    [Fact]
+    public void Merge_RejectsNameOnlyPlayerWithoutStructuralIdentity()
+    {
+        VerifiedRemoteEntityTelemetry[] remotePlayers =
+        [
+            new VerifiedRemoteEntityTelemetry(
+                71439,
+                RemoteEntityKind.Player,
+                "metadata-only-name",
+                "triceratops",
+                "Trice",
+                CreatureDiet.Herbivore,
+                null,
+                new WorldLocation { X = 89_280, Y = -277_806, Z = 28_145 },
+                270.5,
+                66,
+                Now,
+                IsProvisional: false,
+                LocationObservedAt: Now)
+        ];
+
+        var merged = LocalPositionSnapshotMerger.Merge(
+            null,
+            Observation(80_548, -252_203, 28_061, 45),
+            Now,
+            remotePlayers: remotePlayers);
+
+        Assert.Null(merged.Map);
+        var diagnostics = merged.ProTrackingDiagnostics
+            ?? throw new Xunit.Sdk.XunitException("Expected remote tracking diagnostics.");
+        Assert.Equal(
+            1,
+            diagnostics.Rejections[
+                RemoteEntityRejectionReason.MissingPlayerProof]);
+    }
+
+    [Fact]
     public void Merge_DoesNotPresentAiWithoutPositiveSpeciesClassification()
     {
         VerifiedRemoteEntityTelemetry[] entities =
