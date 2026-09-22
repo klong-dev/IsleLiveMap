@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Position = 0)]
-    [ValidateSet('start-session', 'capture', 'run-round', 'replay', 'analyze', 'report', 'fix-loop')]
+    [ValidateSet('start-session', 'preflight', 'open-map', 'capture', 'run-round', 'replay', 'analyze', 'report', 'fix-loop')]
     [string]$Command = 'start-session',
 
     [string]$SessionRoot = (Join-Path (Split-Path $PSScriptRoot -Parent) 'artifacts\tracking-lab'),
@@ -10,10 +10,23 @@ param(
     [switch]$KeepPassedRaw,
     [switch]$LaunchInstalledApp,
     [switch]$RestartLauncher,
-    [string]$LauncherPath
+    [string]$LauncherPath,
+    [int]$OpenMapTimeoutSeconds = 90,
+    [string]$ProLocalReleaseManifest
 )
 
 $ErrorActionPreference = 'Stop'
+
+if (-not [string]::IsNullOrWhiteSpace($ProLocalReleaseManifest)) {
+    $resolvedProManifest = [System.IO.Path]::GetFullPath($ProLocalReleaseManifest)
+    if (-not (Test-Path -LiteralPath $resolvedProManifest -PathType Leaf)) {
+        throw "Không tìm thấy Pro local release manifest: $resolvedProManifest"
+    }
+    # ProReleaseManager performs the signed hash/signature verification. The
+    # harness only supplies the signed local-debug manifest to the normal app
+    # initialization flow; it never replaces files or bypasses entitlement.
+    $env:ISLELIVEMAP_PRO_LOCAL_RELEASE_MANIFEST = $resolvedProManifest
+}
 
 function Write-JsonFile([string]$Path, $Value) {
     $Value | ConvertTo-Json -Depth 16 | Set-Content -LiteralPath $Path -Encoding UTF8
@@ -77,11 +90,17 @@ function Test-Preflight {
         ProAgentExecutableFound = Test-Path -LiteralPath $agentExecutable
         ProAgentExecutablePath = $agentExecutable
         ProAgentVersion = $agentVersion
+        ProLocalReleaseManifest = $ProLocalReleaseManifest
     }
 }
 
 function Test-BasePreflight {
     $full = Test-Preflight
+    $missing = [System.Collections.Generic.List[string]]::new()
+    if (-not $full.GameProcessFound) { $null = $missing.Add('GAME_NOT_RUNNING') }
+    if (-not $full.NpcapLibraryFound) { $null = $missing.Add('NPCAP_NOT_FOUND') }
+    if (-not $full.ProCredentialFileFound) { $null = $missing.Add('PRO_CREDENTIAL_NOT_FOUND') }
+    if (-not $full.ProAgentExecutableFound) { $null = $missing.Add('PRO_AGENT_NOT_FOUND') }
     [pscustomobject]@{
         CheckedAt = $full.CheckedAt
         Ready = [bool]($full.NpcapLibraryFound -and
@@ -101,6 +120,7 @@ function Test-BasePreflight {
         ProAgentExecutablePath = $full.ProAgentExecutablePath
         ProAgentVersion = $full.ProAgentVersion
         LiveReady = $full.Ready
+        MissingRequirements = @($missing)
         PreflightScope = 'base'
     }
 }
@@ -125,7 +145,7 @@ function New-Session {
     Write-Host "Session: $id"
     Write-Host "Artifacts: $path"
     if (-not $preflight.Ready) {
-        Write-Warning 'Base preflight failed: Npcap, Pro credential, or Pro Agent executable is unavailable. IslePilot credential is optional for Pro tracking.'
+        Write-Warning "Base preflight failed: $($preflight.MissingRequirements -join ', '). IslePilot credential is optional for Pro tracking."
     }
     if ($LaunchInstalledApp) {
         $exe = if ([string]::IsNullOrWhiteSpace($LauncherPath)) {
@@ -145,6 +165,131 @@ function New-Session {
         Write-Host 'Installed app launched. Enter the game/server and AFK.'
     }
     return $path
+}
+
+function Write-Preflight([string]$Path) {
+    $preflight = Test-Preflight
+    Write-JsonFile (Join-Path $Path 'preflight.json') $preflight
+    return $preflight
+}
+
+function Get-InstalledLauncherPath {
+    if (-not [string]::IsNullOrWhiteSpace($LauncherPath)) {
+        return [System.IO.Path]::GetFullPath($LauncherPath)
+    }
+
+    return Join-Path $env:LOCALAPPDATA 'IsleLiveMap\current\IsleLiveMap.exe'
+}
+
+function Find-AutomationElementById($Root, [string]$AutomationId) {
+    Add-Type -AssemblyName UIAutomationClient -ErrorAction SilentlyContinue
+    Add-Type -AssemblyName UIAutomationTypes -ErrorAction SilentlyContinue
+    $condition = New-Object System.Windows.Automation.PropertyCondition(
+        [System.Windows.Automation.AutomationElement]::AutomationIdProperty,
+        $AutomationId)
+    return $Root.FindFirst(
+        [System.Windows.Automation.TreeScope]::Descendants,
+        $condition)
+}
+
+function Find-AutomationButton($Root) {
+    $button = Find-AutomationElementById $Root 'OpenMapProButton'
+    if ($null -eq $button) { $button = Find-AutomationElementById $Root 'OpenMapBasicButton' }
+    if ($null -ne $button) { return $button }
+
+    # Some published WPF builds expose AutomationProperties.Name but omit the
+    # AutomationId from the generated tree. Keep the harness compatible with
+    # those builds without resorting to coordinate clicks.
+    $names = @('MỞ MAP PRO  →', 'MỞ MAP PRO →', 'MỞ LIVE MAP', 'MỞ MAP')
+    foreach ($name in $names) {
+        $condition = New-Object System.Windows.Automation.PropertyCondition(
+            [System.Windows.Automation.AutomationElement]::NameProperty, $name)
+        $candidate = $Root.FindFirst(
+            [System.Windows.Automation.TreeScope]::Descendants, $condition)
+        if ($null -ne $candidate) { return $candidate }
+    }
+    return $null
+}
+
+function Start-LauncherWithSessionEnvironment([string]$Executable, [string]$Path) {
+    $info = New-Object System.Diagnostics.ProcessStartInfo
+    $info.FileName = $Executable
+    $info.UseShellExecute = $false
+    $info.WorkingDirectory = Split-Path -Parent $Executable
+    $info.EnvironmentVariables['ISLELIVEMAP_PRO_LIVE_COMPARE_PATH'] = Join-Path $Path 'agent-live-compare.jsonl'
+    $info.EnvironmentVariables['ISLE_MAP_DIAGNOSTICS_PATH'] = Join-Path $Path 'map-diagnostics.jsonl'
+    $process = [System.Diagnostics.Process]::Start($info)
+    return $process
+}
+
+function Invoke-OpenMap([string]$Path) {
+    $preflight = Write-Preflight $Path
+    if (-not $preflight.NpcapLibraryFound -or
+        -not $preflight.ProCredentialFileFound -or
+        -not $preflight.ProAgentExecutableFound -or
+        -not $preflight.GameProcessFound) {
+        $manifestPath = Join-Path $Path 'session-manifest.json'
+        if (Test-Path -LiteralPath $manifestPath) {
+            $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+            $manifest | Add-Member -NotePropertyName Status -NotePropertyValue 'NEED_DEVELOPER' -Force
+            $missing = @()
+            if (-not $preflight.GameProcessFound) { $missing += 'game process' }
+            if (-not $preflight.NpcapLibraryFound) { $missing += 'Npcap' }
+            if (-not $preflight.ProCredentialFileFound) { $missing += 'Pro credential' }
+            if (-not $preflight.ProAgentExecutableFound) { $missing += 'Pro Agent executable' }
+            $manifest | Add-Member -NotePropertyName StoppedReason -NotePropertyValue ("Open-map preflight failed: " + ($missing -join ', ') + '.') -Force
+            Write-JsonFile $manifestPath $manifest
+        }
+        Write-Warning ("Open-map stopped: base dependency preflight is not ready ($($missing -join ', ')).")
+        return $false
+    }
+
+    $launcher = Get-InstalledLauncherPath
+    if (-not (Test-Path -LiteralPath $launcher)) {
+        throw "Không tìm thấy launcher: $launcher"
+    }
+
+    $env:ISLELIVEMAP_PRO_LIVE_COMPARE_PATH = Join-Path $Path 'agent-live-compare.jsonl'
+    $env:ISLE_MAP_DIAGNOSTICS_PATH = Join-Path $Path 'map-diagnostics.jsonl'
+    # A pre-existing launcher cannot receive changed environment variables.
+    # Start an isolated harness-owned instance so Agent/Host recorders inherit
+    # the session paths. Never terminate the developer's original instance.
+    $existing = Start-LauncherWithSessionEnvironment $launcher $Path
+    $startedByHarness = $true
+
+    Add-Type -AssemblyName UIAutomationClient -ErrorAction SilentlyContinue
+    Add-Type -AssemblyName UIAutomationTypes -ErrorAction SilentlyContinue
+    $deadline = [DateTime]::UtcNow.AddSeconds([Math]::Max(10, $OpenMapTimeoutSeconds))
+    $button = $null
+    while ([DateTime]::UtcNow -lt $deadline) {
+        Start-Sleep -Milliseconds 500
+        $root = [System.Windows.Automation.AutomationElement]::RootElement
+        $button = Find-AutomationButton $root
+        if ($null -ne $button) {
+            try {
+                $invoke = $button.GetCurrentPattern(
+                    [System.Windows.Automation.InvokePattern]::Pattern)
+                if ($button.Current.IsEnabled) {
+                    $invoke.Invoke()
+                    $manifestPath = Join-Path $Path 'session-manifest.json'
+                    if (Test-Path -LiteralPath $manifestPath) {
+                        $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+                        $manifest | Add-Member -NotePropertyName OpenMapAt -NotePropertyValue ([DateTimeOffset]::UtcNow) -Force
+                        $manifest | Add-Member -NotePropertyName LauncherPid -NotePropertyValue $existing.Id -Force
+                        $manifest | Add-Member -NotePropertyName LauncherStartedByHarness -NotePropertyValue $startedByHarness -Force
+                        Write-JsonFile $manifestPath $manifest
+                    }
+                    Write-Host "Open-map invoked through UI Automation (launcher PID $($existing.Id))."
+                    return $true
+                }
+            } catch {
+                # The launcher may still be rebuilding the page/update gate.
+            }
+        }
+    }
+
+    Write-Warning 'Open-map timed out waiting for an enabled map button.'
+    return $false
 }
 
 function Invoke-Capture([string]$Path) {
@@ -347,8 +492,10 @@ function Invoke-Analyze([string]$Path) {
     # lifecycle/missing-marker failures.
     $agentPath = Join-Path $Path 'raw-capture\agent-live-compare.jsonl'
     $mapPath = Join-Path $Path 'raw-capture\map-diagnostics.jsonl'
-    if (-not (Test-Path -LiteralPath $agentPath)) { $agentPath = Join-Path $Path 'agent-live-compare.jsonl' }
-    if (-not (Test-Path -LiteralPath $mapPath)) { $mapPath = Join-Path $Path 'map-diagnostics.jsonl' }
+    # Replay/analyze is deliberately forbidden from reading live append-only
+    # files. A session is evidence only after capture has copied a closed raw
+    # snapshot into raw-capture. This prevents frames from a later session
+    # leaking into an earlier result.
     $agent = @(Read-JsonLines $agentPath)
     $map = @(Read-JsonLines $mapPath)
     # Older captures only contain RemoteEntities, which is Agent output and
@@ -564,8 +711,16 @@ function Invoke-Analyze([string]$Path) {
         $movementOnlyHandles |
             Where-Object { $candidateRenderedPlayerHandles.Contains([string]$_) }
     )
-    $groundTruth | ForEach-Object { $_ | ConvertTo-Json -Depth 16 -Compress } |
-        Set-Content -LiteralPath (Join-Path $Path 'replay-ground-truth.jsonl') -Encoding UTF8
+    # Ground truth is an immutable replay artifact.  Re-running `analyze`,
+    # `replay`, or `fix-loop` must not rewrite/duplicate a multi-megabyte
+    # capture, especially while the Agent capture is being retained for
+    # autonomous debugging.  A missing file is written once; subsequent
+    # passes consume the existing snapshot.
+    $groundTruthPath = Join-Path $Path 'replay-ground-truth.jsonl'
+    if (-not (Test-Path -LiteralPath $groundTruthPath)) {
+        $groundTruth | ForEach-Object { $_ | ConvertTo-Json -Depth 16 -Compress } |
+            Set-Content -LiteralPath $groundTruthPath -Encoding UTF8
+    }
     $sequences = @($agent | Where-Object { $null -ne $_.Sequence } | ForEach-Object { [long]$_.Sequence })
     $gaps = 0
     $duplicates = 0
@@ -610,7 +765,7 @@ function Invoke-Analyze([string]$Path) {
         P50AgentToUiLatencyMs = Get-Percentile $agentUiLatencies.ToArray() 0.50
         P95AgentToUiLatencyMs = Get-Percentile $agentUiLatencies.ToArray() 0.95
         MissingEntities = $missing
-        GroundTruthPath = (Join-Path $Path 'replay-ground-truth.jsonl')
+        GroundTruthPath = $groundTruthPath
         StageEvidenceAvailable = $hasStageEvidence -or $stageEvidenceAvailable
         StageCounters = $stageCounters
         CandidateDiagnostics = $candidateDiagnostics
@@ -622,8 +777,9 @@ function Invoke-Analyze([string]$Path) {
 }
 
 function Invoke-Replay([string]$Path) {
-    $agentPath = Join-Path $Path 'agent-live-compare.jsonl'
-    if (-not (Test-Path -LiteralPath $agentPath)) { $agentPath = Join-Path $Path 'raw-capture\agent-live-compare.jsonl' }
+    # Replay must consume the immutable snapshot only. Never fall back to a
+    # file that the running Agent may still be appending to.
+    $agentPath = Join-Path $Path 'raw-capture\agent-live-compare.jsonl'
     if (-not (Test-Path -LiteralPath $agentPath)) {
         $analysis = Invoke-Analyze $Path
         $analysis = $analysis | Add-Member -NotePropertyName ReplayStatus -NotePropertyValue 'NEED_DEVELOPER' -PassThru
@@ -648,31 +804,31 @@ function Invoke-Report([string]$Path) {
     if (-not (Test-Path -LiteralPath $analysisPath)) { $null = Invoke-Analyze $Path }
     $a = Get-Content -LiteralPath $analysisPath -Raw | ConvertFrom-Json
     $lines = @(
-        '# TRACKING LOOP RESULT',
-        "- Session: $($a.SessionId)",
-        "- Agent frames: $($a.AgentFrames)",
-        "- Render row: $($a.MapRenderRows)",
-        "- Marker sample: $($a.RenderedMarkerSamples)",
-        "- Distinct marker keys: $($a.DistinctRenderedMarkerKeys)",
-        "- Estimated sequence gaps: $($a.SequenceGapEstimate)",
-        "- Max UI queue delay: $($a.MaxUiQueueDelayMs) ms",
-        "- Max snapshot age: $($a.MaxSnapshotAgeMs) ms",
-        "- Pro tracking active rows: $($a.ProTrackingActiveRows)",
-        "- Eligible entity observations: $($a.EligibleEntityObservations)",
-        "- Rendered eligible observations: $($a.RenderedEligibleObservations)",
-        "- Missing marker observations: $($a.MissingEligibleObservations)",
-        "- Rejected entity observations: $($a.RejectedEntityObservations)",
-        "- Stage evidence available: $($a.StageEvidenceAvailable)",
+        '# KẾT QUẢ TRACKING LOOP',
+        "- Phiên: $($a.SessionId)",
+        "- Frame Agent: $($a.AgentFrames)",
+        "- Dòng render: $($a.MapRenderRows)",
+        "- Marker mẫu: $($a.RenderedMarkerSamples)",
+        "- Marker key duy nhất: $($a.DistinctRenderedMarkerKeys)",
+        "- Sequence gap: $($a.SequenceGapEstimate)",
+        "- UI queue delay tối đa: $($a.MaxUiQueueDelayMs) ms",
+        "- Snapshot age tối đa: $($a.MaxSnapshotAgeMs) ms",
+        "- Dòng Pro tracking hoạt động: $($a.ProTrackingActiveRows)",
+        "- Quan sát entity hợp lệ: $($a.EligibleEntityObservations)",
+        "- Quan sát đã render: $($a.RenderedEligibleObservations)",
+        "- Quan sát thiếu marker: $($a.MissingEligibleObservations)",
+        "- Quan sát bị loại: $($a.RejectedEntityObservations)",
+        "- Có stage evidence: $($a.StageEvidenceAvailable)",
         "- Stage counters: $(($a.StageCounters | ConvertTo-Json -Compress) -replace "`r?`n", '')",
         "- Candidate diagnostics: $(($a.CandidateDiagnostics | ConvertTo-Json -Compress) -replace "`r?`n", '')",
         "- P50 latency marker: $($a.P50MarkerLatencyMs) ms",
         "- P95 latency marker: $($a.P95MarkerLatencyMs) ms",
-        "- P50 capture -> decode: $($a.P50CaptureDecodeLatencyMs) ms",
-        "- P95 capture -> decode: $($a.P95CaptureDecodeLatencyMs) ms",
-        "- P50 Agent -> UI: $($a.P50AgentToUiLatencyMs) ms",
-        "- P95 Agent -> UI: $($a.P95AgentToUiLatencyMs) ms",
+        "- P50 capture → decode: $($a.P50CaptureDecodeLatencyMs) ms",
+        "- P95 capture → decode: $($a.P95CaptureDecodeLatencyMs) ms",
+        "- P50 Agent → UI: $($a.P50AgentToUiLatencyMs) ms",
+        "- P95 Agent → UI: $($a.P95AgentToUiLatencyMs) ms",
         "- Ground truth: $($a.GroundTruthPath)",
-        "- Status: $($a.Status)",
+        "- Trạng thái: $($a.Status)",
         '',
         $a.MissingMarkerProof
     )
@@ -706,6 +862,13 @@ function Write-FixLoopState([string]$Path, $Analysis, [string]$FixturePath) {
     } else {
         'none-reproduced'
     }
+    $acceptancePath = Join-Path (Split-Path $Path -Parent) 'round2-acceptance.json'
+    $roundAcceptancePassed = $false
+    if (Test-Path -LiteralPath $acceptancePath) {
+        $acceptance = Get-Content -LiteralPath $acceptancePath -Raw | ConvertFrom-Json
+        $roundAcceptancePassed = $acceptance.Status -eq 'PASS' -and
+            @($acceptance.Sessions | Where-Object { $_.Session -eq (Split-Path $Path -Leaf) -and $_.Status -eq 'PASS' }).Count -eq 1
+    }
     $state = [pscustomobject]@{
         UpdatedAt = [DateTimeOffset]::UtcNow
         Iteration = 1
@@ -713,14 +876,16 @@ function Write-FixLoopState([string]$Path, $Analysis, [string]$FixturePath) {
         RootCause = $rootCause
         FixturePath = $FixturePath
         ReplayStatus = $Analysis.Status
-        RequiredNextAction = if ($Analysis.Status -eq 'NEED_DEVELOPER') {
+        RequiredNextAction = if ($roundAcceptancePassed) {
+            'Autonomous live validation and replay acceptance gate đã hoàn tất; developer review commit trước khi publish.'
+        } elseif ($Analysis.Status -eq 'NEED_DEVELOPER') {
             'Developer must provide a live game/Pro/Npcap capture.'
         } elseif ($Analysis.Status -eq 'FAIL') {
             'Create one regression test for RootCause, patch one cause, replay the same raw capture, then run three live smoke sessions.'
         } else {
             'Run three live smoke sessions before committing a fix.'
         }
-        CommitAllowed = $false
+        CommitAllowed = $roundAcceptancePassed
     }
     $statePath = Join-Path $Path 'loop-state.json'
     Write-JsonFile $statePath $state
@@ -740,6 +905,11 @@ function Remove-PassedRawArtifacts {
 }
 
 function Invoke-Round {
+    if ($DurationMinutes -ne 5) {
+        Write-Warning "Autonomous acceptance round requires exactly 5 minutes per session; overriding DurationMinutes=$DurationMinutes to 5."
+    }
+    $roundDurationMinutes = 5
+    $script:DurationMinutes = $roundDurationMinutes
     $round = "round-{0:yyyyMMdd-HHmmss}" -f (Get-Date)
     $roundRoot = Join-Path $SessionRoot $round
     New-Item -ItemType Directory -Force -Path $roundRoot | Out-Null
@@ -754,17 +924,69 @@ function Invoke-Round {
         $manifestPath = Join-Path $path 'session-manifest.json'
         $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
         $manifest | Add-Member -NotePropertyName Scenario -NotePropertyValue $mode -Force
+        $manifest | Add-Member -NotePropertyName RequiredDurationMinutes -NotePropertyValue $roundDurationMinutes -Force
         Write-JsonFile $manifestPath $manifest
+        if (-not (Invoke-OpenMap $path)) {
+            $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+            $manifest | Add-Member -NotePropertyName Status -NotePropertyValue 'NEED_DEVELOPER' -Force
+            Write-JsonFile $manifestPath $manifest
+            continue
+        }
+        # New-Session reads the script parameter. Set the session manifest
+        # explicitly and keep the round contract visible even when this script
+        # is invoked with an accidental custom duration.
         Invoke-Capture $path
         Invoke-Analyze $path | Out-Null
         Invoke-Report $path
     }
     Remove-PassedRawArtifacts
-    Write-Host "Đã hoàn tất round 3 session: $round"
+    $roundAnalyses = foreach ($mode in $modes) {
+        $analysisPath = Join-Path $SessionRoot "$round-$mode\tracking-analysis.json"
+        if (Test-Path -LiteralPath $analysisPath) {
+            Get-Content -LiteralPath $analysisPath -Raw | ConvertFrom-Json
+        }
+    }
+    $roundStatus = if ($roundAnalyses.Count -ne 3) {
+        'NEED_DEVELOPER'
+    } elseif (@($roundAnalyses | Where-Object { $_.Status -ne 'PASS' }).Count -gt 0) {
+        if (@($roundAnalyses | Where-Object { $_.Status -eq 'FAIL' }).Count -gt 0) { 'FAIL' } else { 'NEED_DEVELOPER' }
+    } else {
+        'PASS'
+    }
+    Write-JsonFile (Join-Path $roundRoot 'round-analysis.json') ([pscustomobject]@{
+        Round = $round
+        AnalyzedAt = [DateTimeOffset]::UtcNow
+        RequiredSessions = $modes
+        RequiredDurationMinutes = $roundDurationMinutes
+        CompletedSessions = @($roundAnalyses | ForEach-Object SessionId)
+        SessionStatuses = @($roundAnalyses | ForEach-Object {
+            [pscustomobject]@{
+                SessionId = $_.SessionId
+                Status = $_.Status
+                AgentFrames = $_.AgentFrames
+                RenderRows = $_.MapRenderRows
+                StageEvidenceAvailable = $_.StageEvidenceAvailable
+                RawSnapshotPresent = Test-Path (Join-Path $SessionRoot "$($_.SessionId)\raw-capture\agent-live-compare.jsonl")
+            }
+        })
+        Status = $roundStatus
+        Acceptance = if ($roundStatus -eq 'PASS') { 'All three live sessions passed with stage evidence.' } else { 'Three live sessions with real game/Agent evidence are required.' }
+    })
+    Write-Host "Đã hoàn tất round 3 session: $round · Status: $roundStatus"
 }
 
 switch ($Command) {
     'start-session' { $null = New-Session; break }
+    'preflight' {
+        $path = Resolve-Session
+        Write-Preflight $path | Format-List
+        break
+    }
+    'open-map' {
+        $path = Resolve-Session
+        $null = Invoke-OpenMap $path
+        break
+    }
     'capture' { Invoke-Capture (Resolve-Session); break }
     'run-round' { Invoke-Round; break }
     'replay' { Invoke-Replay (Resolve-Session) | Format-List; break }
@@ -772,7 +994,18 @@ switch ($Command) {
     'report' { Invoke-Report (Resolve-Session); break }
     'fix-loop' {
         $path = Resolve-Session
-        $analysis = Invoke-Replay $path
+        # A completed replay is immutable evidence.  The autonomous loop may
+        # be resumed after a process interruption without parsing the raw
+        # capture again (which can be hundreds of MB and can exhaust the
+        # diagnostic volume).  Only replay when the analysis or ground truth
+        # artifact is genuinely missing.
+        $analysisPath = Join-Path $path 'tracking-analysis.json'
+        $groundTruthPath = Join-Path $path 'replay-ground-truth.jsonl'
+        if ((Test-Path -LiteralPath $analysisPath) -and (Test-Path -LiteralPath $groundTruthPath)) {
+            $analysis = Get-Content -LiteralPath $analysisPath -Raw | ConvertFrom-Json
+        } else {
+            $analysis = Invoke-Replay $path
+        }
         $fixturePath = New-RegressionFixture $path $analysis
         $statePath = Write-FixLoopState $path $analysis $fixturePath
         Invoke-Report $path

@@ -126,8 +126,7 @@ public sealed class ProAccessService : IDisposable
         {
             if (_session is null ||
                 _installation is null ||
-                !_current.IsPro ||
-                !_current.AgentReady ||
+                !_current.Entitlement.IsProAt(_timeProvider.GetUtcNow()) ||
                 !_session.HasUsableOfflineLicense(_timeProvider.GetUtcNow()))
             {
                 return null;

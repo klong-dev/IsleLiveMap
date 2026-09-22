@@ -137,6 +137,15 @@ public partial class HomeWindow : Window
             ? new Button { Content = _proPresentation.MapAction, Style = (Style)FindResource("PrimaryMapAction"), HorizontalAlignment = HorizontalAlignment.Left, CommandParameter = "basic" }
             : Action(_proPresentation.MapAction, OpenMap_Click);
         if (_proPresentation.HasCurrentProAccess) mapButton.Click += OpenMap_Click;
+        AutomationProperties.SetAutomationId(
+            mapButton,
+            _proPresentation.HasCurrentProAccess ? "OpenMapProButton" : "OpenMapBasicButton");
+        AutomationProperties.SetName(
+            mapButton,
+            _proPresentation.HasCurrentProAccess ? "MỞ MAP PRO" : "MỞ MAP");
+        AutomationProperties.SetHelpText(
+            mapButton,
+            "Mở Live Map sau khi kiểm tra cập nhật và Npcap");
         if (_mapLaunchGateState == MapLaunchGateState.Checking)
             mapButton.Content = _proPresentation.HasCurrentProAccess ? "ĐANG KIỂM TRA CẬP NHẬT" : "ĐANG KIỂM TRA CẬP NHẬT";
         mapButton.IsEnabled = MapLaunchGatePolicy.AllowsMap(_mapLaunchGateState);
@@ -391,7 +400,13 @@ public partial class HomeWindow : Window
             var proPresentation = HomeProPresentationPolicy.Evaluate(
                 _pro,
                 DateTimeOffset.UtcNow);
-            if (proPresentation.IsVerified)
+            // Pro entitlement is sufficient to open the Pro overlay. The
+            // Agent may still be pending and must be allowed to start from
+            // the overlay source; requiring IsVerified here creates a
+            // circular gate (AgentReady can only become true after the Agent
+            // has been started). IslePilot credentials are only needed for
+            // the optional remote session, not for the Pro local overlay.
+            if (proPresentation.HasCurrentProAccess)
             {
                 OpenProOnlyOverlay();
                 return;
