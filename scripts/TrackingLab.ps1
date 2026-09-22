@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Position = 0)]
-    [ValidateSet('start-session', 'preflight', 'open-map', 'capture', 'run-round', 'replay', 'analyze', 'report', 'fix-loop')]
+    [ValidateSet('start-session', 'preflight', 'open-map', 'capture', 'run-round', 'replay', 'analyze', 'stale-report', 'report', 'fix-loop')]
     [string]$Command = 'start-session',
 
     [string]$SessionRoot = (Join-Path (Split-Path $PSScriptRoot -Parent) 'artifacts\tracking-lab'),
@@ -32,6 +32,34 @@ function Write-JsonFile([string]$Path, $Value) {
     $Value | ConvertTo-Json -Depth 16 | Set-Content -LiteralPath $Path -Encoding UTF8
 }
 
+$script:RoundLockStream = $null
+
+function Enter-RoundLock {
+    $lockPath = Join-Path ([System.IO.Path]::GetFullPath($SessionRoot)) 'run-round.lock'
+    New-Item -ItemType Directory -Force -Path (Split-Path $lockPath -Parent) | Out-Null
+    try {
+        $script:RoundLockStream = [System.IO.File]::Open(
+            $lockPath,
+            [System.IO.FileMode]::OpenOrCreate,
+            [System.IO.FileAccess]::ReadWrite,
+            [System.IO.FileShare]::None)
+        $script:RoundLockStream.SetLength(0)
+        $bytes = [System.Text.Encoding]::UTF8.GetBytes("PID=$PID`nStartedAt=$([DateTimeOffset]::UtcNow.ToString('O'))`n")
+        $script:RoundLockStream.Write($bytes, 0, $bytes.Length)
+        $script:RoundLockStream.Flush()
+    } catch {
+        if ($script:RoundLockStream) { $script:RoundLockStream.Dispose(); $script:RoundLockStream = $null }
+        throw "RUN_ALREADY_ACTIVE: một run-round khác đang giữ $lockPath"
+    }
+}
+
+function Exit-RoundLock {
+    if ($script:RoundLockStream) {
+        $script:RoundLockStream.Dispose()
+        $script:RoundLockStream = $null
+    }
+}
+
 function Resolve-Session {
     if ([string]::IsNullOrWhiteSpace($SessionId)) {
         $latest = Get-ChildItem -LiteralPath $SessionRoot -Directory -ErrorAction SilentlyContinue |
@@ -46,6 +74,7 @@ function Resolve-Session {
 
 function Test-Preflight {
     $game = Get-Process -Name @(
+        'TheIsle',
         'TheIsle-Win64-Shipping',
         'TheIsleClient-Win64-Shipping'
     ) -ErrorAction SilentlyContinue | Select-Object -First 1
@@ -126,6 +155,7 @@ function Test-BasePreflight {
 }
 
 function New-Session {
+    $SessionRoot = [System.IO.Path]::GetFullPath($SessionRoot)
     New-Item -ItemType Directory -Force -Path $SessionRoot | Out-Null
     $id = if ($SessionId) { $SessionId } else { "session-{0:yyyyMMdd-HHmmss}-{1}" -f (Get-Date), ([Guid]::NewGuid().ToString('N').Substring(0, 6)) }
     $path = Join-Path $SessionRoot $id
@@ -140,6 +170,7 @@ function New-Session {
         GroundTruth = 'Chronological Agent/capture replay; no screenshot-based player count.'
         Preflight = $preflight
     })
+    $path = [System.IO.Path]::GetFullPath($path)
     $env:ISLELIVEMAP_PRO_LIVE_COMPARE_PATH = Join-Path $path 'agent-live-compare.jsonl'
     $env:ISLE_MAP_DIAGNOSTICS_PATH = Join-Path $path 'map-diagnostics.jsonl'
     Write-Host "Session: $id"
@@ -218,11 +249,20 @@ function Start-LauncherWithSessionEnvironment([string]$Executable, [string]$Path
     $info.WorkingDirectory = Split-Path -Parent $Executable
     $info.EnvironmentVariables['ISLELIVEMAP_PRO_LIVE_COMPARE_PATH'] = Join-Path $Path 'agent-live-compare.jsonl'
     $info.EnvironmentVariables['ISLE_MAP_DIAGNOSTICS_PATH'] = Join-Path $Path 'map-diagnostics.jsonl'
+    if (-not [string]::IsNullOrWhiteSpace($ProLocalReleaseManifest)) {
+        # Environment variables do not flow from this harness invocation into
+        # a newly created launcher automatically. Forward the signed release
+        # manifest explicitly so the normal ProReleaseManager can verify and
+        # install the requested Agent instead of silently reusing current.json.
+        $info.EnvironmentVariables['ISLELIVEMAP_PRO_LOCAL_RELEASE_MANIFEST'] =
+            [System.IO.Path]::GetFullPath($ProLocalReleaseManifest)
+    }
     $process = [System.Diagnostics.Process]::Start($info)
     return $process
 }
 
 function Invoke-OpenMap([string]$Path) {
+    $Path = [System.IO.Path]::GetFullPath($Path)
     $preflight = Write-Preflight $Path
     if (-not $preflight.NpcapLibraryFound -or
         -not $preflight.ProCredentialFileFound -or
@@ -294,11 +334,24 @@ function Invoke-OpenMap([string]$Path) {
 
 function Invoke-Capture([string]$Path) {
     $preflightPath = Join-Path $Path 'preflight.json'
-    $preflight = Test-Preflight
+    # Opening the map starts the Pro source asynchronously.  Do not sample
+    # preflight in the small window before the Agent process has spawned.
+    $preflight = Wait-ForTrackingRuntime -TimeoutSeconds 45
     Write-JsonFile $preflightPath $preflight
+    $manifestPath = Join-Path $Path 'session-manifest.json'
+    $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+    $expectedAgentVersion = [string]$manifest.Preflight.ProAgentVersion
+    if (-not [string]::IsNullOrWhiteSpace($expectedAgentVersion) -and
+        -not [string]::IsNullOrWhiteSpace([string]$preflight.ProAgentVersion) -and
+        $expectedAgentVersion -ne [string]$preflight.ProAgentVersion) {
+        $manifest | Add-Member -NotePropertyName Status -NotePropertyValue 'NEED_STAGE_EVIDENCE' -Force
+        $manifest | Add-Member -NotePropertyName StoppedReason -NotePropertyValue (
+            "Pro Agent version mismatch: preflight expected $expectedAgentVersion, runtime reported $($preflight.ProAgentVersion).") -Force
+        Write-JsonFile $manifestPath $manifest
+        Write-Warning "Capture stopped: Pro Agent version mismatch ($expectedAgentVersion -> $($preflight.ProAgentVersion))."
+        return
+    }
     if (-not $preflight.Ready) {
-        $manifestPath = Join-Path $Path 'session-manifest.json'
-        $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
         $manifest | Add-Member -NotePropertyName Status -NotePropertyValue 'NEED_DEVELOPER' -Force
         $manifest | Add-Member -NotePropertyName StoppedReason -NotePropertyValue 'Preflight failed; no bypass.' -Force
         Write-JsonFile $manifestPath $manifest
@@ -328,6 +381,41 @@ function Invoke-Capture([string]$Path) {
     }
     Write-JsonFile $manifestPath $manifest
     Write-Host "Capture complete: $Path"
+}
+
+function Wait-ForTrackingRuntime([int]$TimeoutSeconds = 45) {
+    $deadline = [DateTime]::UtcNow.AddSeconds([Math]::Max(5, $TimeoutSeconds))
+    do {
+        $preflight = Test-Preflight
+        if ($preflight.GameProcessFound -and
+            $preflight.ProAgentFound -and
+            $preflight.NpcapLibraryFound -and
+            $preflight.ProCredentialFileFound -and
+            $preflight.ProAgentExecutableFound) {
+            return $preflight
+        }
+
+        Start-Sleep -Milliseconds 500
+    } while ([DateTime]::UtcNow -lt $deadline)
+
+    return (Test-Preflight)
+}
+
+function Stop-HarnessLauncher([string]$Path) {
+    $manifestPath = Join-Path $Path 'session-manifest.json'
+    if (-not (Test-Path -LiteralPath $manifestPath)) { return }
+
+    $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+    if (-not [bool](Get-Field $manifest @('LauncherStartedByHarness'))) { return }
+
+    $launcherPid = Get-Field $manifest @('LauncherPid')
+    if ($null -eq $launcherPid) { return }
+
+    $launcher = Get-Process -Id ([int]$launcherPid) -ErrorAction SilentlyContinue
+    if ($null -ne $launcher) {
+        Stop-Process -Id $launcher.Id -Force -ErrorAction SilentlyContinue
+        Start-Sleep -Milliseconds 500
+    }
 }
 
 function Read-JsonLines([string]$Path) {
@@ -431,7 +519,7 @@ function Test-EligibleEntity($Entity, $Frame) {
     if ($null -eq $frameAt) { $frameAt = Get-DateTimeOffsetOrNull (Get-Field $Entity @('ObservedAt', 'observedAt')) }
     if ($null -ne $locationAt -and $null -ne $frameAt -and
         (($locationAt -gt $frameAt) -or
-         (($frameAt - $locationAt).TotalSeconds -gt 90))) { return $false }
+         (($frameAt - $locationAt).TotalSeconds -gt 2))) { return $false }
     if ($kind -eq 'ai') {
         return -not [string]::IsNullOrWhiteSpace((Get-EntitySpeciesId $Entity)) -and
             -not [string]::IsNullOrWhiteSpace((Get-EntitySpeciesName $Entity))
@@ -459,7 +547,7 @@ function Get-EntityRejectionReason($Entity, $Frame) {
     $locationAt = Get-DateTimeOffsetOrNull $Entity.LocationObservedAt
     $frameAt = Get-FrameTimestamp $Frame
     if ($null -eq $frameAt) { $frameAt = Get-DateTimeOffsetOrNull (Get-Field $Entity @('ObservedAt', 'observedAt')) }
-    if ($null -ne $locationAt -and $null -ne $frameAt -and ($frameAt - $locationAt).TotalSeconds -gt 90) { return 'StaleLocation' }
+    if ($null -ne $locationAt -and $null -ne $frameAt -and ($frameAt - $locationAt).TotalSeconds -gt 2) { return 'StaleLocation' }
     $kind = Get-EntityKind $Entity
     if ($kind -eq 'ai' -and ([string]::IsNullOrWhiteSpace((Get-EntitySpeciesId $Entity)) -or [string]::IsNullOrWhiteSpace((Get-EntitySpeciesName $Entity)))) { return 'MissingSpecies' }
     if ($kind -eq 'player' -and -not (Get-EntityProvisional $Entity) -and
@@ -555,12 +643,26 @@ function Invoke-Analyze([string]$Path) {
         HandlesLaterRenderedAsPlayer = @()
         LateProofUpgradedHandles = @()
     }
+    $locationAges = [System.Collections.Generic.List[double]]::new()
+    $locationAgeGt2s = 0
+    $locationAgeGt6s = 0
+    $locationAgeGt15s = 0
+    $maxLocationAgeMs = 0d
+    $maxQueueDroppedPackets = 0L
+    $maxQueueDepth = 0
+    $staleMarkerRows = 0
     $candidateHandlesByDecision = @{}
     $allCandidateHandles = [System.Collections.Generic.HashSet[string]]::new()
     $candidateRenderedPlayerHandles = [System.Collections.Generic.HashSet[string]]::new()
     $hasStageEvidence = $false
     foreach ($frame in $agent) {
         $frameAt = Get-FrameTimestamp $frame
+        if ($null -ne $frame.PlayerSync) {
+            $dropped = [long](Get-Field $frame.PlayerSync @('QueueDroppedPackets', 'queueDroppedPackets'))
+            $depth = [int](Get-Field $frame.PlayerSync @('QueueDepth', 'queueDepth'))
+            if ($dropped -gt $maxQueueDroppedPackets) { $maxQueueDroppedPackets = $dropped }
+            if ($depth -gt $maxQueueDepth) { $maxQueueDepth = $depth }
+        }
         $endpoint = if ([string]::IsNullOrWhiteSpace([string]$frame.ServerEndpoint)) { 'unknown' } else { [string]$frame.ServerEndpoint }
         if (-not $seenByEndpoint.ContainsKey($endpoint)) { $seenByEndpoint[$endpoint] = 1 }
         # The live recorder stores the post-fusion output in separate player
@@ -603,6 +705,15 @@ function Invoke-Analyze([string]$Path) {
             }
         }
         foreach ($entity in $entities) {
+            $locationAt = Get-DateTimeOffsetOrNull (Get-Field $entity @('LocationObservedAt', 'locationObservedAt'))
+            if ($null -ne $locationAt -and $null -ne $frameAt -and $frameAt -ge $locationAt) {
+                $ageMs = ($frameAt - $locationAt).TotalMilliseconds
+                $locationAges.Add([double]$ageMs)
+                if ($ageMs -gt 2000) { $locationAgeGt2s++ }
+                if ($ageMs -gt 6000) { $locationAgeGt6s++ }
+                if ($ageMs -gt 15000) { $locationAgeGt15s++ }
+                if ($ageMs -gt $maxLocationAgeMs) { $maxLocationAgeMs = $ageMs }
+            }
             $eligible = Test-EligibleEntity $entity $frame
             $key = Get-EntityKey $entity $endpoint $seenByEndpoint[$endpoint]
             $render = $null
@@ -734,6 +845,7 @@ function Invoke-Analyze([string]$Path) {
     foreach ($row in $renderRows) {
         $diagnostic = $row.ProTrackingDiagnostics
         if ($null -eq $diagnostic) { continue }
+        $staleMarkerRows += [int](Get-Field $diagnostic @('StaleCount', 'staleCount'))
         foreach ($property in $diagnostic.Rejections.PSObject.Properties) {
             $current = if ($diagnosticRejections.ContainsKey($property.Name)) { [int]$diagnosticRejections[$property.Name] } else { 0 }
             $diagnosticRejections[$property.Name] = $current + [int]$property.Value
@@ -764,6 +876,16 @@ function Invoke-Analyze([string]$Path) {
         P95CaptureDecodeLatencyMs = Get-Percentile $captureDecodeLatencies.ToArray() 0.95
         P50AgentToUiLatencyMs = Get-Percentile $agentUiLatencies.ToArray() 0.50
         P95AgentToUiLatencyMs = Get-Percentile $agentUiLatencies.ToArray() 0.95
+        LocationAgeSamples = $locationAges.Count
+        LocationAgeGt2s = $locationAgeGt2s
+        LocationAgeGt6s = $locationAgeGt6s
+        LocationAgeGt15s = $locationAgeGt15s
+        P50LocationAgeMs = Get-Percentile $locationAges.ToArray() 0.50
+        P95LocationAgeMs = Get-Percentile $locationAges.ToArray() 0.95
+        MaxLocationAgeMs = $maxLocationAgeMs
+        MaxQueueDroppedPackets = $maxQueueDroppedPackets
+        MaxQueueDepth = $maxQueueDepth
+        StaleMarkerRows = $staleMarkerRows
         MissingEntities = $missing
         GroundTruthPath = $groundTruthPath
         StageEvidenceAvailable = $hasStageEvidence -or $stageEvidenceAvailable
@@ -827,6 +949,9 @@ function Invoke-Report([string]$Path) {
         "- P95 capture → decode: $($a.P95CaptureDecodeLatencyMs) ms",
         "- P50 Agent → UI: $($a.P50AgentToUiLatencyMs) ms",
         "- P95 Agent → UI: $($a.P95AgentToUiLatencyMs) ms",
+        "- Tuổi tọa độ: p50 $($a.P50LocationAgeMs) ms · p95 $($a.P95LocationAgeMs) ms · tối đa $($a.MaxLocationAgeMs) ms",
+        "- Tọa độ cũ hơn 2/6/15 giây: $($a.LocationAgeGt2s) / $($a.LocationAgeGt6s) / $($a.LocationAgeGt15s)",
+        "- Queue Agent: drop tối đa $($a.MaxQueueDroppedPackets) · depth tối đa $($a.MaxQueueDepth) · stale marker rows $($a.StaleMarkerRows)",
         "- Ground truth: $($a.GroundTruthPath)",
         "- Trạng thái: $($a.Status)",
         '',
@@ -835,6 +960,98 @@ function Invoke-Report([string]$Path) {
     $reportPath = Join-Path $Path 'tracking-report.md'
     $lines | Set-Content -LiteralPath $reportPath -Encoding UTF8
     Write-Host ($lines -join [Environment]::NewLine)
+}
+
+function Invoke-StaleAgeReport([string]$Path) {
+    # This diagnostic deliberately streams JSONL. The live capture can exceed
+    # 100 MB and must not be loaded into one PowerShell object graph.
+    $agentPath = Join-Path $Path 'raw-capture\agent-live-compare.jsonl'
+    $mapPath = Join-Path $Path 'raw-capture\map-diagnostics.jsonl'
+    $ages = [System.Collections.Generic.List[double]]::new()
+    $frames = 0
+    $entities = 0
+    $players = 0
+    $ai = 0
+    $gt2 = 0
+    $gt6 = 0
+    $gt15 = 0
+    $maxAge = 0d
+    $maxDrop = 0L
+    $maxDepth = 0
+    $reader = if (Test-Path -LiteralPath $agentPath) { [System.IO.StreamReader]::new($agentPath) } else { $null }
+    try {
+        while ($null -ne $reader -and $null -ne ($line = $reader.ReadLine())) {
+            if ([string]::IsNullOrWhiteSpace($line)) { continue }
+            try { $frame = $line | ConvertFrom-Json -Depth 32 } catch { continue }
+            if ($null -eq $frame.frameObservedAt -and $null -eq $frame.receivedAt) { continue }
+            $frames++
+            $frameAt = Get-FrameTimestamp $frame
+            if ($frame.PlayerSync) {
+                $drop = [long](Get-Field $frame.PlayerSync @('QueueDroppedPackets','queueDroppedPackets'))
+                $depth = [int](Get-Field $frame.PlayerSync @('QueueDepth','queueDepth'))
+                if ($drop -gt $maxDrop) { $maxDrop = $drop }
+                if ($depth -gt $maxDepth) { $maxDepth = $depth }
+            }
+            foreach ($entity in @($frame.RemoteEntities)) {
+                $entities++
+                if ((Get-EntityKind $entity) -eq 'player') { $players++ } else { $ai++ }
+                $locationAt = Get-DateTimeOffsetOrNull (Get-Field $entity @('LocationObservedAt','locationObservedAt'))
+                if ($null -eq $locationAt -or $null -eq $frameAt -or $frameAt -lt $locationAt) { continue }
+                $age = ($frameAt - $locationAt).TotalMilliseconds
+                $ages.Add([double]$age)
+                if ($age -gt 2000) { $gt2++ }
+                if ($age -gt 6000) { $gt6++ }
+                if ($age -gt 15000) { $gt15++ }
+                if ($age -gt $maxAge) { $maxAge = $age }
+            }
+        }
+    } finally { if ($reader) { $reader.Dispose() } }
+    $renderRows = 0
+    $staleRows = 0
+    $maxUiDelay = 0d
+    $maxSnapshotAge = 0d
+    $mapReader = if (Test-Path -LiteralPath $mapPath) { [System.IO.StreamReader]::new($mapPath) } else { $null }
+    try {
+        while ($null -ne $mapReader -and $null -ne ($line = $mapReader.ReadLine())) {
+            if ([string]::IsNullOrWhiteSpace($line)) { continue }
+            try { $row = $line | ConvertFrom-Json -Depth 32 } catch { continue }
+            if ($row.stage -ne 'render-end') { continue }
+            $renderRows++
+            $staleRows += [int](Get-Field $row.ProTrackingDiagnostics @('StaleCount','staleCount'))
+            $ui = [double]$row.UiQueueDelayMs
+            $snap = [double]$row.SnapshotAgeMs
+            if ($ui -gt $maxUiDelay) { $maxUiDelay = $ui }
+            if ($snap -gt $maxSnapshotAge) { $maxSnapshotAge = $snap }
+        }
+    } finally { if ($mapReader) { $mapReader.Dispose() } }
+    $ordered = @($ages | Sort-Object)
+    $p = { param([double]$q) if ($ordered.Count -eq 0) { return $null }; return $ordered[[Math]::Max(0,[Math]::Min($ordered.Count - 1,[Math]::Ceiling($ordered.Count * $q)-1))] }
+    $result = [pscustomobject]@{
+        SessionId = Split-Path $Path -Leaf
+        GeneratedAt = [DateTimeOffset]::UtcNow
+        AgentFrames = $frames
+        Entities = $entities
+        Players = $players
+        Ai = $ai
+        LocationAgeSamples = $ages.Count
+        LocationAgeGt2s = $gt2
+        LocationAgeGt6s = $gt6
+        LocationAgeGt15s = $gt15
+        P50LocationAgeMs = & $p 0.5
+        P95LocationAgeMs = & $p 0.95
+        MaxLocationAgeMs = $maxAge
+        RenderRows = $renderRows
+        StaleMarkerRows = $staleRows
+        MaxUiQueueDelayMs = $maxUiDelay
+        MaxSnapshotAgeMs = $maxSnapshotAge
+        MaxQueueDroppedPackets = $maxDrop
+        MaxQueueDepth = $maxDepth
+        RawCapturePresent = (Test-Path -LiteralPath $agentPath)
+    }
+    $output = Join-Path $Path 'stale-age-analysis.json'
+    Write-JsonFile $output $result
+    $result | ConvertTo-Json -Depth 8
+    return $result
 }
 
 function New-RegressionFixture([string]$Path, $Analysis) {
@@ -905,6 +1122,8 @@ function Remove-PassedRawArtifacts {
 }
 
 function Invoke-Round {
+    Enter-RoundLock
+    try {
     if ($DurationMinutes -ne 5) {
         Write-Warning "Autonomous acceptance round requires exactly 5 minutes per session; overriding DurationMinutes=$DurationMinutes to 5."
     }
@@ -935,9 +1154,17 @@ function Invoke-Round {
         # New-Session reads the script parameter. Set the session manifest
         # explicitly and keep the round contract visible even when this script
         # is invoked with an accidental custom duration.
-        Invoke-Capture $path
-        Invoke-Analyze $path | Out-Null
-        Invoke-Report $path
+        try {
+            Invoke-Capture $path
+            Invoke-Analyze $path | Out-Null
+            Invoke-Report $path
+        }
+        finally {
+            # Every round session owns its launcher.  Closing it here prevents
+            # later sessions from attaching to an older map/Agent and mixing
+            # diagnostics or packets across session boundaries.
+            Stop-HarnessLauncher $path
+        }
     }
     Remove-PassedRawArtifacts
     $roundAnalyses = foreach ($mode in $modes) {
@@ -973,6 +1200,9 @@ function Invoke-Round {
         Acceptance = if ($roundStatus -eq 'PASS') { 'All three live sessions passed with stage evidence.' } else { 'Three live sessions with real game/Agent evidence are required.' }
     })
     Write-Host "Đã hoàn tất round 3 session: $round · Status: $roundStatus"
+    } finally {
+        Exit-RoundLock
+    }
 }
 
 switch ($Command) {
@@ -991,6 +1221,7 @@ switch ($Command) {
     'run-round' { Invoke-Round; break }
     'replay' { Invoke-Replay (Resolve-Session) | Format-List; break }
     'analyze' { Invoke-Analyze (Resolve-Session) | Format-List; break }
+    'stale-report' { Invoke-StaleAgeReport (Resolve-Session) | Format-List; break }
     'report' { Invoke-Report (Resolve-Session); break }
     'fix-loop' {
         $path = Resolve-Session

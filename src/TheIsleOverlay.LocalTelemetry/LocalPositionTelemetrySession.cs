@@ -194,7 +194,7 @@ public sealed class LocalPositionTelemetrySession : ITelemetrySession
                             merged.Map,
                             lifecycle,
                             previousMap,
-                            preserveMissingFromNonEmptyFrame: remotePlayers is { Count: > 0 }),
+                            preserveMissingFromNonEmptyFrame: false),
                         ProPlayerTrackingActive = _remotePlayerSource is not null,
                         ProTrackingDiagnostics = trackingDiagnostics with
                         {
@@ -210,7 +210,7 @@ public sealed class LocalPositionTelemetrySession : ITelemetrySession
                             merged.Map,
                             lifecycle,
                             previousMap,
-                            preserveMissingFromNonEmptyFrame: remotePlayers is { Count: > 0 }),
+                            preserveMissingFromNonEmptyFrame: false),
                         ProPlayerTrackingActive = true,
                         ProTrackingDiagnostics = new RemoteTrackingDiagnostics
                         {
@@ -432,7 +432,9 @@ public sealed class LocalPositionTelemetrySession : ITelemetrySession
                 }
 
                 return !byTrack.TryGetValue((kind, trackId), out var state)
-                       || state.State != RemoteEntityLifecycleState.Removed;
+                       || state.State is not (RemoteEntityLifecycleState.Removed
+                           or RemoteEntityLifecycleState.TemporarilyMissing
+                           or RemoteEntityLifecycleState.Stale);
             })
             .Select(marker =>
             {
@@ -454,26 +456,6 @@ public sealed class LocalPositionTelemetrySession : ITelemetrySession
                 };
             })
             .ToArray();
-
-        if (preserveMissingFromNonEmptyFrame && previousMap is not null)
-        {
-            var currentKeys = markers
-                .Select(marker => marker.SteamId)
-                .Where(key => !string.IsNullOrWhiteSpace(key))
-                .ToHashSet(StringComparer.Ordinal);
-            var retained = previousMap.Markers
-                .Where(marker =>
-                    marker.SteamId is not null
-                    && marker.SteamId.StartsWith("pro-entity:", StringComparison.Ordinal)
-                    && !currentKeys.Contains(marker.SteamId)
-                    && marker.ProEntityKind is { } kind
-                    && TryGetTrackId(marker.SteamId, out var trackId)
-                    && byTrack.TryGetValue((kind, trackId), out var state)
-                    && state.State is RemoteEntityLifecycleState.TemporarilyMissing
-                        or RemoteEntityLifecycleState.Stale)
-                .Select(marker => marker with { ProEntityIsStale = true });
-            markers = [.. markers, .. retained];
-        }
 
         return map with { Markers = markers };
     }

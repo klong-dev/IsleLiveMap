@@ -737,14 +737,15 @@ public sealed class LocalPositionSnapshotMergerTests
             Now,
             remotePlayers: [entity]);
 
-        Assert.Equal(1, merged.ProTrackingDiagnostics?.RenderedCount);
-        Assert.True(Assert.Single(merged.Map!.Markers).ProEntityIsStale);
-        Assert.Equal(0, merged.ProTrackingDiagnostics?.RejectedCount);
+        Assert.Equal(0, merged.ProTrackingDiagnostics?.RenderedCount);
+        Assert.Empty(merged.Map!.Markers);
+        Assert.Equal(1, merged.ProTrackingDiagnostics?.RejectedCount);
+        Assert.Equal(1, merged.ProTrackingDiagnostics?.StaleCount);
         Assert.Equal(1, merged.ProTrackingDiagnostics?.Rejections[RemoteEntityRejectionReason.StaleLocation]);
     }
 
     [Fact]
-    public void Merge_RetainsPreviouslyRenderedVerifiedActorAsStaleWhenLocationIsStale()
+    public void Merge_DropsPreviouslyRenderedVerifiedActorWhenLocationIsStale()
     {
         var marker = new MapMarkerTelemetry
         {
@@ -775,15 +776,15 @@ public sealed class LocalPositionSnapshotMergerTests
             Now,
             remotePlayers: [entity]);
 
-        var retained = Assert.Single(merged.Map!.Markers);
-        Assert.Equal("pro-entity:player:100", retained.SteamId);
-        Assert.True(retained.ProEntityIsStale);
-        Assert.Equal(1, merged.ProTrackingDiagnostics?.RenderedCount);
+        Assert.Empty(merged.Map!.Markers);
+        Assert.Equal(0, merged.ProTrackingDiagnostics?.RenderedCount);
+        Assert.Equal(1, merged.ProTrackingDiagnostics?.RejectedCount);
+        Assert.Equal(1, merged.ProTrackingDiagnostics?.StaleCount);
         Assert.Equal(1, merged.ProTrackingDiagnostics?.Rejections[RemoteEntityRejectionReason.StaleLocation]);
     }
 
     [Fact]
-    public void Merge_ProjectsFirstVerifiedActorAsStaleWhenItsOnlyLocationIsOld()
+    public void Merge_DoesNotProjectFirstVerifiedActorWhenItsOnlyLocationIsOld()
     {
         var entity = new VerifiedRemoteEntityTelemetry(
             101,
@@ -809,10 +810,10 @@ public sealed class LocalPositionSnapshotMergerTests
             Now,
             remotePlayers: [entity]);
 
-        var marker = Assert.Single(merged.Map!.Markers);
-        Assert.Equal("pro-entity:player:101", marker.SteamId);
-        Assert.True(marker.ProEntityIsStale);
-        Assert.Equal(1, merged.ProTrackingDiagnostics?.RenderedCount);
+        Assert.Empty(merged.Map!.Markers);
+        Assert.Equal(0, merged.ProTrackingDiagnostics?.RenderedCount);
+        Assert.Equal(1, merged.ProTrackingDiagnostics?.RejectedCount);
+        Assert.Equal(1, merged.ProTrackingDiagnostics?.StaleCount);
         Assert.Equal(1, merged.ProTrackingDiagnostics?.Rejections[RemoteEntityRejectionReason.StaleLocation]);
     }
 

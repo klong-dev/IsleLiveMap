@@ -290,10 +290,6 @@ public static class LocalPositionSnapshotMerger
         var seen = new HashSet<string>(StringComparer.Ordinal);
         var proMarkers = new List<MapMarkerTelemetry>();
         var staleCount = 0;
-        var existingProMarkers = (map?.Markers ?? [])
-            .Where(marker => marker.SteamId?.StartsWith("pro-entity:", StringComparison.Ordinal) == true)
-            .GroupBy(marker => marker.SteamId!, StringComparer.Ordinal)
-            .ToDictionary(group => group.Key, group => group.Last(), StringComparer.Ordinal);
         foreach (var entity in remotePlayers)
         {
             if (!TryGetRejectionReason(entity, seen, now, out var reason))
@@ -322,30 +318,13 @@ public static class LocalPositionSnapshotMerger
 
             rejectionCounts[reason] = rejectionCounts.GetValueOrDefault(reason) + 1;
 
-            // A verified actor with an old coordinate is not the same as an
-            // absent actor. Keep its last known marker for the lifecycle TTL,
-            // but mark it stale so the renderer cannot present it as live.
-            // This is especially important when Agent presence continues to
-            // refresh while movement packets are sparse.
+            // Presence and movement are separate signals. An actor with an
+            // old coordinate is retained in diagnostics only; projecting its
+            // old coordinate, even as a dim marker, makes users walk to a
+            // location where the dino is no longer present.
             if (reason == RemoteEntityRejectionReason.StaleLocation)
             {
-                var key = $"pro-entity:{entity.Kind.ToString().ToLowerInvariant()}:{entity.TrackId}";
-                if (existingProMarkers.TryGetValue(key, out var previousMarker))
-                {
-                    proMarkers.Add(previousMarker with { ProEntityIsStale = true });
-                    staleCount++;
-                }
-                else if (HasVerifiedIdentity(entity))
-                {
-                    // A verified actor can enter the stream with a location
-                    // older than the live freshness window. Surface its last
-                    // known coordinate immediately as stale instead of losing
-                    // the actor until a fresh movement packet happens to
-                    // arrive. The renderer dims this marker and never treats
-                    // it as live.
-                    proMarkers.Add(CreateRemoteMarker(entity, isStale: true));
-                    staleCount++;
-                }
+                staleCount++;
             }
         }
         var diagnostics = new RemoteTrackingDiagnostics
@@ -368,28 +347,6 @@ public static class LocalPositionSnapshotMerger
             Markers = [.. providerMarkers, .. proMarkers]
         }, diagnostics);
     }
-
-    private static MapMarkerTelemetry CreateRemoteMarker(
-        VerifiedRemoteEntityTelemetry entity,
-        bool isStale = false) =>
-        new()
-        {
-            SteamId = $"pro-entity:{entity.Kind.ToString().ToLowerInvariant()}:{entity.TrackId}",
-            Label = CreatureMarkerLabelFormatter.Format(
-                string.IsNullOrWhiteSpace(entity.SpeciesShortName)
-                    ? "Player ?"
-                    : entity.SpeciesShortName,
-                entity.MassKg),
-            Self = false,
-            Location = entity.Location,
-            ProEntityKind = entity.Kind,
-            CreatureSpeciesId = entity.SpeciesId,
-            CreatureSpeciesShortName = entity.SpeciesShortName,
-            ProCreatureDiet = entity.Diet,
-            CreatureMassKg = entity.MassKg,
-            ProEntityIsProvisional = entity.IsProvisional,
-            ProEntityIsStale = isStale
-        };
 
     private static bool HasVerifiedIdentity(VerifiedRemoteEntityTelemetry entity) =>
         entity.Kind == RemoteEntityKind.Ai

@@ -143,7 +143,12 @@ public sealed record VerifiedRemoteEntityTelemetry(
     ulong PlayerStateNetRefHandle = 0,
     ulong PawnNetRefHandle = 0)
 {
-    public static readonly TimeSpan LocationFreshness = TimeSpan.FromSeconds(90);
+    // Presence/identity can be refreshed without a new movement sample. Do
+    // not keep projecting that old coordinate as a dim marker: after this
+    // window the actor is diagnostic-only until a fresh movement packet
+    // arrives. This prevents a user from walking to a stale marker and
+    // finding no dino there.
+    public static readonly TimeSpan LocationFreshness = TimeSpan.FromSeconds(2);
 
     public TimeSpan? LocationAgeAt(DateTimeOffset now) =>
         LocationObservedAt is { } observed && now >= observed
