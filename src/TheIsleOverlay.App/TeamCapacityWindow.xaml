@@ -1,7 +1,7 @@
 <Window x:Class="TheIsleOverlay.App.TeamCapacityWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Nhóm sinh tồn · Quy mô phòng" Width="510" Height="490" ResizeMode="NoResize"
+        Title="Nhóm sinh tồn · Quy mô phòng" Width="510" Height="550" ResizeMode="NoResize"
         WindowStartupLocation="CenterOwner" ShowInTaskbar="False" Background="#0C211E" Foreground="#EAF4F0" FontFamily="Segoe UI">
     <Window.Resources>
         <Style x:Key="CapacityChoice" TargetType="Button">
@@ -28,7 +28,7 @@
             <TextBlock Text="Số người tối đa trong phòng, tính cả bạn." Margin="0,8,0,4" FontSize="14" Foreground="#A7C3B9"/>
             <TextBlock x:Name="TierLabel" FontSize="12" Foreground="#E8CB88"/>
         </StackPanel>
-        <UniformGrid x:Name="ChoicesPanel" Grid.Row="1" Columns="2" VerticalAlignment="Center"/>
+        <UniformGrid x:Name="ChoicesPanel" Grid.Row="1" Columns="2" Rows="2" Height="224" VerticalAlignment="Center"/>
         <TextBlock x:Name="MessageLabel" Grid.Row="2" MinHeight="45" Margin="0,4,0,10" FontSize="14" Foreground="#E8CB88" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite"/>
         <Button Grid.Row="3" Content="HỦY" IsCancel="True" HorizontalAlignment="Right" Padding="24,9" Background="#16342E" Foreground="#EAF4F0" BorderBrush="#416C61"/>
     </Grid></Grid>

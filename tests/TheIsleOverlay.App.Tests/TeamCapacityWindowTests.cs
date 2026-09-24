@@ -82,8 +82,16 @@ public sealed class TeamCapacityWindowTests
     private static void Render(Window window, string path)
     {
         var root = (FrameworkElement)window.Content;
-        root.Measure(new Size(490, 450)); root.Arrange(new Rect(0, 0, 490, 450)); root.UpdateLayout();
-        var bmp = new RenderTargetBitmap(490, 450, 96, 96, PixelFormats.Pbgra32); bmp.Render(root);
+        root.Measure(new Size(490, 510)); root.Arrange(new Rect(0, 0, 490, 510)); root.UpdateLayout();
+        var choices = (UniformGrid)window.FindName("ChoicesPanel");
+        Assert.True(choices.ActualHeight >= 224);
+        foreach (var button in choices.Children.OfType<Button>())
+        {
+            var bounds = button.TransformToAncestor(root).TransformBounds(new Rect(button.RenderSize));
+            Assert.InRange(bounds.Bottom, 1d, root.ActualHeight - 50);
+            Assert.True(button.ActualHeight >= 100);
+        }
+        var bmp = new RenderTargetBitmap(490, 510, 96, 96, PixelFormats.Pbgra32); bmp.Render(root);
         var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bmp));
         using var stream = File.Create(path); encoder.Save(stream);
     }
