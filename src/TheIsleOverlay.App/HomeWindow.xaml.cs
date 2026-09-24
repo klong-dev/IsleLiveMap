@@ -408,31 +408,30 @@ public partial class HomeWindow : Window
             if (!await PrepareMapLaunchAsync()) return;
 
             var store = new IslePilotCredentialStore(AppPaths.IslePilotCredential);
-            var credentials = await store.LoadAsync(_shutdown.Token);
+            using var authHttp = new System.Net.Http.HttpClient(
+                new System.Net.Http.HttpClientHandler { AllowAutoRedirect = false })
+                { Timeout = TimeSpan.FromSeconds(8) };
+            var localOnlyRequested = false;
+            var credentials = await new IslePilotOverlayLoginFlow(authHttp, store).ResolveAsync(_ =>
+            {
+                // Pro grants tracking, not an IslePilot login. Never silently
+                // open without stats just because the saved login is missing.
+                var login = new IslePilotSteamLoginWindow
+                {
+                    Owner = this,
+                    AllowLocalOnly = HomeProPresentationPolicy.Evaluate(_pro, DateTimeOffset.UtcNow).HasCurrentProAccess
+                };
+                var loggedIn = login.ShowDialog() == true;
+                localOnlyRequested = login.LocalOnlyRequested;
+                return Task.FromResult(loggedIn ? login.Credentials : null);
+            }, SetStatus, _shutdown.Token);
             if (credentials is null)
             {
-                var proPresentation = HomeProPresentationPolicy.Evaluate(
-                    _pro,
-                    DateTimeOffset.UtcNow);
-            // Pro entitlement is sufficient to open the Pro overlay. The
-            // Agent may still be pending and must be allowed to start from
-            // the overlay source; requiring IsVerified here creates a
-            // circular gate (AgentReady can only become true after the Agent
-            // has been started). IslePilot credentials are only needed for
-            // the optional remote session, not for the Pro local overlay.
-                if (proPresentation.HasCurrentProAccess)
-                {
+                if (localOnlyRequested)
                     handedOffToOverlay = await OpenProOnlyOverlayAsync();
-                    return;
-                }
-
-                var login = new IslePilotSteamLoginWindow { Owner = this };
-                if (login.ShowDialog() != true || login.Credentials is null)
-                {
-                    return;
-                }
-
-                credentials = login.Credentials;
+                else
+                    SetStatus("Đã hủy đăng nhập IslePilot. Cần đăng nhập để nhận dino stats và nhiệm vụ.");
+                return;
             }
 
             var session = new AuthenticationInvalidatingTelemetrySession(

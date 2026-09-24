@@ -16,6 +16,19 @@ public partial class IslePilotSteamLoginWindow : Window
     }
 
     public IslePilotOverlayAuthResult? Credentials { get; private set; }
+    public bool LocalOnlyRequested { get; private set; }
+    public bool AllowLocalOnly
+    {
+        get => LocalOnlyButton.Visibility == Visibility.Visible;
+        set => LocalOnlyButton.Visibility = value ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private void LocalOnlyButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (!AllowLocalOnly || _completing) return;
+        LocalOnlyRequested = true;
+        Close();
+    }
 
     private async void Window_Loaded(object sender, RoutedEventArgs e)
     {
