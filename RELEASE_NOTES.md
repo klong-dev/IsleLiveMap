@@ -1,3 +1,12 @@
+# Isle Live Map 2.4.2
+
+## IslePilot và marker stale
+
+- Giữ phiên đăng nhập IslePilot sau khi launcher khởi động lại; chỉ yêu cầu đăng nhập lại khi phiên thực sự hết hạn.
+- Giữ dino stats khi GPS local tạm gián đoạn, đồng thời không biến dữ liệu stats thành vị trí local mới.
+- Tăng độ rõ marker mất tín hiệu từ 42% lên 60%; marker live và marker provisional giữ nguyên cách phân biệt.
+- Giữ toàn bộ cải thiện tracking và thay đổi nhóm sinh tồn/server riêng từ 2.4.1.
+
 # Isle Live Map 2.4.1
 
 ## Cải thiện hiển thị Player và AI

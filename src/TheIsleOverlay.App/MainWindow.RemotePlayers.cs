@@ -80,9 +80,7 @@ public partial class MainWindow
                 ApplyPalette(dot, marker.Category);
                 ApplyProvisionalStyle(dot, marker.IsProvisional);
             }
-            dot.Visual.Opacity = marker.IsStale
-                ? 0.42d
-                : marker.IsProvisional ? 0.82d : 1d;
+            dot.Visual.Opacity = RemoteMarkerOpacity(marker.IsStale, marker.IsProvisional);
         }
 
         foreach (var key in _remotePlayerMapDots.Keys
@@ -96,6 +94,9 @@ public partial class MainWindow
         _renderedRemotePlayerMarkers = markers.ToArray();
         return true;
     }
+
+    internal static double RemoteMarkerOpacity(bool isStale, bool isProvisional) =>
+        isStale ? 0.60d : isProvisional ? 0.82d : 1d;
 
     private static RemotePlayerMapDot CreateRemotePlayerDot(
         string label,
@@ -147,7 +148,7 @@ public partial class MainWindow
         dot.Shape.StrokeDashArray = isProvisional
             ? new DoubleCollection { 1.5d, 1.5d }
             : null;
-        dot.Visual.Opacity = isProvisional ? 0.82d : 1d;
+        dot.Visual.Opacity = RemoteMarkerOpacity(false, isProvisional);
         dot.IsProvisional = isProvisional;
     }
 
