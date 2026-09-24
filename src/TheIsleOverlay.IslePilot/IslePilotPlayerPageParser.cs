@@ -13,7 +13,9 @@ public sealed record IslePilotPlayerPage(
     double? Hunger,
     double? MaxHunger,
     double? Thirst,
-    double? MaxThirst);
+    double? MaxThirst,
+    double? Stamina = null,
+    double? MaxStamina = null);
 
 public static partial class IslePilotPlayerPageParser
 {
@@ -26,6 +28,7 @@ public static partial class IslePilotPlayerPageParser
         var (health, maxHealth) = ParsePair(ReadLabelValue(html, "Health"));
         var (hunger, maxHunger) = ParsePair(ReadLabelValue(html, "Hunger"));
         var (thirst, maxThirst) = ParsePair(ReadLabelValue(html, "Thirst"));
+        var (stamina, maxStamina) = ParsePair(ReadLabelValue(html, "Stamina"));
 
         return new IslePilotPlayerPage(
             EmptyToNull(species),
@@ -36,7 +39,7 @@ public static partial class IslePilotPlayerPageParser
             hunger,
             maxHunger,
             thirst,
-            maxThirst);
+            maxThirst, stamina, maxStamina);
     }
 
     private static string? ReadLabelValue(string html, string label)

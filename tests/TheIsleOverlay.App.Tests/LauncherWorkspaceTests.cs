@@ -45,7 +45,12 @@ public sealed class LauncherWorkspaceTests
         Assert.Contains("MỞ MAP PRO  →", code, StringComparison.Ordinal);
         Assert.Contains("GachaLogo.png", code, StringComparison.Ordinal);
         Assert.Contains("OriginLogo.png", code, StringComparison.Ordinal);
-        Assert.Contains("Columns = 2", code, StringComparison.Ordinal);
+        Assert.Contains("SDVNIcon.png", code, StringComparison.Ordinal);
+        Assert.Contains("new WrapPanel", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("flow đăng nhập riêng", code, StringComparison.Ordinal);
+        Assert.Contains("GachaServer_Click,", code, StringComparison.Ordinal);
+        Assert.Contains("OriginServer_Click,", code, StringComparison.Ordinal);
+        Assert.Contains("SdvnServer_Click,", code, StringComparison.Ordinal);
         Assert.Contains("ServerAction", xaml, StringComparison.Ordinal);
     }
 

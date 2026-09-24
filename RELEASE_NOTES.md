@@ -1,3 +1,14 @@
+# Isle Live Map 2.4.0
+
+## SDVN và kết nối server riêng
+
+- Thêm một nút SDVN trên Home với logo riêng; chọn SDVN #1, #2 hoặc #3 trong cùng một cửa sổ và nhớ server gần nhất.
+- Phiên SDVN được mã hóa bằng DPAPI, tách riêng từng tenant; không dùng chung cookie với DinoVietnam hoặc HoHo. SDVN #4 tạm ẩn do lỗi TLS phía website.
+- Khôi phục thao tác thật cho nút GACHA và ORIGIN: đăng nhập, kiểm tra phiên và mở overlay; hiển thị trạng thái/lỗi ngay trên Home.
+- Stats Origin được cập nhật theo nhịp mục tiêu 2,5 giây khi API đáp ứng; Prime chạy độc lập, không giữ HP/Hunger/Thirst/Stamina chờ theo.
+- Command Origin chậm được tiếp tục theo cùng mã lệnh, có backoff/rate-limit; dữ liệu cũ được đánh dấu và chỉ giữ tối đa 10 giây, không tự gia hạn vô hạn.
+- Các nút server cùng tuân theo bước kiểm tra cập nhật, Npcap và chống mở nhiều overlay; giữ nguyên GPS local, quyền Pro và relay nhóm.
+
 # Isle Live Map 2.3.6
 
 ## Auto update và server riêng trong Pro

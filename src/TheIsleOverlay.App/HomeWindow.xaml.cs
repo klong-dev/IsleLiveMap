@@ -30,6 +30,7 @@ public partial class HomeWindow : Window
     private readonly GitHubReleaseNotesService _releaseService = new();
     private readonly GitHubUpdateService _updateService = new();
     private readonly ProAccessService _proService = new();
+    private readonly ProTelemetryWarmup _proTelemetryWarmup;
     private readonly Dictionary<OverlayShortcutAction, TextBox> _shortcutFields = new();
     private string _page = "home";
     private MapLayerPreferences _layers = new();
@@ -40,6 +41,7 @@ public partial class HomeWindow : Window
     private HomeProPresentationState _proPresentation;
     private Task? _proLoadTask;
     private Task? _updateTask;
+    private int _mapOpenStarted;
     private MapLaunchGateState _mapLaunchGateState = MapLaunchGateState.Checking;
     private Button? _mapActionButton;
     private TextBlock? _updateStatus;
@@ -47,7 +49,15 @@ public partial class HomeWindow : Window
     private TextBlock? _status;
     private static Brush B(string color) => new SolidColorBrush((Color)ColorConverter.ConvertFromString(color));
     private static TextBlock T(string text, double size = 14, Brush? foreground = null, FontWeight? weight = null) => new() { Text = text, FontSize = size, Foreground = foreground ?? B("#EAF4F0"), FontWeight = weight ?? FontWeights.Normal, TextWrapping = TextWrapping.Wrap };
-    public HomeWindow() { InitializeComponent(); _snapshots.Changed += SnapshotChanged; App.CurrentTeam.StateChanged += HomeTeamStateChanged; }
+    public HomeWindow()
+    {
+        InitializeComponent();
+        VersionLabel.Text = $"  v{CurrentVersion()}";
+        SizeChanged += (_, _) => UpdateReleaseRailLayout();
+        _proTelemetryWarmup = new(() => _proService.CreateRemotePlayerSource());
+        _snapshots.Changed += SnapshotChanged;
+        App.CurrentTeam.StateChanged += HomeTeamStateChanged;
+    }
     private void Window_Loaded(object sender, RoutedEventArgs e)
     {
         EnsureWindowVisible();
@@ -66,7 +76,19 @@ public partial class HomeWindow : Window
         if (double.IsNaN(Left) || double.IsInfinity(Left) || Left < area.Left - Width + 80 || Left > area.Right - 80) Left = area.Left + Math.Max(0, (area.Width - Width) / 2);
         if (double.IsNaN(Top) || double.IsInfinity(Top) || Top < area.Top - Height + 80 || Top > area.Bottom - 80) Top = area.Top + Math.Max(0, (area.Height - Height) / 2);
     }
-    private void Window_Closed(object? sender, EventArgs e) { _snapshots.Changed -= SnapshotChanged; App.CurrentTeam.StateChanged -= HomeTeamStateChanged; _shutdown.Cancel(); _proService.Dispose(); _shutdown.Dispose(); }
+    private void Window_Closed(object? sender, EventArgs e)
+    {
+        _snapshots.Changed -= SnapshotChanged;
+        App.CurrentTeam.StateChanged -= HomeTeamStateChanged;
+        // Async click/startup handlers can still be unwinding after Close().
+        // Cancel the shared work, but do not dispose the CTS here: a handler
+        // that resumes after the window closes must still be able to read its
+        // token and observe cancellation. The window owns the CTS for its
+        // lifetime and it will be collected with the window.
+        _shutdown.Cancel();
+        _proTelemetryWarmup.DisposeAsync().AsTask().GetAwaiter().GetResult();
+        _proService.Dispose();
+    }
     private void HomeTeamStateChanged(object? sender, TeamRelayState state)
     {
         if (_page == "team") Dispatcher.InvokeAsync(() => ReplacePage(BuildTeam));
@@ -78,7 +100,8 @@ public partial class HomeWindow : Window
     private void ReplacePage(Action builder) { Workspace.Children.Clear(); _shortcutFields.Clear(); _status = null; builder(); UpdateNavigationVisuals(); }
     private void UpdateNavigationVisuals()
     {
-        foreach (var button in FindVisualButtons(this))
+        UpdateReleaseRailLayout();
+        foreach (var button in FindVisualButtons(this).Where(button => button.Style == (Style)FindResource("Nav")))
         {
             if (button.Tag is not string key) continue;
             var selected = string.Equals(key, _page, StringComparison.OrdinalIgnoreCase);
@@ -123,7 +146,7 @@ public partial class HomeWindow : Window
     private void BuildHome()
     {
         var p = Page(_proPresentation.HeroEyebrow, _proPresentation.HeroTitle, _proPresentation.HeroDescription);
-        var hero = new Grid { Height = 270, MaxWidth = 860, MinHeight = 250 };
+        var hero = new Grid { MaxWidth = 860, Height = 270 };
         hero.Children.Add(new Image { Source = new BitmapImage(new Uri("/IsleLiveMap;component/Assets/GatewayMapWater.jpg", UriKind.Relative)), Stretch = Stretch.UniformToFill, Opacity = .82 });
         hero.Children.Add(new Border { Background = B("#C90A1917") });
         var copy = new StackPanel { VerticalAlignment = VerticalAlignment.Center, MaxWidth = 500, Margin = new Thickness(26) };
@@ -148,7 +171,7 @@ public partial class HomeWindow : Window
             "Mở Live Map sau khi kiểm tra cập nhật và Npcap");
         if (_mapLaunchGateState == MapLaunchGateState.Checking)
             mapButton.Content = _proPresentation.HasCurrentProAccess ? "ĐANG KIỂM TRA CẬP NHẬT" : "ĐANG KIỂM TRA CẬP NHẬT";
-        mapButton.IsEnabled = MapLaunchGatePolicy.AllowsMap(_mapLaunchGateState);
+        mapButton.IsEnabled = MapLaunchGatePolicy.AllowsMap(_mapLaunchGateState) && _mapOpenStarted == 0;
         _mapActionButton = mapButton;
         primary.Children.Add(mapButton);
         copy.Children.Add(primary);
@@ -156,12 +179,17 @@ public partial class HomeWindow : Window
         var supportedLabel = T("Hoặc các server được hỗ trợ riêng:", 13, B("#A9BAB4"), FontWeights.SemiBold);
         supportedLabel.Margin = new Thickness(0, 10, 0, 0);
         copy.Children.Add(supportedLabel);
-        var servers = new UniformGrid { Columns = 2, Margin = new Thickness(0, 10, 0, 0), MaxWidth = 430 };
-        // Opaque, low-saturation surfaces keep the two server choices legible
-        // over the map and make them read as a deliberate pair in Pro mode.
-        servers.Children.Add(ServerButton("Assets/GachaLogo.png", "GACHA", "GachaStatsButton_Click", _proPresentation.HasCurrentProAccess ? "#536F4D" : "#A7C9AE", _proPresentation.HasCurrentProAccess ? "#A8D17A" : "#D8F0DB"));
-        servers.Children.Add(ServerButton("Assets/OriginLogo.png", "ORIGIN 5x", "OriginStatsButton_Click", _proPresentation.HasCurrentProAccess ? "#405F86" : "#A8C1DE", _proPresentation.HasCurrentProAccess ? "#9CC8FF" : "#DCEBFA"));
+        var servers = new WrapPanel { Margin = new Thickness(0, 10, 0, 0) };
+        _serverActionButtons.Clear();
+        _serverButtonLabels.Clear();
+        // Three equal branded actions; wrap only at the smallest viewport.
+        servers.Children.Add(ServerButton("Assets/GachaLogo.png", "GACHA", GachaServer_Click, "#415D3E", "#A8D17A"));
+        servers.Children.Add(ServerButton("Assets/OriginLogo.png", "ORIGIN 5X", OriginServer_Click, "#344F71", "#9CC8FF"));
+        servers.Children.Add(ServerButton("Assets/SDVNIcon.png", "SDVN", SdvnServer_Click, "#303F7D", "#A6B8FF"));
         copy.Children.Add(servers);
+        _status = T(_launchStatus, 12, B("#E7D9AB"), FontWeights.SemiBold);
+        _status.Margin = new Thickness(0, 4, 0, 0);
+        copy.Children.Add(_status);
         hero.Children.Add(copy);
         p.Children.Add(new Border { Child = hero, CornerRadius = new CornerRadius(10), ClipToBounds = true, BorderBrush = B(_proPresentation.HasCurrentProAccess ? "#6B5434" : "#294943"), BorderThickness = new Thickness(1) });
         var row = new UniformGrid { Columns = 3, Margin = new Thickness(0, 12, 0, 0) };
@@ -169,25 +197,24 @@ public partial class HomeWindow : Window
         row.Children.Add(StatusLine("NPCAP / GPS", NpcapAvailabilityProbe.Check().IsAvailable ? "Sẵn sàng" : "Chưa sẵn sàng"));
         row.Children.Add(StatusLine("PHIÊN", _snapshots.Current is null ? "Chưa có phiên" : "Có dữ liệu gần nhất"));
         p.Children.Add(row);
-        _updateStatus = T("ĐANG KIỂM TRA BẢN CẬP NHẬT…", 12, B("#E7B74E"), FontWeights.SemiBold);
+        _updateStatus = T(_lastUpdateStatus, 12, B(_lastUpdateColor), FontWeights.SemiBold);
         _updateStatus.Margin = new Thickness(0, 12, 0, 0);
         p.Children.Add(_updateStatus);
         _restartForUpdateButton = Action("KHỞI ĐỘNG LẠI ĐỂ CẬP NHẬT", (_, _) => _updateService.ApplyAndRestart(), true);
         _restartForUpdateButton.Visibility = _mapLaunchGateState == MapLaunchGateState.UpdateRequired ? Visibility.Visible : Visibility.Collapsed;
         _restartForUpdateButton.Margin = new Thickness(0, 8, 0, 0);
         p.Children.Add(_restartForUpdateButton);
+        RefreshLaunchButtons();
     }
 
-    private Button ServerButton(string logo, string label, string action, string surface, string border)
+    private Button ServerButton(string logo, string label, RoutedEventHandler action, string surface, string border)
     {
-        var button = new Button { Style = (Style)FindResource("ServerAction"), Tag = action, Background = B(surface), BorderBrush = B(border), ToolTip = $"Mở {label}" };
+        var button = new Button { Style = (Style)FindResource("ServerAction"), Background = B(surface), BorderBrush = B(border), ToolTip = $"Mở {label}", Width = 132, Height = 76, Padding = new Thickness(6), Margin = new Thickness(0, 0, 8, 8) };
+        AutomationProperties.SetAutomationId(button, "Server" + label.Replace(" ", "") + "Button");
         AutomationProperties.SetName(button, $"Mở server {label}");
         AutomationProperties.SetHelpText(button, $"Mở {label} trong workspace riêng");
-        var content = new Grid { VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Stretch };
-        content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(44) });
-        content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        var content = new StackPanel { VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center };
         var logoImage = new Image { Source = new BitmapImage(new Uri($"/IsleLiveMap;component/{logo}", UriKind.Relative)), Width = 36, Height = 36, Stretch = Stretch.Uniform, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
-        Grid.SetColumn(logoImage, 0);
         content.Children.Add(logoImage);
         var name = T(label, 13, B("#FFFFFF"), FontWeights.Black);
         name.HorizontalAlignment = HorizontalAlignment.Center;
@@ -195,20 +222,14 @@ public partial class HomeWindow : Window
         name.TextAlignment = TextAlignment.Center;
         name.TextWrapping = TextWrapping.NoWrap;
         name.TextTrimming = TextTrimming.CharacterEllipsis;
-        Grid.SetColumn(name, 1);
         content.Children.Add(name);
         button.Content = content;
-        button.Click += action switch
-        {
-            "GachaStatsButton_Click" => GachaServer_Click,
-            "OriginStatsButton_Click" => OriginServer_Click,
-            _ => (_, _) => { }
-        };
+        button.Click += action;
+        _serverActionButtons.Add(button);
+        _serverButtonLabels[button] = label;
         return button;
     }
 
-    private void GachaServer_Click(object sender, RoutedEventArgs e) => SetStatus("Gacha sẽ được mở qua flow đăng nhập riêng.");
-    private void OriginServer_Click(object sender, RoutedEventArgs e) => SetStatus("Origin 5x sẽ được mở qua flow đăng nhập riêng.");
     private Border StatusLine(string label, string value) { var s = new StackPanel(); s.Children.Add(T(label, 11, B("#68817A"), FontWeights.Bold)); s.Children.Add(T(value, 15, null, FontWeights.SemiBold)); return new Border { Child = s, BorderBrush = B("#294943"), BorderThickness = new Thickness(0, 1, 0, 0), Padding = new Thickness(0, 12, 0, 0), Margin = new Thickness(0, 0, 18, 0) }; }
     private void BuildTeam()
     {
@@ -363,66 +384,49 @@ public partial class HomeWindow : Window
     }
     private async void OpenMap_Click(object? sender, RoutedEventArgs e)
     {
-        if (_mapLaunchGateState == MapLaunchGateState.Checking)
+        // UI Automation and a fast double click can otherwise start two map
+        // flows. The first flow closes Home after creating MainWindow; the
+        // second then resumes against a closed/disposed launcher lifetime.
+        if (Interlocked.Exchange(ref _mapOpenStarted, 1) != 0)
         {
-            SetUpdateStatus("Đang kiểm tra bản cập nhật. Vui lòng chờ một chút…", "#E7B74E");
-            if (_updateTask is not null)
+            return;
+        }
+
+        var handedOffToOverlay = false;
+        RefreshLaunchButtons();
+        try
+        {
+
+            if (!await PrepareMapLaunchAsync()) return;
+
+            var store = new IslePilotCredentialStore(AppPaths.IslePilotCredential);
+            var credentials = await store.LoadAsync(_shutdown.Token);
+            if (credentials is null)
             {
-                try { await _updateTask; } catch (OperationCanceledException) when (_shutdown.IsCancellationRequested) { return; }
-            }
-        }
-
-        if (!MapLaunchGatePolicy.AllowsMap(_mapLaunchGateState))
-        {
-            SetUpdateStatus("Có bản cập nhật mới. Hãy khởi động lại để hoàn tất cập nhật trước khi mở map.", "#F0C36A");
-            return;
-        }
-
-        // Npcap is required by the local GPS/telemetry source. Keep this gate
-        // in the launcher entry point so every map launch (including the new
-        // Home/Pro hero action) restores the setup dialog before credentials
-        // or a network session are opened.
-        if (!EnsureNpcapReady())
-        {
-            return;
-        }
-
-        // Startup loads Pro access in the background. Do not create the
-        // overlay while that task is still pending, otherwise MainWindow
-        // receives the initial SignedOut grant and all Pro-only features are
-        // disabled for that session.
-        await LoadProAsync();
-
-        var store = new IslePilotCredentialStore(AppPaths.IslePilotCredential);
-        var credentials = await store.LoadAsync(_shutdown.Token);
-        if (credentials is null)
-        {
-            var proPresentation = HomeProPresentationPolicy.Evaluate(
-                _pro,
-                DateTimeOffset.UtcNow);
+                var proPresentation = HomeProPresentationPolicy.Evaluate(
+                    _pro,
+                    DateTimeOffset.UtcNow);
             // Pro entitlement is sufficient to open the Pro overlay. The
             // Agent may still be pending and must be allowed to start from
             // the overlay source; requiring IsVerified here creates a
             // circular gate (AgentReady can only become true after the Agent
             // has been started). IslePilot credentials are only needed for
             // the optional remote session, not for the Pro local overlay.
-            if (proPresentation.HasCurrentProAccess)
-            {
-                OpenProOnlyOverlay();
-                return;
+                if (proPresentation.HasCurrentProAccess)
+                {
+                    handedOffToOverlay = await OpenProOnlyOverlayAsync();
+                    return;
+                }
+
+                var login = new IslePilotSteamLoginWindow { Owner = this };
+                if (login.ShowDialog() != true || login.Credentials is null)
+                {
+                    return;
+                }
+
+                credentials = login.Credentials;
             }
 
-            var login = new IslePilotSteamLoginWindow { Owner = this };
-            if (login.ShowDialog() != true || login.Credentials is null)
-            {
-                return;
-            }
-
-            credentials = login.Credentials;
-        }
-
-        try
-        {
             var session = new AuthenticationInvalidatingTelemetrySession(
                 IslePilotRealtimeSession.Create(new IslePilotOverlayOptions
                 {
@@ -434,48 +438,34 @@ public partial class HomeWindow : Window
             // source carries the actual Player/AI telemetry. Both must be
             // supplied to the overlay; passing only the grant leaves Pro
             // users looking premium while tracking remains permanently off.
-            var proPlayerSource = _proService.CreateRemotePlayerSource();
-            var local = new LocalPositionTelemetrySession(
-                session,
-                App.CurrentApp.TakeLocalTelemetrySource(),
-                "ISLEPILOT",
-                proPlayerSource);
-            var overlay = new MainWindow(
-                local,
-                "ISLEPILOT",
-                ProFeatureAccessGrant.FromSnapshot(_pro, DateTimeOffset.UtcNow));
-            Application.Current.MainWindow = overlay;
-            overlay.Show();
-            Close();
+            handedOffToOverlay = await OpenOverlaySessionAsync(session, "ISLEPILOT");
+        }
+        catch (OperationCanceledException) when (_shutdown.IsCancellationRequested)
+        {
         }
         catch (Exception ex)
         {
             SetStatus($"Không mở được phiên: {ex.Message}");
         }
+        finally
+        {
+            if (!handedOffToOverlay)
+            {
+                Interlocked.Exchange(ref _mapOpenStarted, 0);
+                RefreshLaunchButtons();
+            }
+        }
     }
 
-    private void OpenProOnlyOverlay()
+    private async Task<bool> OpenProOnlyOverlayAsync()
     {
-        var proPlayerSource = _proService.CreateRemotePlayerSource();
-        try
-        {
-            var overlay = new MainWindow(
-                new LocalPositionTelemetrySession(
-                    remoteSession: null,
-                    localSource: App.CurrentApp.TakeLocalTelemetrySource(),
-                    sourceName: "PRO",
-                    remotePlayerSource: proPlayerSource),
-                "PRO",
-                ProFeatureAccessGrant.FromSnapshot(_pro, DateTimeOffset.UtcNow));
-            Application.Current.MainWindow = overlay;
-            overlay.Show();
-            Close();
-        }
-        catch
-        {
-            proPlayerSource?.DisposeAsync().AsTask().GetAwaiter().GetResult();
-            throw;
-        }
+        return await OpenOverlaySessionAsync(null, "PRO");
+    }
+
+    private async Task<IRemotePlayerTelemetrySource?> TakeProPlayerSourceAsync()
+    {
+        var source = await _proTelemetryWarmup.TakeAsync(_pro, _shutdown.Token);
+        return source ?? _proService.CreateRemotePlayerSource();
     }
 
     private bool EnsureNpcapReady()
@@ -554,8 +544,7 @@ public partial class HomeWindow : Window
         await Dispatcher.InvokeAsync(() =>
         {
             _mapLaunchGateState = MapLaunchGatePolicy.FromUpdate(result.State);
-            if (_mapActionButton is not null)
-                _mapActionButton.IsEnabled = MapLaunchGatePolicy.AllowsMap(_mapLaunchGateState);
+            RefreshLaunchButtons();
             if (_restartForUpdateButton is not null)
                 _restartForUpdateButton.Visibility = _mapLaunchGateState == MapLaunchGateState.UpdateRequired ? Visibility.Visible : Visibility.Collapsed;
 
@@ -585,6 +574,8 @@ public partial class HomeWindow : Window
 
     private void SetUpdateStatus(string text, string color)
     {
+        _lastUpdateStatus = text;
+        _lastUpdateColor = color;
         if (_updateStatus is null) return;
         _updateStatus.Text = text;
         _updateStatus.Foreground = B(color);
@@ -853,10 +844,23 @@ public partial class HomeWindow : Window
             return action;
         }
         if (!_pro.IsAuthenticated || !_proPresentation.HasCurrentProAccess)
-            actions.Children.Add(CompactAction("ĐĂNG NHẬP / XÁC MINH", async (_, _) => { var login = new ProSteamLoginWindow(_proService, CurrentVersion()) { Owner = this }; if (login.ShowDialog() == true && login.Access is { } access) ApplyProPresentation(access, true); }));
+            actions.Children.Add(CompactAction("ĐĂNG NHẬP / XÁC MINH", async (_, _) =>
+            {
+                var login = new ProSteamLoginWindow(_proService, CurrentVersion()) { Owner = this };
+                if (login.ShowDialog() == true && login.Access is { } access)
+                {
+                    ApplyProPresentation(access, true);
+                    await RefreshProTelemetryWarmupAsync(access);
+                }
+            }));
         actions.Children.Add(CompactAction("ĐĂNG KÝ PRO", (_, _) => Process.Start(new ProcessStartInfo("https://isle.klong.dev") { UseShellExecute = true }), false));
         if (_proPresentation.HasCurrentProAccess && !_pro.AgentReady) actions.Children.Add(CompactAction("KIỂM TRA LẠI", async (_, _) => await RefreshProAsync()));
-        if (_pro.IsAuthenticated) actions.Children.Add(CompactAction("ĐĂNG XUẤT", async (_, _) => { await _proService.LogoutAsync(_shutdown.Token); ApplyProPresentation(ProAccessSnapshot.SignedOut, true); }, false));
+        if (_pro.IsAuthenticated) actions.Children.Add(CompactAction("ĐĂNG XUẤT", async (_, _) =>
+        {
+            await _proTelemetryWarmup.StopAsync();
+            await _proService.LogoutAsync(_shutdown.Token);
+            ApplyProPresentation(ProAccessSnapshot.SignedOut, true);
+        }, false));
         p.Children.Add(actions);
         var expiry = entitlement.ExpiresAt is { } at ? at.ToLocalTime().ToString("dd/MM/yyyy HH:mm") : "Vĩnh viễn";
         var agentStatus = _pro.AgentReady ? "SẴN SÀNG" : _pro.StatusCode is "agent_unavailable" or "offline_agent_unavailable" ? "KHÔNG KHẢ DỤNG" : _pro.StatusCode == "agent_update_unavailable" ? "CHƯA CÓ BẢN CẬP NHẬT" : "ĐANG CHỜ";
@@ -909,11 +913,15 @@ public partial class HomeWindow : Window
         try { _pro = await _proService.InitializeAsync(CurrentVersion(), _shutdown.Token); }
         catch { _pro = ProAccessSnapshot.SignedOut with { StatusCode = "license_service_unavailable" }; }
         await Dispatcher.InvokeAsync(() => ApplyProPresentation(_pro, rebuildCurrentPage: true));
+        await RefreshProTelemetryWarmupAsync(_pro);
     }
     private async Task RefreshProAsync()
     {
         await LoadProAsync();
     }
+
+    private Task RefreshProTelemetryWarmupAsync(ProAccessSnapshot? access = null) =>
+        _proTelemetryWarmup.RefreshAsync(access ?? _pro, _shutdown.Token);
     private void ApplyProPresentation(ProAccessSnapshot access, bool rebuildCurrentPage)
     {
         _pro = access;
@@ -1002,7 +1010,7 @@ public partial class HomeWindow : Window
             ReleaseList.Children.Add(T("Release notes hiện không khả dụng.", 12, B("#91AAA3")));
         }
     }
-    private void SetStatus(string text) { if (_status is not null) _status.Text = text; }
+    private void SetStatus(string text) { _launchStatus = text; if (_status is not null) _status.Text = text; }
     private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         Window_PreviewMouseLeftButtonDown(sender, e);

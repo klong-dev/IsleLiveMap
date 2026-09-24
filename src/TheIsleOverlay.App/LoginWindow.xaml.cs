@@ -1,6 +1,7 @@
 using System.IO;
 using System.Windows;
 using Microsoft.Web.WebView2.Core;
+using TheIsleOverlay.IslePilot;
 
 namespace TheIsleOverlay.App;
 
@@ -10,6 +11,7 @@ public partial class LoginWindow : Window
     private readonly Func<string, CancellationToken, Task<LoginSessionValidationState>>? _sessionValidator;
     private bool _checkingCookie;
     private bool _closingWithCookie;
+    private readonly CancellationTokenSource _stop = new();
 
     public LoginWindow(
         TelemetrySourceDefinition source,
@@ -31,13 +33,18 @@ public partial class LoginWindow : Window
     {
         try
         {
-            Directory.CreateDirectory(AppPaths.WebView2Profile);
+            var tenant = SdvnTenant.Find(_source.Id);
+            var profilePath = tenant is null ? AppPaths.WebView2Profile
+                : Path.Combine(AppPaths.Root, "SDVN", tenant.Id, "WebView2");
+            Directory.CreateDirectory(profilePath);
             var environment = await CoreWebView2Environment.CreateAsync(
                 browserExecutableFolder: null,
-                userDataFolder: AppPaths.WebView2Profile);
+                userDataFolder: profilePath);
             await LoginBrowser.EnsureCoreWebView2Async(environment);
+            if (_stop.IsCancellationRequested) return;
 
             LoginBrowser.CoreWebView2.NavigationCompleted += Browser_NavigationCompleted;
+            LoginBrowser.CoreWebView2.NavigationStarting += Browser_NavigationStarting;
             LoginBrowser.CoreWebView2.NewWindowRequested += Browser_NewWindowRequested;
 
             if (await TryCompleteFromCookieAsync())
@@ -45,10 +52,11 @@ public partial class LoginWindow : Window
                 return;
             }
 
-            LoginBrowser.Source = _source.LoginUri;
+            if (!_stop.IsCancellationRequested) LoginBrowser.Source = _source.LoginUri;
         }
         catch (Exception exception)
         {
+            if (_stop.IsCancellationRequested) return;
             BrowserLoadingPanel.Visibility = Visibility.Visible;
             LoginStatusLabel.Text = $"Không mở được trình đăng nhập: {exception.Message}";
         }
@@ -57,11 +65,18 @@ public partial class LoginWindow : Window
     private void Browser_NewWindowRequested(object? sender, CoreWebView2NewWindowRequestedEventArgs e)
     {
         e.Handled = true;
-        LoginBrowser.CoreWebView2.Navigate(e.Uri);
+        if (LoginNavigationPolicy.IsAllowed(_source, e.Uri)) LoginBrowser.CoreWebView2.Navigate(e.Uri);
+        else LoginStatusLabel.Text = "Đã chặn điều hướng ngoài website đăng nhập.";
+    }
+    private void Browser_NavigationStarting(object? sender, CoreWebView2NavigationStartingEventArgs e)
+    {
+        if (!LoginNavigationPolicy.IsAllowed(_source, e.Uri))
+        { e.Cancel = true; LoginStatusLabel.Text = "Đã chặn điều hướng ngoài website đăng nhập."; }
     }
 
     private async void Browser_NavigationCompleted(object? sender, CoreWebView2NavigationCompletedEventArgs e)
     {
+        if (_stop.IsCancellationRequested) return;
         BrowserLoadingPanel.Visibility = Visibility.Collapsed;
         if (!e.IsSuccess)
         {
@@ -74,7 +89,7 @@ public partial class LoginWindow : Window
 
     private async Task<bool> TryCompleteFromCookieAsync()
     {
-        if (_checkingCookie || LoginBrowser.CoreWebView2 is null)
+        if (_checkingCookie || _stop.IsCancellationRequested || LoginBrowser.CoreWebView2 is null)
         {
             return false;
         }
@@ -111,8 +126,10 @@ public partial class LoginWindow : Window
             if (_sessionValidator is not null)
             {
                 LoginStatusLabel.Text = "ĐÃ THẤY COOKIE · ĐANG XÁC MINH VỚI API…";
-                using var validationTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+                using var validationTimeout = CancellationTokenSource.CreateLinkedTokenSource(_stop.Token);
+                validationTimeout.CancelAfter(TimeSpan.FromSeconds(8));
                 var validation = await _sessionValidator(sessionValue, validationTimeout.Token);
+                _stop.Token.ThrowIfCancellationRequested();
                 if (validation == LoginSessionValidationState.Invalid)
                 {
                     // OAuth sites may create an anonymous Express session before
@@ -139,7 +156,8 @@ public partial class LoginWindow : Window
 
                 if (validation == LoginSessionValidationState.Unavailable)
                 {
-                    LoginStatusLabel.Text = "ĐÃ THẤY COOKIE · API ĐANG CHẬM, TIẾP TỤC KẾT NỐI…";
+                    LoginStatusLabel.Text = "Website phản hồi chậm. Phiên được giữ nguyên; bấm KIỂM TRA PHIÊN để thử lại.";
+                    return false;
                 }
             }
 
@@ -148,6 +166,16 @@ public partial class LoginWindow : Window
             DialogResult = true;
             Close();
             return true;
+        }
+        catch (OperationCanceledException)
+        {
+            if (!_stop.IsCancellationRequested) LoginStatusLabel.Text = "Website kiểm tra phiên quá chậm. Hãy bấm KIỂM TRA PHIÊN để thử lại.";
+            return false;
+        }
+        catch (Exception)
+        {
+            if (!_stop.IsCancellationRequested) LoginStatusLabel.Text = "Không kiểm tra được phiên. Hãy thử lại sau; app chưa lưu phiên này.";
+            return false;
         }
         finally
         {
@@ -165,9 +193,11 @@ public partial class LoginWindow : Window
 
     private void Window_Closed(object? sender, EventArgs e)
     {
+        _stop.Cancel();
         if (LoginBrowser.CoreWebView2 is not null)
         {
             LoginBrowser.CoreWebView2.NavigationCompleted -= Browser_NavigationCompleted;
+            LoginBrowser.CoreWebView2.NavigationStarting -= Browser_NavigationStarting;
             LoginBrowser.CoreWebView2.NewWindowRequested -= Browser_NewWindowRequested;
         }
 

@@ -1,0 +1,60 @@
+<Window x:Class="TheIsleOverlay.App.SdvnTenantWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="SDVN · Chọn server" Width="510" Height="620" MinWidth="440" MinHeight="590"
+        WindowStartupLocation="CenterOwner" Background="#101B2B" Foreground="#F0F3FF"
+        FontFamily="Segoe UI" ShowInTaskbar="False" Loaded="Window_Loaded" Closed="Window_Closed">
+    <Window.Resources>
+        <Style TargetType="Button">
+            <Setter Property="Background" Value="#344B96"/><Setter Property="Foreground" Value="#FFFFFF"/>
+            <Setter Property="BorderBrush" Value="#92A8EF"/><Setter Property="Padding" Value="14,10"/>
+            <Setter Property="FontWeight" Value="SemiBold"/><Setter Property="FontSize" Value="13"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style TargetType="ListBoxItem">
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="Padding" Value="12"/><Setter Property="Margin" Value="0,0,0,8"/>
+            <Setter Property="Background" Value="#19283F"/><Setter Property="Foreground" Value="#F0F3FF"/>
+            <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ListBoxItem">
+                <Border x:Name="RowSurface" Background="{TemplateBinding Background}" BorderBrush="#384D76" BorderThickness="1" CornerRadius="7" Padding="{TemplateBinding Padding}"><ContentPresenter/></Border>
+                <ControlTemplate.Triggers>
+                    <Trigger Property="IsSelected" Value="True"><Setter TargetName="RowSurface" Property="Background" Value="#30457E"/><Setter TargetName="RowSurface" Property="BorderBrush" Value="#9AAFFF"/></Trigger>
+                    <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="RowSurface" Property="BorderBrush" Value="#B5C5FF"/></Trigger>
+                </ControlTemplate.Triggers>
+            </ControlTemplate></Setter.Value></Setter>
+            <Style.Triggers><Trigger Property="IsSelected" Value="True">
+                <Setter Property="Background" Value="#30457E"/>
+            </Trigger></Style.Triggers>
+        </Style>
+    </Window.Resources>
+    <Grid Background="#101B2B"><Grid Margin="24">
+        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+        <StackPanel Margin="0,0,0,18">
+            <TextBlock Text="SDVN" FontSize="28" FontWeight="Bold"/>
+            <TextBlock Text="Chọn server bạn đang chơi" FontSize="16" Margin="0,4,0,5"/>
+            <TextBlock Text="Phiên đăng nhập được lưu riêng cho từng server." FontSize="13" Foreground="#B0C0DE" TextWrapping="Wrap"/>
+            <TextBlock x:Name="LastTenantLabel" FontSize="12" Foreground="#94A9EB" Margin="0,8,0,0"/>
+        </StackPanel>
+        <ListBox x:Name="TenantList" Grid.Row="1" Background="Transparent" BorderThickness="0"
+                 ScrollViewer.HorizontalScrollBarVisibility="Disabled" SelectionChanged="TenantList_SelectionChanged"
+                 AutomationProperties.Name="Server SDVN" >
+            <ListBox.ItemTemplate><DataTemplate>
+                <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="54"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                    <Border Width="44" Height="44" Background="White" CornerRadius="5" ClipToBounds="True" VerticalAlignment="Center">
+                        <Image Source="Assets/SDVNIcon.png" Stretch="Uniform"/>
+                    </Border>
+                    <StackPanel Grid.Column="1">
+                        <TextBlock Text="{Binding Tenant.DisplayName}" FontWeight="SemiBold" FontSize="15"/>
+                        <TextBlock Text="{Binding Tenant.Host}" FontSize="12" Foreground="#B0C0DE" Margin="0,3,0,0"/>
+                        <TextBlock Text="{Binding Status}" FontSize="11" Foreground="#AEBFF9" Margin="0,5,0,0"/>
+                    </StackPanel>
+                </Grid>
+            </DataTemplate></ListBox.ItemTemplate>
+        </ListBox>
+        <TextBlock x:Name="StatusLabel" Grid.Row="2" Text="Chọn server rồi bấm KẾT NỐI." FontSize="13" TextWrapping="Wrap" Foreground="#EACB89" Margin="0,12" MinHeight="38"/>
+        <Grid Grid.Row="3"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+            <Button x:Name="ChangeTenantButton" Content="ĐỔI SERVER SDVN" Click="ChangeTenant_Click" Background="Transparent" BorderBrush="#556587" HorizontalAlignment="Left"/>
+            <Button x:Name="ConnectButton" Grid.Column="1" Content="KẾT NỐI" Click="Connect_Click" IsDefault="True" AutomationProperties.Name="Kết nối SDVN"/>
+        </Grid>
+    </Grid></Grid>
+</Window>
