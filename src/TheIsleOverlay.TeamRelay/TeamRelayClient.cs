@@ -81,9 +81,18 @@ public sealed class TeamRelayClient : IAsyncDisposable
         string displayName,
         TeamAccessTier tier = TeamAccessTier.Free,
         CancellationToken cancellationToken = default) =>
-        StartNewSessionAsync(
+        CreateAsync(displayName, tier, TeamRoomLimits.For(tier), cancellationToken);
+
+    public Task<TeamSession> CreateAsync(
+        string displayName,
+        TeamAccessTier tier,
+        int requestedMaxMembers,
+        CancellationToken cancellationToken = default) =>
+        !TeamRoomLimits.CanCreate(tier, requestedMaxMembers)
+            ? Task.FromException<TeamSession>(new ArgumentException("Quy mô phòng không hợp lệ cho quyền hiện tại.", nameof(requestedMaxMembers)))
+            : StartNewSessionAsync(
             "api/v1/teams",
-            new CreateTeamRequest(displayName, tier, TeamRoomLimits.For(tier), _entitlementProof),
+            new CreateTeamRequest(displayName, tier, requestedMaxMembers, _entitlementProof),
             cancellationToken);
 
     public Task<TeamSession> CreateAsync(

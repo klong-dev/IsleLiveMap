@@ -42,6 +42,10 @@ public sealed class TeamCoordinator : IAsyncDisposable
         _client.CreateAsync(displayName.Trim(), tier, cancellationToken);
 
     public Task<TeamSession> CreateAsync(
+        string displayName, TeamAccessTier tier, int requestedMaxMembers, CancellationToken cancellationToken = default) =>
+        _client.CreateAsync(displayName.Trim(), tier, requestedMaxMembers, cancellationToken);
+
+    public Task<TeamSession> CreateAsync(
         string displayName,
         CancellationToken cancellationToken) =>
         CreateAsync(displayName, TeamAccessTier.Free, cancellationToken);

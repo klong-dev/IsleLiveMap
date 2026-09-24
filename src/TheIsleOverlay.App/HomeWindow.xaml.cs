@@ -91,7 +91,7 @@ public partial class HomeWindow : Window
     }
     private void HomeTeamStateChanged(object? sender, TeamRelayState state)
     {
-        if (_page == "team") Dispatcher.InvokeAsync(() => ReplacePage(BuildTeam));
+        if (_page == "team" && !_teamOperationRunning) Dispatcher.InvokeAsync(() => { if (!_teamOperationRunning && _page == "team") ReplacePage(BuildTeam); });
     }
     private void SnapshotChanged(object? sender, EventArgs e) { if (_page == "info") Dispatcher.Invoke(() => ReplacePage(BuildInfo)); }
     private static string CurrentVersion() => Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "2.2.3";
@@ -240,8 +240,11 @@ public partial class HomeWindow : Window
     private void BuildTeam()
     {
         var p = Page("KẾT NỐI ĐỒNG ĐỘI", "NHÓM SINH TỒN", "Tạo hoặc nhập phòng để chia sẻ vị trí và trạng thái trong cùng phiên chơi.");
+        _status = T(_teamStatus, 13, B("#E7D9AB"), FontWeights.SemiBold);
+        _status.Margin = new Thickness(0, 0, 0, 12);
+        p.Children.Add(_status);
         var state = App.CurrentTeam.CurrentState;
-        var tier = _proPresentation.HasCurrentProAccess ? TeamAccessTier.Pro : TeamAccessTier.Free;
+        var tier = _pro.Entitlement.IsProAt(DateTimeOffset.UtcNow) ? TeamAccessTier.Pro : TeamAccessTier.Free;
         var limit = TeamRoomLimits.For(tier);
         var intro = Section("GIỚI HẠN PHÒNG", tier == TeamAccessTier.Pro ? "Quyền Pro đang mở phòng tối đa 21 người, tính cả chủ phòng." : "Tài khoản miễn phí tạo phòng tối đa 7 người, tính cả chủ phòng.");
         ((StackPanel)intro.Child).Children.Add(T($"CHẾ ĐỘ HIỆN TẠI · {(tier == TeamAccessTier.Pro ? "PRO" : "MIỄN PHÍ")}  ·  TỐI ĐA {limit} NGƯỜI", 13, B(tier == TeamAccessTier.Pro ? "#E6C477" : "#49D5C3"), FontWeights.Bold));
@@ -266,13 +269,8 @@ public partial class HomeWindow : Window
         form.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         var create = new StackPanel { Margin = new Thickness(0, 0, 14, 0) };
         create.Children.Add(T("TẠO PHÒNG", 11, B("#49D5C3"), FontWeights.Bold));
-        var createButton = Action("TẠO PHÒNG", async (_, _) =>
-        {
-            var displayName = PromptTeamName("TẠO PHÒNG");
-            if (displayName is null) return;
-            try { await App.CurrentTeam.CreateAsync(displayName, tier, _shutdown.Token); ReplacePage(BuildTeam); }
-            catch (Exception ex) { SetStatus(FriendlyTeamErrorText(ex)); }
-        });
+        var createButton = Action("TẠO PHÒNG", CreateSizedTeam_Click);
+        createButton.IsEnabled = !_teamOperationRunning;
         create.Children.Add(createButton);
         Grid.SetColumn(create, 0); form.Children.Add(create);
 
@@ -282,11 +280,13 @@ public partial class HomeWindow : Window
         join.Children.Add(invite);
         var joinButton = Action("VÀO PHÒNG", async (_, _) =>
         {
+            if (_teamOperationRunning) return;
             var displayName = PromptTeamName("VÀO PHÒNG");
             if (displayName is null) return;
             try { await App.CurrentTeam.JoinAsync(invite.Text.Trim(), displayName, tier, _shutdown.Token); ReplacePage(BuildTeam); }
             catch (Exception ex) { SetStatus(FriendlyTeamErrorText(ex)); }
         });
+        joinButton.IsEnabled = !_teamOperationRunning;
         join.Children.Add(joinButton);
         Grid.SetColumn(join, 1); form.Children.Add(join);
         p.Children.Add(form);
@@ -339,6 +339,8 @@ public partial class HomeWindow : Window
     private static string FriendlyTeamErrorText(Exception exception) => exception switch
     {
         TeamRelayApiException { Code: "team_full" } => "Phòng đã đủ thành viên.",
+        TeamRelayApiException { Code: "pro_required" } => "Relay chưa xác minh được Pro còn hạn. Hãy đăng nhập/xác minh Pro rồi tạo lại phòng 10 hoặc 21 người.",
+        TeamRelayApiException { Code: "invalid_room_size" } => "Chọn một trong các quy mô 3, 7, 10 hoặc 21 người.",
         TeamRelayApiException { Code: "invite_not_found" } => "Không tìm thấy mã mời hoặc phòng đã hết hạn.",
         TimeoutException => "Relay không phản hồi. Hãy thử lại.",
         _ => $"Không thể thao tác nhóm: {exception.Message}"
@@ -931,6 +933,8 @@ public partial class HomeWindow : Window
     private void ApplyProPresentation(ProAccessSnapshot access, bool rebuildCurrentPage)
     {
         _pro = access;
+        App.CurrentTeam.ConfigureAccess(
+            access.Entitlement.IsProAt(DateTimeOffset.UtcNow) ? TeamAccessTier.Pro : TeamAccessTier.Free, access.EntitlementProof);
         _proPresentation = HomeProPresentationPolicy.Evaluate(access, DateTimeOffset.UtcNow);
         var premium = _proPresentation.IsPremiumMode;
         Resources["Accent"] = B(premium ? "#D3A85C" : "#49D5C3");

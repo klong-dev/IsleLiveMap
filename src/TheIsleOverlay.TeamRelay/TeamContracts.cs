@@ -12,6 +12,8 @@ public static class TeamRoomLimits
 {
     public const int FreeMaxMembers = 7;
     public const int ProMaxMembers = 21;
+    public static IReadOnlyList<int> Choices { get; } = Array.AsReadOnly(new[] { 3, 7, 10, 21 });
+    public static bool CanCreate(TeamAccessTier tier, int size) => Choices.Contains(size) && size <= For(tier);
 
     public static int For(TeamAccessTier tier) =>
         tier == TeamAccessTier.Pro ? ProMaxMembers : FreeMaxMembers;
