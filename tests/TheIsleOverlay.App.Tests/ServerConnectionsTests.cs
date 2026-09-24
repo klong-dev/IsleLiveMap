@@ -81,6 +81,29 @@ public sealed class ServerConnectionsTests
                         Assert.NotEqual(Brushes.Transparent, button.Background);
                     }
                 }
+                // Exercise the actual compiled handlers without invoking login,
+                // Npcap or network: the update gate must block all three.
+                foreach (var handler in new[] { "GachaServer_Click", "OriginServer_Click", "SdvnServer_Click" })
+                {
+                    typeof(HomeWindow).GetField("_mapLaunchGateState", flags)!.SetValue(home, MapLaunchGateState.UpdateRequired);
+                    typeof(HomeWindow).GetMethod(handler, flags)!.Invoke(home, [home, new RoutedEventArgs()]);
+                    Assert.Equal(0, typeof(HomeWindow).GetField("_mapOpenStarted", flags)!.GetValue(home));
+                    Assert.Contains("khởi động lại", (string)typeof(HomeWindow).GetField("_launchStatus", flags)!.GetValue(home)!);
+                }
+                var premium = ProAccessSnapshot.SignedOut with
+                { SteamId64 = "76561198000000000", Entitlement = new ProEntitlement("pro", "active", null) };
+                typeof(HomeWindow).GetMethod("ApplyProPresentation", flags)!.Invoke(home, [premium, false]);
+                ((Panel)home.FindName("Workspace")).Children.Clear();
+                typeof(HomeWindow).GetMethod("BuildHome", flags)!.Invoke(home, null);
+                home.Width = 960;
+                typeof(HomeWindow).GetMethod("UpdateReleaseRailLayout", flags)!.Invoke(home, null);
+                Render((FrameworkElement)home.Content, 960, 600, Path.Combine(output, "home-pro.png"));
+
+                typeof(HomeWindow).GetField("_mapOpenStarted", flags)!.SetValue(home, 1);
+                foreach (var handler in new[] { "GachaServer_Click", "OriginServer_Click", "SdvnServer_Click" })
+                    typeof(HomeWindow).GetMethod(handler, flags)!.Invoke(home, [home, new RoutedEventArgs()]);
+                Assert.Equal(1, typeof(HomeWindow).GetField("_mapOpenStarted", flags)!.GetValue(home));
+                typeof(HomeWindow).GetField("_mapOpenStarted", flags)!.SetValue(home, 0);
                 var modal = new SdvnTenantWindow(new SdvnCredentialStore(Path.Combine(output, "empty-credentials")));
                 var list = (ListBox)modal.FindName("TenantList");
                 Assert.Equal(3, list.Items.Count);

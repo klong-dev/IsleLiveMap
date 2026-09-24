@@ -146,8 +146,14 @@ public partial class HomeWindow : Window
     private void BuildHome()
     {
         var p = Page(_proPresentation.HeroEyebrow, _proPresentation.HeroTitle, _proPresentation.HeroDescription);
-        var hero = new Grid { MaxWidth = 860, Height = 270 };
-        hero.Children.Add(new Image { Source = new BitmapImage(new Uri("/IsleLiveMap;component/Assets/GatewayMapWater.jpg", UriKind.Relative)), Stretch = Stretch.UniformToFill, Opacity = .82 });
+        // A background brush does not participate in measure. Content can grow
+        // for wrapped error/status text without inheriting the bitmap size.
+        var hero = new Grid
+        {
+            MaxWidth = 860, MinHeight = 270,
+            Background = new ImageBrush(new BitmapImage(new Uri("pack://application:,,,/IsleLiveMap;component/Assets/GatewayMapWater.jpg", UriKind.Absolute)))
+            { Stretch = Stretch.UniformToFill, Opacity = .82 }
+        };
         hero.Children.Add(new Border { Background = B("#C90A1917") });
         var copy = new StackPanel { VerticalAlignment = VerticalAlignment.Center, MaxWidth = 500, Margin = new Thickness(26) };
         copy.Children.Add(T(_proPresentation.HasCurrentProAccess ? "THEO DÕI NGƯỜI CHƠI + AI" : "SỬ DỤNG NGAY", 13, B(_proPresentation.HasCurrentProAccess ? "#E6C477" : "#49D5C3"), FontWeights.Bold));
