@@ -281,6 +281,8 @@ public partial class MainWindow : Window
             snapshot?.UpdatedAt,
             snapshot?.ProPlayerTrackingActive,
             snapshot?.ProPlayerSequence,
+            snapshot?.ProPlayerSessionId,
+            snapshot?.ProPlayerServerEndpoint,
             snapshot?.ProPlayerFrameObservedAt,
             snapshot?.ProPlayerFrameReceivedAt,
             snapshot?.ProPlayerSync,
@@ -316,7 +318,8 @@ public partial class MainWindow : Window
                 marker.EntityKind,
                 marker.Category,
                 marker.Point,
-                marker.IsProvisional
+                marker.IsProvisional,
+                marker.IsStale
             }).ToArray()
         };
 

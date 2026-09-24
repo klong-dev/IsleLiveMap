@@ -1,3 +1,16 @@
+# Isle Live Map 2.4.1
+
+## Cải thiện hiển thị Player và AI
+
+- Đưa các sửa đổi tracking đã nghiệm thu vào launcher: không loại marker ngay khi tọa độ quá 2 giây nhưng vẫn còn bằng chứng hiện diện hợp lệ.
+- Nới cửa sổ nhận vị trí lên tối đa 15 giây khi entity có định danh hợp lệ và presence mới; vị trí cũ hiển thị mờ, không giả thành vị trí trực tiếp.
+- Giữ lịch sử marker theo đúng phiên/server khi nhận stats, áp dụng cho MỞ MAP PRO và GACHA/ORIGIN/SDVN; không dùng lịch sử từ phiên khác.
+- Đọc bằng chứng vị trí đã xác thực từ Pro Agent, tránh trùng frame khi bàn giao prewarm; giữ các kiểm tra định danh, tọa độ và marker trùng.
+- Giữ giấy phép Pro ngoại tuyến còn hiệu lực khi refresh phiên trực tuyến thất bại; không bỏ qua xác minh giấy phép của Agent.
+- Tương thích Pro Agent 0.3.80 đang được phân phối riêng. Giữ toàn bộ thay đổi nhóm sinh tồn và server của 2.4.0.
+
+Lưu ý: marker mờ là vị trí đã biết gần nhất, không bảo đảm dino vẫn ở đúng vị trí đó. Bản cập nhật cải thiện giữ marker, không cam kết phát hiện mọi dino.
+
 # Isle Live Map 2.4.0
 
 ## Nhóm sinh tồn

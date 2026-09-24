@@ -11,6 +11,10 @@ public sealed class ProAgentRemotePlayerSource :
     IRemotePlayerTelemetrySource,
     IRemotePlayerTelemetryHealthSource
 {
+    // Agent and Host comparison streams use separate files. Two processes
+    // appending the same JSONL path can split a line in the frozen capture.
+    public const string HostComparisonOutputPathEnvironmentVariable =
+        "ISLELIVEMAP_PRO_HOST_COMPARE_PATH";
     private static readonly TimeSpan ConnectionTimeout = TimeSpan.FromSeconds(15);
     private static readonly TimeSpan HandshakeTimeout = TimeSpan.FromSeconds(15);
     private static readonly TimeSpan MaximumRestartDelay = TimeSpan.FromSeconds(30);
@@ -210,8 +214,8 @@ public sealed class ProAgentRemotePlayerSource :
                         Message = null
                     });
                 }
-                WriteLiveCompare(telemetry);
-                yield return MapFrame(telemetry);
+                WriteLiveCompare(telemetry, pipeName);
+                yield return MapFrame(telemetry, pipeName);
             }
         }
         finally
@@ -236,10 +240,11 @@ public sealed class ProAgentRemotePlayerSource :
         return ValueTask.CompletedTask;
     }
 
-    private void WriteLiveCompare(ProTelemetryFrame frame)
+    internal void WriteLiveCompare(ProTelemetryFrame frame, string sessionId)
     {
-        var configuredPath = _liveComparePath ?? Environment.GetEnvironmentVariable(
-            "ISLELIVEMAP_PRO_LIVE_COMPARE_PATH");
+        var configuredPath = ResolveHostComparisonPath(
+            _liveComparePath ?? Environment.GetEnvironmentVariable(HostComparisonOutputPathEnvironmentVariable),
+            Environment.GetEnvironmentVariable("ISLELIVEMAP_PRO_LIVE_COMPARE_PATH"));
         if (string.IsNullOrWhiteSpace(configuredPath))
         {
             return;
@@ -254,7 +259,7 @@ public sealed class ProAgentRemotePlayerSource :
                     var path = Path.GetFullPath(configuredPath);
                     Directory.CreateDirectory(Path.GetDirectoryName(path)!);
                     _compareWriter = new StreamWriter(
-                        new FileStream(path, FileMode.Append, FileAccess.Write, FileShare.ReadWrite),
+                        new FileStream(path, FileMode.Append, FileAccess.Write, FileShare.Read),
                         new System.Text.UTF8Encoding(false))
                     {
                         AutoFlush = true
@@ -263,6 +268,9 @@ public sealed class ProAgentRemotePlayerSource :
 
                 var record = new
                 {
+                    Stage = "host-ipc-received",
+                    SessionId = sessionId,
+                    ProcessId = Environment.ProcessId,
                     ReceivedAt = DateTimeOffset.UtcNow,
                     frame.Sequence,
                     frame.ObservedAt,
@@ -281,6 +289,7 @@ public sealed class ProAgentRemotePlayerSource :
                         entity.Location,
                         entity.ObservedAt,
                         entity.LocationObservedAt,
+                        entity.HasVerifiedPosition,
                         entity.ActorNetRefHandle,
                         entity.PlayerStateNetRefHandle,
                         entity.PawnNetRefHandle,
@@ -332,6 +341,7 @@ public sealed class ProAgentRemotePlayerSource :
         startInfo.ArgumentList.Add(pipeName);
         startInfo.ArgumentList.Add("--parent-pid");
         startInfo.ArgumentList.Add(Environment.ProcessId.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        startInfo.Environment["ISLELIVEMAP_TRACKING_SESSION_ID"] = pipeName;
         return Process.Start(startInfo)
                ?? throw new ProAgentException("Windows could not start the Pro Agent.");
     }
@@ -352,7 +362,18 @@ public sealed class ProAgentRemotePlayerSource :
         }
     }
 
-    private static RemotePlayerTelemetryFrame MapFrame(ProTelemetryFrame frame)
+    internal static string? ResolveHostComparisonPath(string? hostPath, string? agentPath)
+    {
+        if (string.IsNullOrWhiteSpace(hostPath)) return null;
+        var path = Path.GetFullPath(hostPath.Trim());
+        // Refuse accidental aliasing even for callers supplying explicit paths.
+        return !string.IsNullOrWhiteSpace(agentPath)
+               && string.Equals(path, Path.GetFullPath(agentPath.Trim()), StringComparison.OrdinalIgnoreCase)
+            ? null
+            : path;
+    }
+
+    internal static RemotePlayerTelemetryFrame MapFrame(ProTelemetryFrame frame, string? sessionId = null)
     {
         if (!IsFinite(frame.LocalLocation))
         {
@@ -389,7 +410,8 @@ public sealed class ProAgentRemotePlayerSource :
                 entity.LocationObservedAt,
                 entity.ActorNetRefHandle,
                 entity.PlayerStateNetRefHandle,
-                entity.PawnNetRefHandle))
+                entity.PawnNetRefHandle,
+                entity.HasVerifiedPosition))
             .ToArray();
 
         return new RemotePlayerTelemetryFrame(
@@ -417,7 +439,8 @@ public sealed class ProAgentRemotePlayerSource :
                     frame.PlayerSync.SpeciesEvidenceActors,
                     frame.PlayerSync.LocatedActors,
                     frame.PlayerSync.QueueDroppedPackets,
-                    frame.PlayerSync.QueueDepth));
+                    frame.PlayerSync.QueueDepth),
+            SessionId: sessionId);
     }
 
     private static string UserFacingAgentFailure(Exception exception) => exception switch

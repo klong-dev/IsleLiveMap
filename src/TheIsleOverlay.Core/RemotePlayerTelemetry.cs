@@ -53,7 +53,8 @@ public sealed record RemotePlayerTelemetryFrame(
     // drains a burst. Receipt time proves IPC liveness without pretending the
     // underlying GPS or entity samples were captured more recently.
     DateTimeOffset? ReceivedAt = null,
-    RemotePlayerSyncState? PlayerSync = null);
+    RemotePlayerSyncState? PlayerSync = null,
+    string? SessionId = null);
 
 public enum RemoteEntityRejectionReason
 {
@@ -65,6 +66,7 @@ public enum RemoteEntityRejectionReason
     InvalidCoordinate = 4,
     StaleLocation = 13,
     LocationUnavailable = 14,
+    PresenceTimeout = 15,
     WrongServer = 5,
     SessionMismatch = 6,
     [Obsolete("Distance is diagnostic-only; remote entities are no longer rejected by range.")]
@@ -141,13 +143,16 @@ public sealed record VerifiedRemoteEntityTelemetry(
     DateTimeOffset? LocationObservedAt = null,
     ulong ActorNetRefHandle = 0,
     ulong PlayerStateNetRefHandle = 0,
-    ulong PawnNetRefHandle = 0)
+    ulong PawnNetRefHandle = 0,
+    bool HasVerifiedPosition = false)
 {
-    // Presence/identity can be refreshed without a new movement sample. Do
-    // not keep projecting that old coordinate as a dim marker: after this
-    // window the actor is diagnostic-only until a fresh movement packet
-    // arrives. This prevents a user from walking to a stale marker and
-    // finding no dino there.
+    public static readonly TimeSpan PresenceRetention = TimeSpan.FromSeconds(90);
+    public static readonly TimeSpan MaximumPositionRetention = TimeSpan.FromMinutes(6);
+    // Display-only grace for identified actors arriving with sparse movement.
+    // This never makes an old coordinate live or changes its timestamp.
+    public static readonly TimeSpan InitialPositionAdmission = TimeSpan.FromSeconds(15);
+    // Older positions may be displayed under bounded presence/history rules,
+    // but must be marked stale after this window.
     public static readonly TimeSpan LocationFreshness = TimeSpan.FromSeconds(2);
 
     public TimeSpan? LocationAgeAt(DateTimeOffset now) =>

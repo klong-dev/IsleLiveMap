@@ -13,7 +13,8 @@ public sealed class RemoteEntityLifecycleTrackerTests
         var tracker = new RemoteEntityLifecycleTracker();
         var entity = Entity(7);
         var first = tracker.ApplyFrame(Frame(1, [entity]), Start);
-        Assert.Equal(RemoteEntityLifecycleState.Visible, Assert.Single(first).State);
+        Assert.Equal(RemoteEntityLifecycleState.Discovered, Assert.Single(first).State);
+        Assert.Null(Assert.Single(first).LastRenderedAt);
 
         var missing = tracker.ApplyFrame(Frame(2, []), Start.AddSeconds(1));
         Assert.Equal(
@@ -54,7 +55,7 @@ public sealed class RemoteEntityLifecycleTrackerTests
 
         Assert.Equal(first.Key, second.Key);
         Assert.False(second.IsProvisional);
-        Assert.Equal(RemoteEntityLifecycleState.Updated, second.State);
+        Assert.Equal(RemoteEntityLifecycleState.Discovered, second.State);
     }
 
     [Fact]
@@ -81,7 +82,7 @@ public sealed class RemoteEntityLifecycleTrackerTests
         Assert.Equal(first.Key, second.Key);
         Assert.Equal(11, second.TrackId);
         Assert.False(second.IsProvisional);
-        Assert.Equal(RemoteEntityLifecycleState.Updated, second.State);
+        Assert.Equal(RemoteEntityLifecycleState.Discovered, second.State);
     }
 
     [Fact]
@@ -107,8 +108,32 @@ public sealed class RemoteEntityLifecycleTrackerTests
         Assert.Equal(first.Key, temporarilyMissing.Key);
         Assert.Equal(RemoteEntityLifecycleState.TemporarilyMissing, temporarilyMissing.State);
         Assert.Equal(first.Key, recovered.Key);
-        Assert.Equal(RemoteEntityLifecycleState.Visible, recovered.State);
+        Assert.Equal(RemoteEntityLifecycleState.Discovered, recovered.State);
         Assert.False(recovered.IsProvisional);
+    }
+
+    [Fact]
+    public void SameEndpointNewSessionDoesNotReuseKeyOrSequence()
+    {
+        var tracker = new RemoteEntityLifecycleTracker();
+        var first = Assert.Single(tracker.ApplyFrame(
+            Frame(99, [Entity(7)]) with { SessionId = "old" }, Start));
+        var second = Assert.Single(tracker.ApplyFrame(
+            Frame(1, [Entity(7)]) with { SessionId = "new" }, Start.AddSeconds(1)));
+        Assert.NotEqual(first.Key, second.Key);
+        Assert.Null(second.LastRenderedAt);
+    }
+
+    [Fact]
+    public void DuplicateAndReorderedFramesDoNotRefreshPresence()
+    {
+        var tracker = new RemoteEntityLifecycleTracker();
+        tracker.ApplyFrame(Frame(2, [Entity(7)]), Start);
+        tracker.ApplyFrame(Frame(1, []), Start.AddSeconds(1));
+        var duplicate = Assert.Single(tracker.ApplyFrame(Frame(2, [Entity(7)]), Start.AddSeconds(5)));
+        Assert.Equal(Start, duplicate.LastSeenAt);
+        var removed = Assert.Single(tracker.AdvanceWithoutFrame(Start.AddSeconds(7)));
+        Assert.Equal(RemoteEntityLifecycleState.Removed, removed.State);
     }
 
     private static RemotePlayerTelemetryFrame Frame(

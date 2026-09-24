@@ -73,7 +73,8 @@ internal sealed record VerifiedMapEntity(
     DateTimeOffset? LocationObservedAt = null,
     ulong ActorNetRefHandle = 0,
     ulong PlayerStateNetRefHandle = 0,
-    ulong PawnNetRefHandle = 0);
+    ulong PawnNetRefHandle = 0,
+    bool HasVerifiedPosition = false);
 
 internal sealed record PlayerSyncState(
     bool IsSynchronizing,

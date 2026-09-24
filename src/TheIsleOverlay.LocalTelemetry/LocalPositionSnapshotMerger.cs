@@ -169,6 +169,8 @@ public static class LocalPositionSnapshotMerger
             Map = mergedRemote?.Map ?? baseSnapshot.Map,
             ProPlayerTrackingActive = remotePlayers is not null,
             ProPlayerSequence = verifiedLocalFallback?.Sequence,
+            ProPlayerSessionId = verifiedLocalFallback?.SessionId,
+            ProPlayerServerEndpoint = verifiedLocalFallback?.ServerEndpoint,
             ProPlayerFrameObservedAt = verifiedLocalFallback?.ObservedAt,
             ProPlayerFrameReceivedAt = verifiedLocalFallback?.ReceivedAt,
             ProPlayerSync = verifiedLocalFallback?.PlayerSync,
@@ -272,6 +274,17 @@ public static class LocalPositionSnapshotMerger
             return new RemoteMergeResult(map, RemoteTrackingDiagnostics.NoFrame);
         }
 
+        var previousProMarkers = (map?.Markers ?? [])
+            .Where(marker => marker.SteamId is not null
+                             && (marker.SteamId.StartsWith(
+                                     "pro-player:",
+                                     StringComparison.Ordinal)
+                                 || marker.SteamId.StartsWith(
+                                     "pro-entity:",
+                                     StringComparison.Ordinal)))
+            .ToDictionary(
+                marker => marker.SteamId!,
+                StringComparer.Ordinal);
         var providerMarkers = (map?.Markers ?? [])
             .Where(marker => marker.SteamId is null
                              || (!marker.SteamId.StartsWith(
@@ -292,6 +305,7 @@ public static class LocalPositionSnapshotMerger
         var staleCount = 0;
         foreach (var entity in remotePlayers)
         {
+            var staleLocation = IsStaleLocation(entity, now);
             if (!TryGetRejectionReason(entity, seen, now, out var reason))
             {
                 eligible++;
@@ -311,17 +325,44 @@ public static class LocalPositionSnapshotMerger
                     CreatureSpeciesShortName = entity.SpeciesShortName,
                     ProCreatureDiet = entity.Diet,
                     CreatureMassKg = entity.MassKg,
-                    ProEntityIsProvisional = entity.IsProvisional
+                    ProEntityIsProvisional = entity.IsProvisional,
+                    // A retained stale marker is deliberately dimmed by the
+                    // renderer and is never counted by live/fresh gates.
+                    ProEntityIsStale = staleLocation
+                });
+                if (staleLocation)
+                {
+                    staleCount++;
+                }
+                continue;
+            }
+
+            // A previously rendered identity is continuity evidence even if
+            // the current sparse frame no longer carries structural handles.
+            // Retain only the exact key and only inside the same stale TTL;
+            // never manufacture a new marker from a stale, unproven entity.
+            if (reason == RemoteEntityRejectionReason.StaleLocation
+                && previousProMarkers.TryGetValue(
+                    $"pro-entity:{entity.Kind.ToString().ToLowerInvariant()}:{entity.TrackId}",
+                    out var previousMarker)
+                && previousMarker.Location == entity.Location
+                && ((staleLocation && IsFresh(entity.ObservedAt, now, RemotePlayerFreshness))
+                    || CanRetainAdmittedPlayer(entity, previousMarker, now))
+                && seen.Add($"{entity.Kind}:{entity.TrackId}"))
+            {
+                eligible++;
+                staleCount++;
+                proMarkers.Add(previousMarker with
+                {
+                    ProEntityIsStale = true
                 });
                 continue;
             }
 
             rejectionCounts[reason] = rejectionCounts.GetValueOrDefault(reason) + 1;
 
-            // Presence and movement are separate signals. An actor with an
-            // old coordinate is retained in diagnostics only; projecting its
-            // old coordinate, even as a dim marker, makes users walk to a
-            // location where the dino is no longer present.
+            // Positions outside both admission and bounded retention remain
+            // diagnostic-only; presence must not refresh location time.
             if (reason == RemoteEntityRejectionReason.StaleLocation)
             {
                 staleCount++;
@@ -389,8 +430,23 @@ public static class LocalPositionSnapshotMerger
         // provide LocationObservedAt, which prevents presence refreshes from
         // making an old coordinate look live.
         var locationObservedAt = entity.LocationObservedAt ?? entity.ObservedAt;
+        var locationAge = now - locationObservedAt;
+        var retainVerifiedPosition = CanRetainVerifiedPosition(entity, now);
+        var admitRecentPosition = HasReliableEntityIdentity(entity)
+            && IsFresh(entity.ObservedAt, now, RemotePlayerFreshness)
+            && entity.ObservedAt >= locationObservedAt
+            && IsFresh(locationObservedAt, now,
+                VerifiedRemoteEntityTelemetry.InitialPositionAdmission);
+        if (entity.HasVerifiedPosition && !IsFresh(entity.ObservedAt, now,
+                VerifiedRemoteEntityTelemetry.PresenceRetention))
+        {
+            reason = RemoteEntityRejectionReason.PresenceTimeout;
+            return true;
+        }
         if (locationObservedAt > now
-            || now - locationObservedAt > VerifiedRemoteEntityTelemetry.LocationFreshness)
+            || locationAge > RemotePlayerFreshness && !retainVerifiedPosition && !admitRecentPosition
+            || locationAge > VerifiedRemoteEntityTelemetry.LocationFreshness
+                && !HasReliableEntityIdentity(entity))
         {
             reason = RemoteEntityRejectionReason.StaleLocation;
             return true;
@@ -429,6 +485,51 @@ public static class LocalPositionSnapshotMerger
         entity.ActorNetRefHandle > 0
         || entity.PlayerStateNetRefHandle > 0
         || entity.PawnNetRefHandle > 0;
+
+    private static bool HasReliableEntityIdentity(VerifiedRemoteEntityTelemetry entity) =>
+        entity.Kind == RemoteEntityKind.Player
+            ? HasStablePlayerIdentity(entity)
+            : !string.IsNullOrWhiteSpace(entity.SpeciesId)
+              && !string.IsNullOrWhiteSpace(entity.SpeciesShortName);
+
+    private static bool IsStaleLocation(
+        VerifiedRemoteEntityTelemetry entity,
+        DateTimeOffset now)
+    {
+        var locationObservedAt = entity.LocationObservedAt ?? entity.ObservedAt;
+        return locationObservedAt <= now
+               && now - locationObservedAt
+               > VerifiedRemoteEntityTelemetry.LocationFreshness
+               && now - locationObservedAt
+               <= (CanRetainVerifiedPosition(entity, now)
+                   ? VerifiedRemoteEntityTelemetry.MaximumPositionRetention
+                   : VerifiedRemoteEntityTelemetry.InitialPositionAdmission);
+    }
+
+    private static bool CanRetainVerifiedPosition(
+        VerifiedRemoteEntityTelemetry entity, DateTimeOffset now) =>
+        entity.HasVerifiedPosition
+        && !entity.IsProvisional
+        && HasVerifiedIdentity(entity)
+        && entity.LocationObservedAt is { } positionAt
+        && IsFresh(positionAt, now, VerifiedRemoteEntityTelemetry.MaximumPositionRetention)
+        && entity.ObservedAt >= positionAt
+        && IsFresh(entity.ObservedAt, now, VerifiedRemoteEntityTelemetry.PresenceRetention);
+
+    // Admission and position verification are different facts. An admitted
+    // player may have an unverified movement sample followed by owner-only
+    // updates. Keep the exact previously displayed position as STALE, never
+    // admit an unseen candidate here and never refresh its location timestamp.
+    private static bool CanRetainAdmittedPlayer(
+        VerifiedRemoteEntityTelemetry entity, MapMarkerTelemetry previous, DateTimeOffset now) =>
+        entity.Kind == RemoteEntityKind.Player
+        && !entity.IsProvisional && !previous.ProEntityIsProvisional
+        && HasStablePlayerIdentity(entity)
+        && previous.Location == entity.Location
+        && entity.LocationObservedAt is { } positionAt
+        && IsFresh(positionAt, now, VerifiedRemoteEntityTelemetry.MaximumPositionRetention)
+        && entity.ObservedAt >= positionAt
+        && IsFresh(entity.ObservedAt, now, VerifiedRemoteEntityTelemetry.PresenceRetention);
 
     private static bool IsFinite(WorldLocation location) =>
         double.IsFinite(location.X)

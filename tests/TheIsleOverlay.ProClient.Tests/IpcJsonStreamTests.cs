@@ -134,6 +134,31 @@ public sealed class IpcJsonStreamTests
     }
 
     [Fact]
+    public async Task RoundTrip_PreservesVerifiedPositionProofWithoutName()
+    {
+        await using var memory = new MemoryStream();
+        await using var ipc = new IpcJsonStream(memory);
+        var observedAt = DateTimeOffset.Parse("2026-09-23T07:00:00Z");
+        var expected = new ProTelemetryFrame(
+            44, observedAt, "127.0.0.1:7777", new WorldPosition(1, 2, 3), 0,
+            [new VerifiedMapEntity(
+                7, MapEntityKind.Player, null, "triceratops", "Trice",
+                MapCreatureDiet.Herbivore, null, new WorldPosition(4, 5, 6), 0,
+                3, observedAt, LocationObservedAt: observedAt,
+                ActorNetRefHandle: 7, PlayerStateNetRefHandle: 8,
+                PawnNetRefHandle: 9, HasVerifiedPosition: true)]);
+
+        await ipc.WriteAsync(expected, TestContext.Current.CancellationToken);
+        memory.Position = 0;
+        var actual = await ipc.ReadAsync<ProTelemetryFrame>(TestContext.Current.CancellationToken);
+
+        var entity = Assert.Single(actual.RemoteEntities);
+        Assert.True(entity.HasVerifiedPosition);
+        Assert.Null(entity.PlayerProofName);
+        Assert.Equal((ulong)8, entity.PlayerStateNetRefHandle);
+    }
+
+    [Fact]
     public async Task RoundTrip_PreservesCaptureHealthStatus()
     {
         await using var memory = new MemoryStream();
