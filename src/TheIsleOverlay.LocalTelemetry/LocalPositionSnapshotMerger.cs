@@ -23,6 +23,13 @@ public static class LocalPositionSnapshotMerger
     {
         var localObservation = local.GetValueOrDefault();
         var fallback = verifiedLocalFallback;
+        // Authentication is authoritative for the provider lane. A local
+        // packet (or its absence) must never turn an expired IslePilot
+        // session back into Live/Connecting.
+        if (remote?.SessionState == TelemetrySessionState.AuthenticationRequired)
+        {
+            return remote;
+        }
         var hasFreshLocal = local.HasValue
                             && localObservation.HasMovement
                             && IsFresh(
@@ -53,15 +60,31 @@ public static class LocalPositionSnapshotMerger
             && !hasFreshRemoteFrame
             && !hasRemoteInput)
         {
-            return remote is null
-                ? Waiting(sourceName)
-                : remote with
+            if (remote is null)
+            {
+                return Waiting(sourceName);
+            }
+
+            // Provider stats have their own freshness/lifecycle. Losing GPS
+            // must not erase them, nor may retaining them revive an expired
+            // local position or a local-only synthetic player.
+            if (remote is { Success: true, ServerOnline: true, PlayerOnline: true, Player: { } providerPlayer }
+                && !string.IsNullOrWhiteSpace(providerPlayer.ExactVitalsSource)
+                && providerPlayer.ExactVitalsSource != LocalVitalsFeature.SourceName)
+            {
+                return remote with
                 {
-                    PlayerOnline = false,
-                    Player = null,
-                    SessionState = TelemetrySessionState.Connecting,
-                    StatusMessage = "Đang chờ The Isle và dữ liệu movement cục bộ."
+                    Player = providerPlayer with { Location = null, MapLocation = null, ExactMapHeadingDegrees = null }
                 };
+            }
+
+            return remote with
+            {
+                PlayerOnline = false,
+                Player = null,
+                SessionState = TelemetrySessionState.Connecting,
+                StatusMessage = "Đang chờ The Isle và dữ liệu movement cục bộ."
+            };
         }
         if (!hasFreshLocal && !hasFreshVerifiedFallback && !useLocalVitals && !hasRemoteInput)
         {

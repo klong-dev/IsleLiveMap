@@ -59,6 +59,7 @@
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <TextBlock x:Name="LoginStatusLabel"
                            Text="Đăng nhập tại Steam. Token chỉ được lưu mã hóa cho tài khoản Windows hiện tại."
@@ -67,7 +68,13 @@
                 <Button Grid.Column="1" Content="THỬ LẠI" Padding="15,7" Margin="10,0,0,0"
                         Click="RetryButton_Click" Background="#173F3A" Foreground="#E9F4EE"
                         BorderBrush="#4F8177" FontFamily="Bahnschrift SemiCondensed" Cursor="Hand" />
-                <Button Grid.Column="2" Content="HỦY" Padding="15,7" Margin="8,0,0,0"
+                <Button x:Name="LocalOnlyButton" Grid.Column="2" Content="CHỈ MAP · KHÔNG STATS"
+                        Visibility="Collapsed" Padding="15,7" Margin="8,0,0,0"
+                        ToolTip="Chỉ dùng GPS và Pro tracking, không có dino stats hoặc nhiệm vụ IslePilot."
+                        AutomationProperties.Name="Mở map không có stats IslePilot"
+                        Click="LocalOnlyButton_Click" Background="Transparent" Foreground="#A8BBB5"
+                        BorderBrush="#48655F" FontFamily="Bahnschrift SemiCondensed" Cursor="Hand" />
+                <Button Grid.Column="3" Content="HỦY" Padding="15,7" Margin="8,0,0,0"
                         Click="CancelButton_Click" Background="Transparent" Foreground="#A8BBB5"
                         BorderBrush="#48655F" FontFamily="Bahnschrift SemiCondensed" Cursor="Hand" />
             </Grid>
