@@ -30,6 +30,8 @@ public sealed class PrewarmedRemotePlayerTelemetrySource :
     private int _started;
     private int _watchStarted;
     private int _disposed;
+    internal bool IsCompleted => _pumpTask?.IsCompleted == true;
+
     private RemotePlayerCaptureHealth? _terminalHealth;
 
     public RemotePlayerCaptureHealth CaptureHealth =>
