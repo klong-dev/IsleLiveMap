@@ -19,7 +19,7 @@ public partial class MainWindow
             .Where(quest => !string.IsNullOrWhiteSpace(quest.Name))
             .ToArray() ?? [];
 
-        _hasMissions = quests.Length > 0;
+        _hasMissions = quests.Length > 0 || prime?.IsSynchronizing == true;
         RefreshOptionalWidgetVisibility();
         if (_missionListRenderCache.Update(quests))
         {
@@ -36,7 +36,9 @@ public partial class MainWindow
 
         var done = prime?.Done ?? quests.Count(quest => quest.Done == true);
         var required = prime?.Required ?? quests.Length;
-        MissionProgressLabel.Text = $"{Math.Max(0, done)} / {Math.Max(0, required)}";
+        MissionProgressLabel.Text = prime?.IsSynchronizing == true
+            ? "ĐANG ĐỒNG BỘ PRIME"
+            : $"{Math.Max(0, done)} / {Math.Max(0, required)}";
 
         foreach (var completed in _primeQuestCompletionTracker.Capture(quests))
         {

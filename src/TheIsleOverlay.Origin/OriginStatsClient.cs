@@ -25,7 +25,8 @@ public sealed record OriginCommandResult(
     string Status,
     JsonElement? Result,
     string? Error,
-    string? CommandId = null)
+    string? CommandId = null,
+    DateTimeOffset? RequestedAt = null)
 {
     public bool IsCompletedSuccessfully =>
         string.Equals(Status, "completed", StringComparison.OrdinalIgnoreCase)
@@ -40,16 +41,25 @@ public sealed record OriginCommandResult(
 /// API. It sends only the dashboard session cookie supplied by the host and
 /// never reads another browser's storage.
 /// </summary>
-public sealed class OriginStatsClient : IDisposable
+public interface IOriginStatsClient : IDisposable
+{
+    OriginServer? PreferredServer { get; }
+    Task<OriginCommandResult> ExecuteHealthAsync(OriginServer server, CancellationToken cancellationToken = default);
+    Task<OriginCommandResult> ExecutePrimeAsync(OriginServer server, CancellationToken cancellationToken = default);
+}
+
+public sealed class OriginStatsClient : IOriginStatsClient
 {
     public static Uri BaseUri { get; } = new("https://playorigin.gg/");
 
     private readonly HttpClient _httpClient;
     private readonly bool _ownsClient;
     private readonly string _cookieHeader;
+    private readonly TimeProvider _clock;
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, CommandLane> _lanes = new();
     private int _disposed;
 
-    public OriginStatsClient(string cookieHeader, HttpClient? httpClient = null)
+    public OriginStatsClient(string cookieHeader, HttpClient? httpClient = null, TimeProvider? timeProvider = null)
     {
         if (string.IsNullOrWhiteSpace(cookieHeader)
             || cookieHeader.Length > 32_768
@@ -60,6 +70,7 @@ public sealed class OriginStatsClient : IDisposable
         }
 
         _cookieHeader = cookieHeader.Trim();
+        _clock = timeProvider ?? TimeProvider.System;
         _httpClient = httpClient ?? new HttpClient(new HttpClientHandler
         {
             AllowAutoRedirect = false
@@ -82,18 +93,52 @@ public sealed class OriginStatsClient : IDisposable
         OriginServer server,
         CancellationToken cancellationToken = default)
     {
-        var command = await ExecuteCommandAsync("health", server, cancellationToken)
-            .ConfigureAwait(false);
-        return await PollCommandAsync(command, cancellationToken).ConfigureAwait(false);
+        return await ExecuteInLaneAsync("health", server, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task<OriginCommandResult> ExecutePrimeAsync(
         OriginServer server,
         CancellationToken cancellationToken = default)
     {
-        var command = await ExecuteCommandAsync("getprime", server, cancellationToken)
-            .ConfigureAwait(false);
-        return await PollCommandAsync(command, cancellationToken).ConfigureAwait(false);
+        return await ExecuteInLaneAsync("getprime", server, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<OriginCommandResult> ExecuteInLaneAsync(string command, OriginServer server, CancellationToken cancellationToken)
+    {
+        ThrowIfDisposed();
+        var lane = _lanes.GetOrAdd($"{server.ApiId}/{command}", _ => new CommandLane());
+        await lane.Gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            // A local timeout cannot cancel a command already queued on Origin.
+            // Resume that id next time instead of enqueueing duplicate work.
+            if (_clock.GetUtcNow() < lane.RetryAt)
+                return new OriginCommandResult("pending", null, "Origin yêu cầu chờ trước khi thử lại.", lane.Pending?.CommandId);
+            using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            deadline.CancelAfter(TimeSpan.FromSeconds(4));
+            lane.Pending ??= await ExecuteCommandAsync(command, server, deadline.Token).ConfigureAwait(false);
+            var result = (await PollCommandAsync(lane.Pending, deadline.Token).ConfigureAwait(false))
+                with { RequestedAt = lane.Pending.RequestedAt };
+            if (result.Status is "completed" or "failed") lane.Pending = null;
+            return result;
+        }
+        catch (OriginRateLimitException exception)
+        {
+            lane.RetryAt = _clock.GetUtcNow() + exception.RetryAfter;
+            return new OriginCommandResult("pending", null, "Origin đang giới hạn tần suất; sẽ tự thử lại.", lane.Pending?.CommandId);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            return new OriginCommandResult("pending", null, "Origin phản hồi chậm.", lane.Pending?.CommandId);
+        }
+        finally { lane.Gate.Release(); }
+    }
+
+    private sealed class CommandLane
+    {
+        public SemaphoreSlim Gate { get; } = new(1, 1);
+        public OriginCommandResult? Pending { get; set; }
+        public DateTimeOffset RetryAt { get; set; }
     }
 
     /// <summary>
@@ -148,6 +193,7 @@ public sealed class OriginStatsClient : IDisposable
         CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
+        var requestedAt = _clock.GetUtcNow();
         using var request = CreateRequest(HttpMethod.Post, "api/commands/execute");
         request.Content = new StringContent(
             JsonSerializer.Serialize(new { command, server = server.ApiId }),
@@ -175,7 +221,7 @@ public sealed class OriginStatsClient : IDisposable
             throw new OriginProtocolException(error);
         }
 
-        return new OriginCommandResult("queued", null, null, id);
+        return new OriginCommandResult("queued", null, null, id, requestedAt);
     }
 
     private async Task<OriginCommandResult> PollCommandAsync(
@@ -187,9 +233,10 @@ public sealed class OriginStatsClient : IDisposable
         {
             throw new OriginProtocolException("Origin did not return a usable command id.");
         }
-        for (var attempt = 0; attempt < 25; attempt++)
+        var missing = 0;
+        for (var attempt = 0; attempt < 12; attempt++)
         {
-            await Task.Delay(attempt == 0 ? 500 : 750, cancellationToken)
+            await Task.Delay(TimeSpan.FromMilliseconds(250), _clock, cancellationToken)
                 .ConfigureAwait(false);
             using var request = CreateRequest(HttpMethod.Get, $"api/commands/{Uri.EscapeDataString(commandId)}");
             using var response = await _httpClient.SendAsync(
@@ -199,6 +246,7 @@ public sealed class OriginStatsClient : IDisposable
                 .ConfigureAwait(false);
             if (response.StatusCode == HttpStatusCode.NotFound)
             {
+                missing++;
                 continue;
             }
 
@@ -217,14 +265,13 @@ public sealed class OriginStatsClient : IDisposable
             if (string.Equals(status, "completed", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(status, "failed", StringComparison.OrdinalIgnoreCase))
             {
-                return new OriginCommandResult(status, result, error);
+                return new OriginCommandResult(status.ToLowerInvariant(), result, error, commandId);
             }
         }
 
+        if (missing == 12) return new OriginCommandResult("failed", null, "Origin command no longer exists.", commandId);
         return new OriginCommandResult(
-            "failed",
-            JsonSerializer.SerializeToElement(new { success = false }),
-            "Origin command timed out.");
+            "pending", null, "Origin command is still pending.", commandId);
     }
 
     private HttpRequestMessage CreateRequest(HttpMethod method, string path)
@@ -250,6 +297,7 @@ public sealed class OriginStatsClient : IDisposable
     internal static bool IsTrustedUri(Uri? uri) =>
         uri is not null
         && string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
+        && uri.Port == 443
         && string.Equals(uri.Host, BaseUri.Host, StringComparison.OrdinalIgnoreCase);
 
     private static OriginServer? ResolvePreferredServer(string cookieHeader)
@@ -315,6 +363,12 @@ public sealed class OriginStatsClient : IDisposable
         {
             throw new OriginAuthenticationException("Origin session has expired.");
         }
+        if ((int)response.StatusCode == 429)
+        {
+            var delay = response.Headers.RetryAfter?.Delta
+                ?? (response.Headers.RetryAfter?.Date is { } date ? date - DateTimeOffset.UtcNow : TimeSpan.FromSeconds(10));
+            throw new OriginRateLimitException(delay > TimeSpan.Zero ? delay : TimeSpan.FromSeconds(1));
+        }
 
         response.EnsureSuccessStatusCode();
     }
@@ -346,3 +400,8 @@ public sealed class OriginStatsClient : IDisposable
 public sealed class OriginAuthenticationException(string message) : Exception(message);
 
 public sealed class OriginProtocolException(string message) : Exception(message);
+
+public sealed class OriginRateLimitException(TimeSpan retryAfter) : Exception("Origin rate limit")
+{
+    public TimeSpan RetryAfter { get; } = retryAfter;
+}

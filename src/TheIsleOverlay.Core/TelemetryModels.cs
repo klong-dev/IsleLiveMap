@@ -71,6 +71,7 @@ public sealed record WorldLocation
 
 public sealed record PrimeTelemetry
 {
+    public bool IsSynchronizing { get; init; }
     public bool? IsPrime { get; init; }
     public double? Progress { get; init; }
     public bool? Elder { get; init; }

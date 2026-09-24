@@ -1,27 +1,41 @@
 using System.Globalization;
 using System.Text.Json;
+using System.Threading.Channels;
 using TheIsleOverlay.Core;
 
 namespace TheIsleOverlay.Origin;
 
 public sealed class OriginStatsSession : ITelemetrySession
 {
-    private static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(10);
+    public static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(2.5);
+    public static readonly TimeSpan PrimeInterval = TimeSpan.FromSeconds(15);
     // Origin's command endpoint can briefly return an empty/timeout result while
     // the dashboard is refreshing. Do not blank a healthy overlay during that
     // short gap; retain the last confirmed dino/stats snapshot as stale data.
-    private static readonly TimeSpan LastSnapshotGrace = TimeSpan.FromSeconds(45);
-    private readonly OriginStatsClient _client;
+    public static readonly TimeSpan LastSnapshotGrace = TimeSpan.FromSeconds(10);
+    private readonly IOriginStatsClient _client;
+    private readonly TimeProvider _clock;
+    private readonly object _gate = new();
+    private readonly CancellationTokenSource _stop = new();
+    private readonly Channel<TelemetrySnapshot> _snapshots = Channel.CreateBounded<TelemetrySnapshot>(new BoundedChannelOptions(1)
+    { FullMode = BoundedChannelFullMode.DropOldest, SingleReader = true, SingleWriter = false });
     private OriginServer? _activeServer;
     private TelemetrySnapshot? _lastLiveSnapshot;
     private DateTimeOffset _lastLiveAt;
+    private DateTimeOffset _lastPrimeAt;
+    private PrimeTelemetry? _prime;
+    private int _generation;
+    private bool _degraded;
+    private bool _authenticationFailed;
+    private Task? _runTask;
     private int _watchStarted;
     private int _disposed;
 
-    public OriginStatsSession(OriginStatsClient client, OriginServer? activeServer = null)
+    public OriginStatsSession(IOriginStatsClient client, OriginServer? activeServer = null, TimeProvider? timeProvider = null)
     {
         _client = client ?? throw new ArgumentNullException(nameof(client));
         _activeServer = activeServer;
+        _clock = timeProvider ?? TimeProvider.System;
     }
 
     public async IAsyncEnumerable<TelemetrySnapshot> WatchAsync(
@@ -34,6 +48,7 @@ public sealed class OriginStatsSession : ITelemetrySession
             throw new InvalidOperationException("An Origin stats session can only be watched once.");
         }
 
+        using var lifetime = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _stop.Token);
         yield return new TelemetrySnapshot
         {
             Source = "ORIGIN x5",
@@ -42,188 +57,194 @@ public sealed class OriginStatsSession : ITelemetrySession
             StatusMessage = "Đang tìm dino trên Main Origin và Voice Chat Server…"
         };
 
-        while (!cancellationToken.IsCancellationRequested)
+        _runTask = RunAsync(lifetime.Token);
+        try
         {
-            TelemetrySnapshot snapshot;
+            // Internal cancellation completes the writer after publishing the
+            // authentication error. Only caller cancellation may skip draining.
+            await foreach (var snapshot in _snapshots.Reader.ReadAllAsync(cancellationToken).ConfigureAwait(false))
+                yield return snapshot;
+        }
+        finally { lifetime.Cancel(); await _runTask.ConfigureAwait(false); }
+    }
+
+    private async Task RunAsync(CancellationToken cancellationToken)
+    {
+        try { await Task.WhenAll(HealthLoopAsync(cancellationToken), PrimeLoopAsync(cancellationToken), FreshnessLoopAsync(cancellationToken)); }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
+        finally { _snapshots.Writer.TryComplete(); }
+    }
+
+    private async Task HealthLoopAsync(CancellationToken ct)
+    {
+        var failures = 0;
+        while (!ct.IsCancellationRequested)
+        {
+            var started = _clock.GetUtcNow();
             try
             {
-                snapshot = await ProbeServersAsync(cancellationToken).ConfigureAwait(false);
-            }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-            {
-                yield break;
-            }
-            catch (OriginAuthenticationException)
-            {
-                _lastLiveSnapshot = null;
-                snapshot = new TelemetrySnapshot
+                OriginServer? selected;
+                lock (_gate) selected = _activeServer;
+                var health = selected is null ? null : await _client.ExecuteHealthAsync(selected, ct).ConfigureAwait(false);
+                if (health is null || health.Status == "failed" || health.Status == "completed"
+                    && (!health.IsCompletedSuccessfully || ParsePlayer(health.Result!.Value, selected!) is null))
                 {
-                    Source = "ORIGIN x5",
-                    Success = false,
-                    SessionState = TelemetrySessionState.AuthenticationRequired,
-                    StatusMessage = "Phiên Origin hết hạn; hãy đăng nhập lại."
-                };
+                    // A timeout is not proof that the player changed servers.
+                    // Only rediscover after a terminal no-dino result.
+                    if (selected is not null)
+                    {
+                        lock (_gate)
+                        {
+                            _activeServer = null; _lastLiveSnapshot = null; _prime = null; _generation++;
+                            PublishLocked();
+                        }
+                    }
+                    var found = await DiscoverAsync(ct).ConfigureAwait(false);
+                    selected = found.Server; health = found.Health;
+                }
+                var player = selected is not null && health?.IsCompletedSuccessfully == true
+                    && (health.RequestedAt is null || _clock.GetUtcNow() - health.RequestedAt <= LastSnapshotGrace)
+                    ? ParsePlayer(health.Result!.Value, selected) : null;
+                lock (_gate)
+                {
+                    if (_authenticationFailed) return;
+                    if (player is not null)
+                    {
+                        if (_activeServer != selected || _lastLiveSnapshot?.Player?.Class != player.Class)
+                        { _generation++; _prime = null; _lastPrimeAt = default; }
+                        _activeServer = selected;
+                        // The API has no reliable measurement timestamp; keep
+                        // request time as a conservative age bound for queued work.
+                        _lastLiveAt = health!.RequestedAt ?? _clock.GetUtcNow();
+                        _lastLiveSnapshot = new TelemetrySnapshot
+                        {
+                            Source = "ORIGIN x5", Success = true, ServerOnline = true, PlayerOnline = true,
+                            UpdatedAt = _lastLiveAt, Player = player, SessionState = TelemetrySessionState.Live,
+                            StatusMessage = $"Origin · {selected!.DisplayName}"
+                        };
+                        _degraded = false; failures = 0;
+                    }
+                    else { _degraded = true; failures++; }
+                    PublishLocked();
+                }
             }
-            catch (Exception exception)
-            {
-                snapshot = ReuseLastSnapshot(
-                    $"Origin stats tạm thời không khả dụng: {exception.Message}");
-            }
-
-            if (snapshot.PlayerOnline && snapshot.Player is not null)
-            {
-                _lastLiveSnapshot = snapshot;
-                _lastLiveAt = DateTimeOffset.UtcNow;
-            }
-
-            yield return snapshot;
-            await Task.Delay(PollInterval, cancellationToken).ConfigureAwait(false);
+            catch (OperationCanceledException) when (ct.IsCancellationRequested) { return; }
+            catch (OriginAuthenticationException) { InvalidateAuthentication(); return; }
+            catch { lock (_gate) { _degraded = true; failures++; PublishLocked(); } }
+            var period = failures == 0 ? PollInterval : TimeSpan.FromSeconds(failures == 1 ? 5 : 10);
+            var delay = period - (_clock.GetUtcNow() - started);
+            await Task.Delay(delay > TimeSpan.FromMilliseconds(250) ? delay : TimeSpan.FromMilliseconds(250), _clock, ct);
         }
     }
 
-    private async Task<TelemetrySnapshot> ProbeServersAsync(CancellationToken cancellationToken)
+    private async Task<(OriginServer? Server, OriginCommandResult? Health)> DiscoverAsync(CancellationToken ct)
     {
-        if (_activeServer is { } current)
+        using var probesStop = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        var pending = OriginServer.All.Select(async server =>
         {
-            var currentResult = await ProbeHealthAsync(current, cancellationToken).ConfigureAwait(false);
-            if (currentResult.Result is not null)
-            {
-                return await BuildLiveSnapshotAsync(current, currentResult.Result.Value, cancellationToken)
-                    .ConfigureAwait(false);
-            }
-
-            _activeServer = null;
-        }
-
-        // The dashboard supports exactly two active server ids. Probe them in
-        // parallel so a user on Voice does not wait for a full Main timeout
-        // first (or vice versa).
-        var probes = await Task.WhenAll(
-                OrderedServers().Select(server => ProbeHealthAsync(server, cancellationToken)))
-            .ConfigureAwait(false);
-        foreach (var probe in probes)
-        {
-            if (probe.Result is not { } result)
-            {
-                continue;
-            }
-
-            _activeServer = probe.Server;
-            return await BuildLiveSnapshotAsync(probe.Server, result, cancellationToken)
-                .ConfigureAwait(false);
-        }
-
-        return ReuseLastSnapshot(
-            "Không tìm thấy dino đang chơi trên Main Origin hoặc Voice Chat Server.");
-    }
-
-    private TelemetrySnapshot ReuseLastSnapshot(string statusMessage)
-    {
-        if (_lastLiveSnapshot is { PlayerOnline: true, Player: not null }
-            && DateTimeOffset.UtcNow - _lastLiveAt <= LastSnapshotGrace)
-        {
-            return _lastLiveSnapshot with
-            {
-                SessionState = TelemetrySessionState.Stale,
-                LiveDataStale = true,
-                StatusMessage = statusMessage
-            };
-        }
-
-        return new TelemetrySnapshot
-        {
-            Source = "ORIGIN x5",
-            Success = true,
-            ServerOnline = true,
-            PlayerOnline = false,
-            UpdatedAt = DateTimeOffset.UtcNow,
-            SessionState = TelemetrySessionState.Polling,
-            StatusMessage = statusMessage
-        };
-    }
-
-    private IReadOnlyList<OriginServer> OrderedServers()
-    {
-        if (_client.PreferredServer is not { } preferred)
-        {
-            return OriginServer.All;
-        }
-
-        return OriginServer.All
-            .OrderByDescending(server => Equals(server, preferred))
-            .ToArray();
-    }
-
-    private async Task<(OriginServer Server, JsonElement? Result)> ProbeHealthAsync(
-        OriginServer server,
-        CancellationToken cancellationToken)
-    {
+            try { return (Server: server, Health: await _client.ExecuteHealthAsync(server, probesStop.Token).ConfigureAwait(false)); }
+            catch (OperationCanceledException) when (probesStop.IsCancellationRequested) { throw; }
+            catch (OriginAuthenticationException) { throw; }
+            catch { return (Server: server, Health: new OriginCommandResult("failed", null, "Origin không phản hồi.")); }
+        }).ToList();
         try
         {
-            var health = await _client.ExecuteHealthAsync(server, cancellationToken)
-                .ConfigureAwait(false);
-            if (!health.IsCompletedSuccessfully || health.Result is not { } result)
+            while (pending.Count > 0)
             {
-                return (server, null);
+                var completed = await Task.WhenAny(pending); pending.Remove(completed);
+                var result = await completed;
+                if (result.Health.IsCompletedSuccessfully && ParsePlayer(result.Health.Result!.Value, result.Server) is not null)
+                    return result;
             }
-
-            var player = ParsePlayer(result, server);
-            if (player is null)
-            {
-                return (server, null);
-            }
-
-            return (server, result);
+            return (null, null);
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        finally
         {
-            throw;
-        }
-        catch (OriginAuthenticationException)
-        {
-            throw;
-        }
-        catch
-        {
-            return (server, null);
+            probesStop.Cancel();
+            try { await Task.WhenAll(pending); } catch (OperationCanceledException) when (probesStop.IsCancellationRequested) { }
         }
     }
 
-    private async Task<TelemetrySnapshot> BuildLiveSnapshotAsync(
-        OriginServer server,
-        JsonElement result,
-        CancellationToken cancellationToken)
+    private async Task PrimeLoopAsync(CancellationToken ct)
     {
-        var player = ParsePlayer(result, server)!;
-        PrimeTelemetry? prime = null;
-        try
+        while (!ct.IsCancellationRequested)
         {
-            var primeResult = await _client.ExecutePrimeAsync(server, cancellationToken)
-                .ConfigureAwait(false);
-            if (primeResult.IsCompletedSuccessfully && primeResult.Result is { } primeJson)
+            OriginServer? server; int generation;
+            lock (_gate)
             {
-                prime = ParsePrime(primeJson);
+                if (_authenticationFailed) return;
+                server = _lastLiveSnapshot is not null && _clock.GetUtcNow() - _lastLiveAt <= LastSnapshotGrace
+                    && _clock.GetUtcNow() - _lastPrimeAt >= PrimeInterval ? _activeServer : null;
+                generation = _generation;
+                if (server is not null) _lastPrimeAt = _clock.GetUtcNow();
+            }
+            if (server is not null)
+            {
+                try
+                {
+                    var result = await _client.ExecutePrimeAsync(server, ct).ConfigureAwait(false);
+                    lock (_gate)
+                    {
+                        if (!_authenticationFailed && generation == _generation && server == _activeServer)
+                        {
+                            _prime = result.IsCompletedSuccessfully
+                                && (result.RequestedAt is null || _clock.GetUtcNow() - result.RequestedAt <= PrimeInterval)
+                                ? ParsePrime(result.Result!.Value)
+                                : (_prime ?? new PrimeTelemetry()) with { IsSynchronizing = true };
+                            PublishLocked();
+                        }
+                    }
+                }
+                catch (OperationCanceledException) when (ct.IsCancellationRequested) { return; }
+                catch (OriginAuthenticationException) { InvalidateAuthentication(); return; }
+                catch { lock (_gate) { if (generation == _generation) { _prime = (_prime ?? new PrimeTelemetry()) with { IsSynchronizing = true }; PublishLocked(); } } }
+            }
+            await Task.Delay(TimeSpan.FromMilliseconds(250), _clock, ct);
+        }
+    }
+
+    private async Task FreshnessLoopAsync(CancellationToken ct)
+    {
+        while (!ct.IsCancellationRequested)
+        {
+            await Task.Delay(TimeSpan.FromMilliseconds(500), _clock, ct);
+            lock (_gate)
+            {
+                if (_authenticationFailed) return;
+                if (_lastLiveSnapshot is not null && _clock.GetUtcNow() - _lastLiveAt > PollInterval + TimeSpan.FromSeconds(3))
+                { _degraded = true; PublishLocked(); }
             }
         }
-        catch (OriginProtocolException)
+    }
+
+    private void InvalidateAuthentication()
+    {
+        lock (_gate)
         {
-            // Stats remain useful when a server does not expose prime data.
+            _authenticationFailed = true; _lastLiveSnapshot = null; _prime = null;
+            _snapshots.Writer.TryWrite(new TelemetrySnapshot
+            { Source = "ORIGIN x5", SessionState = TelemetrySessionState.AuthenticationRequired, StatusMessage = "Phiên Origin hết hạn; hãy đăng nhập lại." });
+            _stop.Cancel();
         }
+    }
 
-        player = player with { Prime = prime };
-
-        return new TelemetrySnapshot
+    private void PublishLocked()
+    {
+        if (_authenticationFailed) return;
+        var recent = _lastLiveSnapshot is not null && _clock.GetUtcNow() - _lastLiveAt <= LastSnapshotGrace;
+        var snapshot = recent ? _lastLiveSnapshot! with
         {
-            Source = "ORIGIN x5",
-            Success = true,
-            ServerOnline = true,
-            PlayerOnline = true,
-            UpdatedAt = DateTimeOffset.UtcNow,
-            Player = player,
-            SessionState = TelemetrySessionState.Live,
-            LiveDataStale = false,
-            StatusMessage = $"Origin · {server.DisplayName}"
+            Player = _lastLiveSnapshot!.Player! with { Prime = _prime ?? new PrimeTelemetry { IsSynchronizing = true } },
+            SessionState = _degraded ? TelemetrySessionState.Stale : TelemetrySessionState.Live,
+            LiveDataStale = _degraded,
+            StatusMessage = _degraded ? "Origin phản hồi chậm · đang giữ số liệu gần nhất (tối đa 10 giây)." : _lastLiveSnapshot.StatusMessage
+        }
+        : new TelemetrySnapshot
+        {
+            Source = "ORIGIN x5", Success = true, ServerOnline = true, LiveDataStale = true,
+            SessionState = TelemetrySessionState.Stale, StatusMessage = "Chưa nhận được stats Origin mới; GPS vẫn hoạt động."
         };
+        _snapshots.Writer.TryWrite(snapshot);
     }
 
     private static PlayerTelemetry? ParsePlayer(JsonElement result, OriginServer server)
@@ -319,7 +340,7 @@ public sealed class OriginStatsSession : ITelemetrySession
     private static int? ReadInt(JsonElement value, string name) =>
         int.TryParse(ReadString(value, name), NumberStyles.Integer, CultureInfo.InvariantCulture, out var textValue)
             ? textValue
-            : value.TryGetProperty(name, out var property) && property.TryGetInt32(out var numberValue)
+            : value.TryGetProperty(name, out var property) && property.ValueKind == JsonValueKind.Number && property.TryGetInt32(out var numberValue)
                 ? numberValue
                 : null;
 
@@ -341,13 +362,13 @@ public sealed class OriginStatsSession : ITelemetrySession
                 : null;
     }
 
-    public ValueTask DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         if (Interlocked.Exchange(ref _disposed, 1) == 0)
         {
+            _stop.Cancel();
+            if (_runTask is not null) await _runTask.ConfigureAwait(false);
             _client.Dispose();
         }
-
-        return ValueTask.CompletedTask;
     }
 }
