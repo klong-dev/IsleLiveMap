@@ -1,5 +1,11 @@
 # Isle Live Map 2.4.0
 
+## Nhóm sinh tồn
+
+- Thêm hộp thoại chọn quy mô phòng 3, 7, 10 hoặc 21 người (tính cả chủ phòng); phòng 10/21 người yêu cầu Pro.
+- Gửi quy mô đã chọn tới relay và kiểm tra quy mô được cấp; không tạo nhầm phòng sai giới hạn.
+- Sửa bố cục hộp thoại để các lựa chọn luôn nằm trong khung, không bị che hoặc cắt.
+
 ## SDVN và kết nối server riêng
 
 - Thêm một nút SDVN trên Home với logo riêng; chọn SDVN #1, #2 hoặc #3 trong cùng một cửa sổ và nhớ server gần nhất.
