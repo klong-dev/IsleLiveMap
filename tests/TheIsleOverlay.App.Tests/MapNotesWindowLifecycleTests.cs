@@ -43,6 +43,7 @@ public sealed class MapNotesWindowLifecycleTests
                 Assert.Empty(application.Windows.OfType<MapNotesWindow>());
                 VerifyLayerInspectorAndPersistence();
                 VerifyPeerSymmetry();
+                PersonalHistoryUiTests.VerifyFreeHistoryOnApplicationThread();
                 completed.TrySetResult();
             }
             catch (Exception error)

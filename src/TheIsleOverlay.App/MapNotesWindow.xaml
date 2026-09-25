@@ -108,7 +108,7 @@
                 <RowDefinition Height="54" />
                 <RowDefinition Height="70" />
                 <RowDefinition Height="*" />
-                <RowDefinition Height="40" />
+                <RowDefinition Height="60" />
             </Grid.RowDefinitions>
 
             <Border BorderBrush="#34544E" BorderThickness="0,0,0,1">
@@ -119,9 +119,9 @@
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <StackPanel VerticalAlignment="Center">
-                        <TextBlock Text="GATEWAY // FIELD NOTES" Foreground="#37D4C6"
+                        <TextBlock Text="GATEWAY // FIELD NOTES · KHÔNG ZOOM" Foreground="#37D4C6"
                                    FontFamily="Bahnschrift SemiCondensed" FontSize="10" FontWeight="SemiBold" />
-                        <TextBlock Text="CLICK BẢN ĐỒ ĐỂ ĐẶT MỐC" Foreground="#E9F4EE"
+                        <TextBlock x:Name="MapModeLabel" Text="CLICK BẢN ĐỒ ĐỂ ĐẶT MỐC" Foreground="#E9F4EE"
                                    FontFamily="Bahnschrift SemiCondensed" FontSize="16" FontWeight="Bold" />
                     </StackPanel>
                     <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,14,0">
@@ -198,7 +198,7 @@
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <TextBlock x:Name="SelectionDetailLabel" Text="Chọn một vị trí trên bản đồ"
+                <TextBlock x:Name="SelectionDetailLabel" Text="Chọn một vị trí trên bản đồ" TextWrapping="Wrap"
                            Foreground="#8CA59D" FontFamily="Bahnschrift" FontSize="9.5"
                            VerticalAlignment="Center" />
                 <Button x:Name="DeleteSelectedButton" Grid.Column="1"
@@ -207,9 +207,12 @@
                         Visibility="Collapsed"
                         AutomationProperties.Name="Xóa mốc đang chọn"
                         Click="DeleteSelectedButton_Click" />
-                <TextBlock Grid.Column="2" Text="BẢN ĐỒ CỐ ĐỊNH · KHÔNG ZOOM"
-                           Foreground="#58766E" FontFamily="Bahnschrift SemiCondensed" FontSize="8.5"
-                           VerticalAlignment="Center" />
+                <StackPanel Grid.Column="2" VerticalAlignment="Center" MaxWidth="180">
+                    <CheckBox x:Name="HistoryRelayToggle" Content="Đồng bộ mốc cá nhân"
+                              Foreground="#B5CFC5" FontSize="10" Click="HistoryRelayToggle_Click"
+                              ToolTip="Gửi các mốc vị trí cuối/đã chết của bạn tới isle-relay.klong.dev. Chỉ bạn có quyền đọc/xóa, tự hết hạn sau 24 giờ. Không gửi cookie Steam hoặc website." />
+                    <TextBlock x:Name="HistorySyncLabel" Text="Chỉ lưu trên máy" FontSize="8" Foreground="#91AAA3" TextWrapping="Wrap" />
+                </StackPanel>
             </Grid>
 
             <Popup x:Name="MarkerPalettePopup" PlacementTarget="{Binding ElementName=MapSurface}"

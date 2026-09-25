@@ -25,6 +25,9 @@ public partial class MapNotesWindow : Window
         LoadGatewayMapWaterImage,
         LazyThreadSafetyMode.ExecutionAndPublication);
     private readonly MapNoteStore _store;
+    private readonly bool _allowManualNotes;
+    private readonly Action<bool>? _relayChanged;
+    private string? _historyServer;
     private readonly CancellationTokenSource _shutdown = new();
     private Guid? _selectedNoteId;
     private WorldLocation? _playerLocation;
@@ -46,13 +49,28 @@ public partial class MapNotesWindow : Window
         MapNoteStore store,
         WorldLocation? playerLocation,
         double playerHeading,
-        TeamRelayState? teamState = null)
+        TeamRelayState? teamState = null,
+        bool allowManualNotes = true,
+        string? historyServer = null,
+        Action<bool>? relayChanged = null,
+        bool relayEnabled = false)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
+        _allowManualNotes = allowManualNotes;
+        _historyServer = historyServer;
+        _relayChanged = relayChanged;
         _playerLocation = playerLocation;
         _playerHeading = playerHeading;
         _teamState = teamState ?? new TeamRelayState();
         InitializeComponent();
+        HistoryRelayToggle.IsChecked = relayEnabled;
+        HistoryRelayToggle.IsEnabled = relayChanged is not null;
+        if (!allowManualNotes)
+        {
+            CoordinateEntryPanel.Visibility = Visibility.Collapsed;
+            ((Grid)CoordinateEntryPanel.Parent).RowDefinitions[1].Height = new GridLength(0);
+            MapModeLabel.Text = "VỊ TRÍ CUỐI / MỐC ĐÃ CHẾT";
+        }
         CloseShortcutLabel.Text =
             $"{new ShortcutSettingsStore().Load().MapNotes.ToUpperInvariant()} / ESC ĐỂ ĐÓNG";
         LoadMap();
@@ -101,7 +119,7 @@ public partial class MapNotesWindow : Window
         MapFrame.Width = mapWidth;
         MapFrame.Height = mapHeight;
         Width = mapWidth + 44d;
-        Height = mapHeight + 184d;
+        Height = mapHeight + (_allowManualNotes ? 204d : 134d);
         Left = workArea.Left + (workArea.Width - Width) / 2d;
         Top = workArea.Top + (workArea.Height - Height) / 2d;
         RenderMap();
@@ -413,6 +431,7 @@ public partial class MapNotesWindow : Window
 
     private async Task<string?> TryCreateNoteAtAsync(MapPoint point)
     {
+        if (!_allowManualNotes) return "Mốc thủ công cần Pro. Mốc vị trí cuối được lưu tự động.";
         if (_noteCreationBusy)
         {
             return "Đang tạo mốc trước đó…";
@@ -569,7 +588,16 @@ public partial class MapNotesWindow : Window
         string? failure = null;
         try
         {
-            if (selected.IsTeamPing)
+            if (selected.IsPersonalHistory)
+            {
+                if (!item.IsDelete && (item.Kind != MapNoteKind.Death || selected.Kind != MapNoteKind.LastKnown)) return;
+                var result = item.IsDelete ? _store.TryDelete(id) : _store.TryChangeKind(id, MapNoteKind.Death);
+                succeeded = result.Success;
+                failure = result.Error;
+                if (succeeded && item.IsDelete) _selectedNoteId = null;
+            }
+            else if (!_allowManualNotes) return;
+            else if (selected.IsTeamPing)
             {
                 if (item.IsDelete)
                 {
@@ -657,8 +685,29 @@ public partial class MapNotesWindow : Window
 
     private void OpenPalette(Point anchor)
     {
-        const double paletteWidth = 294d;
-        const double paletteHeight = 198d;
+        var selected = VisibleNotes().FirstOrDefault(n => n.Id == _selectedNoteId);
+        foreach (var button in PaletteGrid.Children.OfType<Button>())
+            button.Visibility = selected?.IsPersonalHistory == true && button.Tag is MapNotePaletteItem { IsDelete: false }
+                ? Visibility.Collapsed : Visibility.Visible;
+        foreach (var old in PaletteGrid.Children.OfType<Button>().Where(b => (string?)b.Name == "ConfirmPersonalDeath").ToArray())
+            PaletteGrid.Children.Remove(old);
+        if (selected?.Kind == MapNoteKind.LastKnown)
+        {
+            var confirm = new Button
+            {
+                Name = "ConfirmPersonalDeath", Content = "TÔI ĐÃ CHẾT\nTẠI ĐÂY",
+                ToolTip = "Chỉ xác nhận nếu đây đúng là vị trí bạn đã chết. Mất GPS không có nghĩa là chết.",
+                Tag = MapNoteIconCatalog.For(MapNoteKind.Death), Style = (Style)FindResource("NotePaletteButton")
+            };
+            confirm.Click += PaletteButton_Click;
+            PaletteGrid.Children.Add(confirm);
+        }
+        PaletteGrid.Columns = selected?.IsPersonalHistory == true ? 2 : 3;
+        PaletteGrid.Rows = selected?.IsPersonalHistory == true ? 1 : 3;
+        PaletteGrid.Width = selected?.IsPersonalHistory == true ? 240 : 282;
+        PaletteGrid.Height = selected?.IsPersonalHistory == true ? 72 : 186;
+        var paletteWidth = PaletteGrid.Width + 12;
+        var paletteHeight = PaletteGrid.Height + 12;
         MarkerPalettePopup.HorizontalOffset = Math.Clamp(
             anchor.X - paletteWidth / 2d,
             8d,
@@ -960,6 +1009,8 @@ public partial class MapNotesWindow : Window
                 ? $"PING NHÓM CỦA BẠN · {note.OwnerDisplayName}"
                 : $"PING CỦA {note.OwnerDisplayName} · CHỈ CHỦ PING ĐƯỢC SỬA"
             : "MỐC CÁ NHÂN";
+        if (note.IsPersonalHistory)
+            ownership = $"RIÊNG TƯ · {note.ObservedAt?.ToLocalTime():dd/MM HH:mm:ss} · {(note.Kind == MapNoteKind.Death ? "BẠN XÁC NHẬN" : "KHÔNG XÁC NHẬN CHẾT")}";
         SelectionDetailLabel.Text = $"{item.Label.ToUpperInvariant()} · {ownership} · X {note.WorldX / 1000d:0.0}  Y {note.WorldY / 1000d:0.0} · {distance}";
         RefreshDeleteButton();
     }
@@ -1029,7 +1080,20 @@ public partial class MapNotesWindow : Window
     }
 
     private IReadOnlyList<MapNotePresentation> VisibleNotes() =>
-        MapNotePresentationBuilder.Merge(_store.Notes, _teamState);
+        MapNotePresentationBuilder.Merge(_store.Notes.Where(n => n.IsPersonalHistory
+            ? n.ServerKey == _historyServer && n.ExpiresAt > DateTimeOffset.UtcNow
+            : _allowManualNotes).ToArray(), _allowManualNotes ? _teamState : null);
+
+    public void UpdateHistoryContext(string? server, string status)
+    {
+        var changed = _historyServer != server;
+        _historyServer = server;
+        HistorySyncLabel.Text = status;
+        if (changed) RenderMap();
+    }
+
+    private void HistoryRelayToggle_Click(object sender, RoutedEventArgs e) =>
+        _relayChanged?.Invoke(HistoryRelayToggle.IsChecked == true);
 
     private void ApplyTeamPing(TeamMapPingSnapshot ping)
     {

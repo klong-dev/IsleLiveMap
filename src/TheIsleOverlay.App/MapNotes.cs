@@ -13,7 +13,9 @@ public enum MapNoteKind
     Plant,
     Nest,
     Danger,
-    Sighting
+    Sighting,
+    LastKnown,
+    Death
 }
 
 public sealed record MapNote
@@ -26,6 +28,9 @@ public sealed record MapNote
     public double WorldY { get; init; }
     public MapNoteKind Kind { get; init; } = MapNoteKind.Pin;
     public DateTimeOffset CreatedAt { get; init; } = DateTimeOffset.UtcNow;
+    public string? ServerKey { get; init; }
+    public DateTimeOffset? ExpiresAt { get; init; }
+    public bool IsPersonalHistory => Kind is MapNoteKind.LastKnown or MapNoteKind.Death;
 }
 
 public sealed record MapNoteMutationResult(
@@ -37,7 +42,7 @@ public sealed record MapNoteMutationResult(
     public static MapNoteMutationResult Failed(string error) => new(false, null, error);
 }
 
-public sealed class MapNoteStore
+public sealed partial class MapNoteStore
 {
     public const string GatewayMapId = "gateway";
     public const int MaximumNotes = 50;
@@ -84,9 +89,9 @@ public sealed class MapNoteStore
             WorldX = world.X,
             WorldY = world.Y
         };
-        if (_notes.Count >= MaximumNotes)
+        if (_notes.Count(n => !n.IsPersonalHistory) >= MaximumNotes)
         {
-            _notes.RemoveAt(0);
+            _notes.RemoveAt(_notes.FindIndex(n => !n.IsPersonalHistory));
         }
         _notes.Add(note);
         if (!TrySaveAndNotify(out var error))
@@ -112,6 +117,10 @@ public sealed class MapNoteStore
         }
 
         var previous = _notes[index];
+        if (previous.IsPersonalHistory
+            ? previous.Kind != MapNoteKind.LastKnown || kind != MapNoteKind.Death
+            : kind is MapNoteKind.LastKnown or MapNoteKind.Death)
+            return MapNoteMutationResult.Failed("Mốc lịch sử chỉ cho phép xác nhận chết hoặc xóa.");
         _notes[index] = _notes[index] with { Kind = kind };
         if (!TrySaveAndNotify(out var error))
         {
@@ -198,7 +207,7 @@ public sealed class MapNoteStore
 
             return (JsonSerializer.Deserialize<List<MapNote>>(File.ReadAllText(path), JsonOptions) ?? [])
                 .Where(IsValid)
-                .TakeLast(MaximumNotes)
+                .TakeLast(MaximumNotes + 20)
                 .Select(Normalize)
                 .ToArray();
         }
@@ -213,7 +222,10 @@ public sealed class MapNoteStore
         && string.Equals(note.MapId, GatewayMapId, StringComparison.OrdinalIgnoreCase)
         && double.IsFinite(note.U)
         && double.IsFinite(note.V)
-        && Enum.IsDefined(note.Kind);
+        && Enum.IsDefined(note.Kind)
+        && (!note.IsPersonalHistory || (!string.IsNullOrWhiteSpace(note.ServerKey)
+            && note.ServerKey.Length <= 160 && double.IsFinite(note.WorldX) && double.IsFinite(note.WorldY)
+            && note.ExpiresAt == note.CreatedAt.AddHours(24)));
 
     private static MapNote Normalize(MapNote note)
     {
@@ -224,8 +236,8 @@ public sealed class MapNoteStore
             MapId = GatewayMapId,
             U = point.Left,
             V = point.Top,
-            WorldX = world.X,
-            WorldY = world.Y
+            WorldX = note.IsPersonalHistory ? note.WorldX : world.X,
+            WorldY = note.IsPersonalHistory ? note.WorldY : world.Y
         };
     }
 

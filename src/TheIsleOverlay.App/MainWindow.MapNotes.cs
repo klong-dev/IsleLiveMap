@@ -14,10 +14,15 @@ public partial class MainWindow
     private TeamRelayState _mapNoteTeamState = new();
     private readonly Dictionary<Guid, MiniMapNoteVisual> _miniMapNoteVisuals = [];
 
-    private void InitializeMapNotes() => _mapNoteStore.Changed += MapNoteStore_Changed;
+    private void InitializeMapNotes()
+    {
+        _mapNoteStore.Changed += MapNoteStore_Changed;
+        InitializePersonalHistory();
+    }
 
     private void DetachMapNotes()
     {
+        DetachPersonalHistory();
         _mapNoteStore.Changed -= MapNoteStore_Changed;
         if (_mapNotesWindow is not null)
         {
@@ -32,12 +37,6 @@ public partial class MainWindow
 
     private void ToggleMapNotesWindow()
     {
-        if (!HasCurrentProFeatures)
-        {
-            _mapNotesWindow?.Close();
-            return;
-        }
-
         if (_mapNotesWindow is not null)
         {
             _mapNotesWindow.Close();
@@ -53,7 +52,11 @@ public partial class MainWindow
             _mapNoteStore,
             _location,
             _hasMovementHeading ? _headingDegrees : 0d,
-            _mapNoteTeamState)
+            _mapNoteTeamState,
+            HasCurrentProFeatures,
+            _historyTracker.ServerKey,
+            SetHistoryRelayEnabled,
+            _historyRelayEnabled)
         {
             Owner = this
         };
@@ -127,13 +130,7 @@ public partial class MainWindow
                 imageLeft + current.Left * imageWidth,
                 imageTop + current.Top * imageHeight)
             : null;
-        if (!HasCurrentProFeatures)
-        {
-            ClearMiniMapNoteVisuals();
-            return;
-        }
-
-        var notes = MapNotePresentationBuilder.Merge(_mapNoteStore.Notes, _mapNoteTeamState);
+        var notes = MapNotePresentationBuilder.Merge(VisibleLocalNotes(), HasCurrentProFeatures ? _mapNoteTeamState : null);
         var visibleIds = notes.Select(note => note.Id).ToHashSet();
         foreach (var removedId in _miniMapNoteVisuals.Keys
                      .Where(id => !visibleIds.Contains(id))

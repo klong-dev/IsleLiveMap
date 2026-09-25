@@ -14,6 +14,8 @@ public sealed record MapNotePresentation
     public required bool CanEdit { get; init; }
     public long Revision { get; init; }
     public string? OwnerDisplayName { get; init; }
+    public DateTimeOffset? ObservedAt { get; init; }
+    public bool IsPersonalHistory => Kind is MapNoteKind.LastKnown or MapNoteKind.Death;
 }
 
 public static class MapNotePresentationBuilder
@@ -32,7 +34,8 @@ public static class MapNotePresentationBuilder
             WorldY = note.WorldY,
             Kind = note.Kind,
             IsTeamPing = false,
-            CanEdit = true
+            CanEdit = true,
+            ObservedAt = note.IsPersonalHistory ? note.CreatedAt : null
         }));
 
         var localMemberId = teamState?.Session?.MemberId;

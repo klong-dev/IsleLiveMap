@@ -342,7 +342,7 @@ public partial class MainWindow : Window
         _windowSource?.AddHook(WindowMessageHook);
         _shortcutRegistrationManager = new ShortcutRegistrationManager(
             handle,
-            includeMapNotes: HasCurrentProFeatures);
+            includeMapNotes: true);
         var shortcutRegistration = _shortcutRegistrationManager.RegisterInitial(_shortcutSettings);
         _shortcutSettings = shortcutRegistration.ActiveSettings;
         StartProFeatureExpiryWatch();
@@ -416,7 +416,7 @@ public partial class MainWindow : Window
         _proFeatureExpiryTimer?.Stop();
         _proFeatureExpiryTimer = null;
         _proFeatureAccess = ProFeatureAccessGrant.Free;
-        RebuildShortcutRegistration(includeMapNotes: false);
+        RebuildShortcutRegistration(includeMapNotes: true);
         DisableProMapFeatures();
     }
 
@@ -1699,11 +1699,7 @@ public partial class MainWindow : Window
 
     private void OpenMapNotesFallbackButton_Click(object sender, RoutedEventArgs e)
     {
-        if (HasCurrentProFeatures)
-            ToggleMapNotesWindow();
-        else
-            MessageBox.Show(this, "Mốc bản đồ là tính năng Pro. Hãy kích hoạt Pro để sử dụng Alt+M.",
-                "Mở bản đồ mốc", MessageBoxButton.OK, MessageBoxImage.Information);
+        ToggleMapNotesWindow();
     }
 
     private BitmapImage? _baseMapImage;
@@ -2066,10 +2062,7 @@ public partial class MainWindow : Window
         }
         else if (message == WmHotkey && wParam.ToInt32() == ShortcutSettingsManager.MapNotesHotkeyId)
         {
-            if (HasCurrentProFeatures)
-            {
-                ToggleMapNotesWindow();
-            }
+            ToggleMapNotesWindow();
             handled = true;
         }
         else if (message == WmHotkey && wParam.ToInt32() == ShortcutSettingsManager.MutationGuideHotkeyId)

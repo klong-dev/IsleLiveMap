@@ -27,8 +27,12 @@ public static class MapNoteIconCatalog
         new(MapNoteKind.Sighting, "Phát hiện player", "#B09CEC", "M1,11 C5,4 17,4 21,11 C17,18 5,18 1,11 Z M11,7 C8.8,7 7,8.8 7,11 C7,13.2 8.8,15 11,15 C13.2,15 15,13.2 15,11 C15,8.8 13.2,7 11,7 Z")
     ];
 
-    public static MapNotePaletteItem For(MapNoteKind kind) =>
-        Palette.First(item => item.Kind == kind);
+    public static MapNotePaletteItem For(MapNoteKind kind) => kind switch
+    {
+        MapNoteKind.LastKnown => new(kind, "Vị trí cuối", "#AAB5C4", "M10,1 A9,9 0 1 1 9.99,1 M10,4 L10,10 L15,13"),
+        MapNoteKind.Death => new(kind, "Đã chết · bạn xác nhận", "#EF8D7C", "M4,13 L4,18 L16,18 L16,13 C23,4 16,0 10,0 C4,0 -3,4 4,13 Z M5,6 L8,6 L8,9 L5,9 Z M12,6 L15,6 L15,9 L12,9 Z M9,12 L11,12 L10,14 Z"),
+        _ => Palette.First(item => item.Kind == kind)
+    };
 
     public static Path CreatePath(MapNotePaletteItem item, double size)
     {
