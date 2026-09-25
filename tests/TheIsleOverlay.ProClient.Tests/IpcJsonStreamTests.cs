@@ -187,6 +187,29 @@ public sealed class IpcJsonStreamTests
     }
 
     [Fact]
+    public async Task RoundTrip_PreservesEarlyDinoPositionEvidence()
+    {
+        var at = DateTimeOffset.UtcNow;
+        var entity = new VerifiedMapEntity(500, MapEntityKind.Player, null, "", "",
+            MapCreatureDiet.Unknown, null, new WorldPosition(100, 200, 30), 0, 1, at,
+            IsProvisional: true, LocationObservedAt: at, ActorNetRefHandle: 500,
+            HasVerifiedPosition: true, LocationEvidenceSource: "SerializedActorCreation",
+            LocationEvidenceEndBitOffset: 100);
+        var expected = new ProTelemetryFrame(1, at, "server:7777", new WorldPosition(0, 0, 0), 0, [entity]);
+        await using var memory = new MemoryStream();
+        await using var ipc = new IpcJsonStream(memory);
+        await ipc.WriteAsync(expected, TestContext.Current.CancellationToken);
+        memory.Position = 0;
+        var wire = await ipc.ReadAsync<ProTelemetryFrame>(TestContext.Current.CancellationToken);
+        var mapped = Assert.Single(ProAgentRemotePlayerSource.MapFrame(wire, "session").RemoteEntities);
+        Assert.True(mapped.IsProvisional);
+        Assert.Equal("", mapped.SpeciesId);
+        Assert.Equal("SerializedActorCreation", mapped.LocationEvidenceSource);
+        Assert.Equal(100, mapped.LocationEvidenceEndBitOffset);
+        Assert.Equal(at, mapped.LocationObservedAt);
+    }
+
+    [Fact]
     public async Task ReadAsync_RejectsOversizedLength()
     {
         await using var memory = new MemoryStream(

@@ -74,7 +74,9 @@ internal sealed record VerifiedMapEntity(
     ulong ActorNetRefHandle = 0,
     ulong PlayerStateNetRefHandle = 0,
     ulong PawnNetRefHandle = 0,
-    bool HasVerifiedPosition = false);
+    bool HasVerifiedPosition = false,
+    string? LocationEvidenceSource = null,
+    int? LocationEvidenceEndBitOffset = null);
 
 internal sealed record PlayerSyncState(
     bool IsSynchronizing,

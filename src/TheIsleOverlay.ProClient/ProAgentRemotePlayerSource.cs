@@ -290,6 +290,8 @@ public sealed class ProAgentRemotePlayerSource :
                         entity.ObservedAt,
                         entity.LocationObservedAt,
                         entity.HasVerifiedPosition,
+                        entity.LocationEvidenceSource,
+                        entity.LocationEvidenceEndBitOffset,
                         entity.ActorNetRefHandle,
                         entity.PlayerStateNetRefHandle,
                         entity.PawnNetRefHandle,
@@ -411,7 +413,9 @@ public sealed class ProAgentRemotePlayerSource :
                 entity.ActorNetRefHandle,
                 entity.PlayerStateNetRefHandle,
                 entity.PawnNetRefHandle,
-                entity.HasVerifiedPosition))
+                entity.HasVerifiedPosition,
+                entity.LocationEvidenceSource,
+                entity.LocationEvidenceEndBitOffset))
             .ToArray();
 
         return new RemotePlayerTelemetryFrame(

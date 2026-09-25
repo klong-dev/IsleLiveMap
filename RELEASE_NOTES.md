@@ -1,3 +1,16 @@
+# Isle Live Map 2.4.3
+
+## Tracking Pro và marker dino
+
+- Hỗ trợ Pro Agent 0.3.84: tăng nhận diện dino dự đoán từ evidence gắn với actor, giữ provenance vị trí qua Agent → Host.
+- Marker dự đoán có nhãn `?` để phân biệt với marker đã xác minh; không bảo đảm nhận diện mọi dino trong game.
+- Giữ vị trí cuối theo presence hợp lệ; tọa độ cũ vẫn được đánh dấu stale, không giả là vị trí live.
+- Chấm dino dự đoán có nền màu đặc, viền liền và độ rõ 60%, ngang chấm mất tín hiệu.
+- Hiện modal khi bản cập nhật tải xong; có thể mở lại modal nếu đã đóng hoặc thao tác khởi động lại thất bại.
+- Giữ các bản sửa phiên đăng nhập IslePilot, stats khi GPS gián đoạn, nhóm sinh tồn, SDVN và server riêng từ các bản trước.
+
+Pro Agent 0.3.84 yêu cầu launcher 2.4.3 trở lên. Hãy cập nhật và khởi động lại launcher, sau đó mở map bằng tài khoản Pro.
+
 # Isle Live Map 2.4.2
 
 ## IslePilot và marker stale

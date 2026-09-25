@@ -36,6 +36,8 @@ public partial class HomeWindow
 
     private void RefreshLaunchButtons()
     {
+        if (_reopenUpdateAction is not null)
+            _reopenUpdateAction.Visibility = _mapLaunchGateState == MapLaunchGateState.UpdateRequired ? Visibility.Visible : Visibility.Collapsed;
         var available = MapLaunchGatePolicy.AllowsMap(_mapLaunchGateState) && _mapOpenStarted == 0;
         if (_mapActionButton is not null) _mapActionButton.IsEnabled = available;
         foreach (var button in _serverActionButtons)

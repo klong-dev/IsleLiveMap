@@ -1295,6 +1295,48 @@ public sealed class LocalPositionSnapshotMergerTests
         Assert.Empty(rejected.Map!.Markers);
     }
 
+    [Theory]
+    [InlineData(true, 500, true)]
+    [InlineData(false, 500, false)]
+    [InlineData(true, 0, false)]
+    public void Merge_EarlyUnknownDinoRequiresActorAndSerializedPosition(bool positionProof, int owner, bool accepted)
+    {
+        var entity = new VerifiedRemoteEntityTelemetry(500, RemoteEntityKind.Player, null,
+            "", "", CreatureDiet.Unknown, null, new WorldLocation { X = 100, Y = 200, Z = 300 },
+            999999, 1, Now, IsProvisional: true, LocationObservedAt: Now,
+            ActorNetRefHandle: (ulong)owner, HasVerifiedPosition: positionProof,
+            LocationEvidenceSource: "SerializedActorCreation", LocationEvidenceEndBitOffset: 100);
+        var result = LocalPositionSnapshotMerger.Merge(null, null, Now, remotePlayers: [entity]);
+        Assert.Equal(accepted ? 1 : 0, result.ProTrackingDiagnostics!.RenderedCount);
+        if (!accepted) return;
+        var predicted = Assert.Single(result.Map!.Markers);
+        Assert.Equal("Dino ?", predicted.Label);
+        Assert.True(predicted.ProEntityIsProvisional);
+        var verified = LocalPositionSnapshotMerger.Merge(result, null, Now,
+            remotePlayers: [entity with { IsProvisional = false, SpeciesId = "rex", SpeciesShortName = "Rex" }]);
+        Assert.Equal(predicted.SteamId, Assert.Single(verified.Map!.Markers).SteamId);
+        Assert.False(Assert.Single(verified.Map.Markers).ProEntityIsProvisional);
+    }
+
+    [Theory]
+    [InlineData("SerializedActorCreation", true)]
+    [InlineData("AnchoredOwnerMovement", false)]
+    public void Merge_AdmittedProvisionalWithPresenceRetainsStalePosition(string source, bool verified)
+    {
+        var entity = new VerifiedRemoteEntityTelemetry(500, RemoteEntityKind.Player, null,
+            "", "", CreatureDiet.Unknown, null, new WorldLocation { X=100,Y=200,Z=300 },0,3,Now,
+            IsProvisional:true,LocationObservedAt:Now.AddSeconds(-30),ActorNetRefHandle:500,
+            HasVerifiedPosition:verified,LocationEvidenceSource:source,LocationEvidenceEndBitOffset:120);
+        var result=LocalPositionSnapshotMerger.Merge(null,null,Now,remotePlayers:[entity]);
+        var marker=Assert.Single(result.Map!.Markers);
+        Assert.True(marker.ProEntityIsStale);
+        Assert.True(marker.ProEntityIsProvisional);
+        var expired=LocalPositionSnapshotMerger.Merge(null,null,Now,remotePlayers:[entity with { ObservedAt=Now.AddSeconds(-16) }]);
+        Assert.Empty(expired.Map?.Markers ?? []);
+        var tooOld=LocalPositionSnapshotMerger.Merge(null,null,Now,remotePlayers:[entity with { LocationObservedAt=Now.AddSeconds(-361) }]);
+        Assert.Empty(tooOld.Map?.Markers ?? []);
+    }
+
     private static LocalMovementObservation Observation(
         double x,
         double y,

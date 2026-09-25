@@ -333,7 +333,7 @@ public static class LocalPositionSnapshotMerger
             {
                 eligible++;
                 var speciesLabel = string.IsNullOrWhiteSpace(entity.SpeciesShortName)
-                    ? "Player ?"
+                    ? entity.IsProvisional ? "Dino ?" : "Player ?"
                     : entity.SpeciesShortName;
                 proMarkers.Add(new MapMarkerTelemetry
                 {
@@ -454,7 +454,7 @@ public static class LocalPositionSnapshotMerger
         // making an old coordinate look live.
         var locationObservedAt = entity.LocationObservedAt ?? entity.ObservedAt;
         var locationAge = now - locationObservedAt;
-        var retainVerifiedPosition = CanRetainVerifiedPosition(entity, now);
+        var retainVerifiedPosition = CanRetainVerifiedPosition(entity, now) || CanRetainProvisionalPosition(entity, now);
         var admitRecentPosition = HasReliableEntityIdentity(entity)
             && IsFresh(entity.ObservedAt, now, RemotePlayerFreshness)
             && entity.ObservedAt >= locationObservedAt
@@ -487,7 +487,9 @@ public static class LocalPositionSnapshotMerger
             && (!HasStablePlayerIdentity(entity)
                 || entity.IsProvisional
                 && (string.IsNullOrWhiteSpace(entity.SpeciesId)
-                    || string.IsNullOrWhiteSpace(entity.SpeciesShortName))))
+                    || string.IsNullOrWhiteSpace(entity.SpeciesShortName))
+                && (!(entity.HasVerifiedPosition || entity.LocationEvidenceSource == "AnchoredOwnerMovement") || entity.ActorNetRefHandle == 0
+                    || entity.LocationObservedAt is null)))
         {
             reason = RemoteEntityRejectionReason.MissingPlayerProof;
             return true;
@@ -524,10 +526,20 @@ public static class LocalPositionSnapshotMerger
                && now - locationObservedAt
                > VerifiedRemoteEntityTelemetry.LocationFreshness
                && now - locationObservedAt
-               <= (CanRetainVerifiedPosition(entity, now)
+               <= (CanRetainVerifiedPosition(entity, now) || CanRetainProvisionalPosition(entity, now)
                    ? VerifiedRemoteEntityTelemetry.MaximumPositionRetention
                    : VerifiedRemoteEntityTelemetry.InitialPositionAdmission);
     }
+
+    private static bool CanRetainProvisionalPosition(VerifiedRemoteEntityTelemetry entity, DateTimeOffset now) =>
+        entity.Kind == RemoteEntityKind.Player && entity.IsProvisional
+        && entity.ActorNetRefHandle > 0 && entity.LocationEvidenceEndBitOffset is > 0
+        && (entity.LocationEvidenceSource == "SerializedActorCreation" && entity.HasVerifiedPosition
+            || entity.LocationEvidenceSource == "AnchoredOwnerMovement" && !entity.HasVerifiedPosition)
+        && entity.LocationObservedAt is { } locationAt
+        && IsFresh(locationAt, now, VerifiedRemoteEntityTelemetry.MaximumPositionRetention)
+        && entity.ObservedAt >= locationAt
+        && IsFresh(entity.ObservedAt, now, TimeSpan.FromSeconds(15));
 
     private static bool CanRetainVerifiedPosition(
         VerifiedRemoteEntityTelemetry entity, DateTimeOffset now) =>

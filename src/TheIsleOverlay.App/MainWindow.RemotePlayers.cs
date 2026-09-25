@@ -40,12 +40,12 @@ public partial class MainWindow
         var aiCount = markers.Count(marker => marker.EntityKind == RemoteEntityKind.Ai);
         var isSynchronizing = snapshot.ProPlayerSync?.IsSynchronizing == true;
         RemotePlayerCountLabel.Text = provisionalCount > 0
-            ? $"P {playerCount} · CHỜ {provisionalCount} · AI {aiCount}"
+            ? $"P {playerCount} · DỰ ĐOÁN {provisionalCount} · AI {aiCount}"
             : isSynchronizing
                 ? $"P {playerCount} · SYNC · AI {aiCount}"
             : $"P {playerCount} · AI {aiCount}";
         RemotePlayerCountLabel.ToolTip = provisionalCount > 0
-            ? $"Player {playerCount} · Đang xác minh {provisionalCount} · AI {aiCount}"
+            ? $"Player {playerCount} · Dino dự đoán {provisionalCount} (chưa xác minh player/AI) · AI {aiCount}"
             : $"Player {playerCount} · AI {aiCount}";
         RemotePlayerCountLabel.Visibility = snapshot.ProPlayerTrackingActive
             ? Visibility.Visible
@@ -96,7 +96,7 @@ public partial class MainWindow
     }
 
     internal static double RemoteMarkerOpacity(bool isStale, bool isProvisional) =>
-        isStale ? 0.60d : isProvisional ? 0.82d : 1d;
+        isStale || isProvisional ? 0.60d : 1d;
 
     private static RemotePlayerMapDot CreateRemotePlayerDot(
         string label,
@@ -144,10 +144,9 @@ public partial class MainWindow
         RemotePlayerMapDot dot,
         bool isProvisional)
     {
-        dot.Shape.Fill = isProvisional ? Brushes.Transparent : dot.Shape.Fill;
-        dot.Shape.StrokeDashArray = isProvisional
-            ? new DoubleCollection { 1.5d, 1.5d }
-            : null;
+        // Keep the filled palette used by stale markers. The label's question
+        // mark and prediction counter still distinguish unverified entities.
+        dot.Shape.StrokeDashArray = null;
         dot.Visual.Opacity = RemoteMarkerOpacity(false, isProvisional);
         dot.IsProvisional = isProvisional;
     }

@@ -45,7 +45,7 @@ public partial class HomeWindow : Window
     private MapLaunchGateState _mapLaunchGateState = MapLaunchGateState.Checking;
     private Button? _mapActionButton;
     private TextBlock? _updateStatus;
-    private Button? _restartForUpdateButton;
+    private bool _updateReadyDialogShown;
     private TextBlock? _status;
     private static Brush B(string color) => new SolidColorBrush((Color)ColorConverter.ConvertFromString(color));
     private static TextBlock T(string text, double size = 14, Brush? foreground = null, FontWeight? weight = null) => new() { Text = text, FontSize = size, Foreground = foreground ?? B("#EAF4F0"), FontWeight = weight ?? FontWeights.Normal, TextWrapping = TextWrapping.Wrap };
@@ -180,6 +180,11 @@ public partial class HomeWindow : Window
         mapButton.IsEnabled = MapLaunchGatePolicy.AllowsMap(_mapLaunchGateState) && _mapOpenStarted == 0;
         _mapActionButton = mapButton;
         primary.Children.Add(mapButton);
+        var updateAction = Action("MỞ THÔNG BÁO CẬP NHẬT", (_, _) => ShowUpdateReadyDialog(_updateService.PendingVersion));
+        AutomationProperties.SetAutomationId(updateAction, "ReopenUpdateReadyDialog");
+        updateAction.Visibility = _mapLaunchGateState == MapLaunchGateState.UpdateRequired ? Visibility.Visible : Visibility.Collapsed;
+        _reopenUpdateAction = updateAction;
+        primary.Children.Add(updateAction);
         copy.Children.Add(primary);
 
         var supportedLabel = T("Hoặc các server được hỗ trợ riêng:", 13, B("#A9BAB4"), FontWeights.SemiBold);
@@ -206,10 +211,6 @@ public partial class HomeWindow : Window
         _updateStatus = T(_lastUpdateStatus, 12, B(_lastUpdateColor), FontWeights.SemiBold);
         _updateStatus.Margin = new Thickness(0, 12, 0, 0);
         p.Children.Add(_updateStatus);
-        _restartForUpdateButton = Action("KHỞI ĐỘNG LẠI ĐỂ CẬP NHẬT", (_, _) => _updateService.ApplyAndRestart(), true);
-        _restartForUpdateButton.Visibility = _mapLaunchGateState == MapLaunchGateState.UpdateRequired ? Visibility.Visible : Visibility.Collapsed;
-        _restartForUpdateButton.Margin = new Thickness(0, 8, 0, 0);
-        p.Children.Add(_restartForUpdateButton);
         RefreshLaunchButtons();
     }
 
@@ -552,8 +553,6 @@ public partial class HomeWindow : Window
         {
             _mapLaunchGateState = MapLaunchGatePolicy.FromUpdate(result.State);
             RefreshLaunchButtons();
-            if (_restartForUpdateButton is not null)
-                _restartForUpdateButton.Visibility = _mapLaunchGateState == MapLaunchGateState.UpdateRequired ? Visibility.Visible : Visibility.Collapsed;
 
             switch (result.State)
             {
@@ -576,8 +575,42 @@ public partial class HomeWindow : Window
                     SetUpdateStatus("Không kiểm tra được cập nhật · vẫn cho phép mở map", "#E7B74E");
                     break;
             }
+
+            if (result.State == UpdatePreparationState.Ready)
+            {
+                ShowUpdateReadyDialog(result.Version);
+            }
         });
     }
+
+    private void ShowUpdateReadyDialog(string? version)
+    {
+        if (_updateReadyDialogShown || !IsVisible)
+        {
+            return;
+        }
+
+        _updateReadyDialogShown = true;
+        try
+        {
+            var dialog = new UpdateReadyWindow(version) { Owner = this };
+            dialog.ShowDialog();
+            if (dialog.ApplyRequested)
+            {
+                _updateService.ApplyAndRestart();
+            }
+        }
+        catch (Exception)
+        {
+            SetUpdateStatus("Chưa thể khởi động lại để cập nhật. Hãy mở lại thông báo cập nhật và thử lại.", "#E7B74E");
+        }
+        finally
+        {
+            _updateReadyDialogShown = false;
+        }
+    }
+
+    private Button? _reopenUpdateAction;
 
     private void SetUpdateStatus(string text, string color)
     {

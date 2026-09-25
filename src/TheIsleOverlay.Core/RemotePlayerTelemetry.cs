@@ -144,7 +144,9 @@ public sealed record VerifiedRemoteEntityTelemetry(
     ulong ActorNetRefHandle = 0,
     ulong PlayerStateNetRefHandle = 0,
     ulong PawnNetRefHandle = 0,
-    bool HasVerifiedPosition = false)
+    bool HasVerifiedPosition = false,
+    string? LocationEvidenceSource = null,
+    int? LocationEvidenceEndBitOffset = null)
 {
     public static readonly TimeSpan PresenceRetention = TimeSpan.FromSeconds(90);
     public static readonly TimeSpan MaximumPositionRetention = TimeSpan.FromMinutes(6);
