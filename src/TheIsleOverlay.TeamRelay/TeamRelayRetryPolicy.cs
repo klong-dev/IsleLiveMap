@@ -4,7 +4,7 @@ namespace TheIsleOverlay.TeamRelay;
 
 public sealed class TeamRelayRetryPolicy : IRetryPolicy
 {
-    private static readonly TimeSpan RetryWindow = TimeSpan.FromSeconds(32);
+    private static readonly TimeSpan RetryWindow = TimeSpan.FromMinutes(1.5);
 
     public TimeSpan? NextRetryDelay(RetryContext retryContext)
     {
@@ -17,7 +17,7 @@ public sealed class TeamRelayRetryPolicy : IRetryPolicy
         {
             0 => TimeSpan.Zero,
             1 => TimeSpan.FromSeconds(2),
-            _ => TimeSpan.FromSeconds(5)
+            _ => TimeSpan.FromSeconds(3)
         };
     }
 }

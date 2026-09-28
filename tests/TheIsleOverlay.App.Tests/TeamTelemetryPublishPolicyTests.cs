@@ -17,12 +17,12 @@ public sealed class TeamTelemetryPublishPolicyTests
     }
 
     [Fact]
-    public void UnchangedFreshTelemetryRefreshesEveryFiveSeconds()
+    public void UnchangedFreshTelemetryRefreshesEverySecond()
     {
         Assert.False(TeamTelemetryPublishPolicy.ShouldPublish(
-            true, 4, 4, Now - TimeSpan.FromSeconds(2), Now - TimeSpan.FromSeconds(4), Now));
+            true, 4, 4, Now - TimeSpan.FromSeconds(2), Now - TimeSpan.FromMilliseconds(900), Now));
         Assert.True(TeamTelemetryPublishPolicy.ShouldPublish(
-            true, 4, 4, Now - TimeSpan.FromSeconds(2), Now - TimeSpan.FromSeconds(5), Now));
+            true, 4, 4, Now - TimeSpan.FromSeconds(2), Now - TimeSpan.FromSeconds(1), Now));
     }
 
     [Fact]

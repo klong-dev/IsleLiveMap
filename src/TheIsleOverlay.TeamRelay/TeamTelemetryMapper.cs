@@ -54,6 +54,15 @@ public static class TeamTelemetryMapper
         };
     }
 
+    public static bool IsPublishable(TelemetrySnapshot? snapshot) => snapshot is
+    {
+        Success: true,
+        ServerOnline: true,
+        PlayerOnline: true,
+        LiveDataStale: false,
+        Player: not null
+    };
+
     private static double? PercentOrNull(double? current, double? maximum, double? fallback)
     {
         if ((current is null || maximum is not > 0d) && fallback is null)

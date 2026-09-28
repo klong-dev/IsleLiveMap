@@ -6,6 +6,17 @@ namespace TheIsleOverlay.Tests;
 public sealed class TeamTelemetryMapperTests
 {
     [Fact]
+    public void TransientUnavailableSnapshotIsNotPublishable()
+    {
+        var valid = new TelemetrySnapshot
+        { Success = true, ServerOnline = true, PlayerOnline = true, Player = new PlayerTelemetry() };
+        Assert.True(TeamTelemetryMapper.IsPublishable(valid));
+        Assert.False(TeamTelemetryMapper.IsPublishable(valid with { LiveDataStale = true }));
+        Assert.False(TeamTelemetryMapper.IsPublishable(valid with { Success = false }));
+        Assert.False(TeamTelemetryMapper.IsPublishable(null));
+    }
+
+    [Fact]
     public void Create_UsesExactVitalsAndCalibratedMapPoint()
     {
         var snapshot = new TelemetrySnapshot

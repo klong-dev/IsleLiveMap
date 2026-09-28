@@ -2,7 +2,9 @@ namespace TheIsleOverlay.App;
 
 internal static class TeamTelemetryPublishPolicy
 {
-    internal static readonly TimeSpan RefreshInterval = TimeSpan.FromSeconds(5);
+    // Keep unchanged snapshots alive without creating a high-frequency relay stream.
+    // New telemetry versions still publish as soon as the coordinator observes them.
+    internal static readonly TimeSpan RefreshInterval = TimeSpan.FromSeconds(1);
     internal static readonly TimeSpan MaximumSnapshotSilence = TimeSpan.FromSeconds(10);
 
     internal static bool ShouldPublish(

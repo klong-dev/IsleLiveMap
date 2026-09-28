@@ -5,6 +5,16 @@ namespace TheIsleOverlay.Tests;
 public sealed class TeamRelayClientPolicyTests
 {
     [Fact]
+    public void ReconnectContinuesPastOldExpiryButStopsBeforeNewGraceEnds()
+    {
+        var policy = new TeamRelayRetryPolicy();
+        Assert.NotNull(policy.NextRetryDelay(new Microsoft.AspNetCore.SignalR.Client.RetryContext
+        { ElapsedTime = TimeSpan.FromSeconds(40), PreviousRetryCount = 10 }));
+        Assert.Null(policy.NextRetryDelay(new Microsoft.AspNetCore.SignalR.Client.RetryContext
+        { ElapsedTime = TimeSpan.FromSeconds(90), PreviousRetryCount = 30 }));
+    }
+
+    [Fact]
     public void RoomLimits_FreeIsSevenAndProIsTwentyOne()
     {
         Assert.Equal(7, TeamRoomLimits.For(TeamAccessTier.Free));

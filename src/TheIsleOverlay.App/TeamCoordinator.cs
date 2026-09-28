@@ -82,6 +82,17 @@ public sealed class TeamCoordinator : IAsyncDisposable
         ArgumentNullException.ThrowIfNull(snapshot);
         lock (_telemetryGate)
         {
+            if (fallbackHeadingDegrees is null
+                && TeamTelemetryMapper.IsPublishable(snapshot)
+                && _latestTelemetry.Snapshot?.Player is { } previous
+                && string.Equals(previous.ServerEndpoint ?? previous.Server,
+                    snapshot.Player?.ServerEndpoint ?? snapshot.Player?.Server, StringComparison.Ordinal))
+            {
+                fallbackHeadingDegrees = _latestTelemetry.FallbackHeadingDegrees;
+                if (previous.Location is { } from && snapshot.Player?.Location is { } to
+                    && MovementHeading.TryCalculate(from, to, out var heading))
+                    fallbackHeadingDegrees = heading;
+            }
             _latestTelemetry = new LatestTelemetry(
                 snapshot,
                 fallbackHeadingDegrees,
@@ -148,7 +159,7 @@ public sealed class TeamCoordinator : IAsyncDisposable
                 var now = DateTimeOffset.UtcNow;
                 latest = _latestTelemetry;
                 if (!TeamTelemetryPublishPolicy.ShouldPublish(
-                        latest.Snapshot is not null,
+                        TeamTelemetryMapper.IsPublishable(latest.Snapshot),
                         version,
                         _publishedVersion,
                         latest.ReceivedAt,
@@ -157,6 +168,11 @@ public sealed class TeamCoordinator : IAsyncDisposable
                 {
                     continue;
                 }
+            }
+
+            if (!TeamTelemetryMapper.IsPublishable(latest.Snapshot))
+            {
+                continue;
             }
 
             var update = TeamTelemetryMapper.Create(
@@ -172,11 +188,8 @@ public sealed class TeamCoordinator : IAsyncDisposable
 
             lock (_telemetryGate)
             {
-                if (_telemetryVersion == version)
-                {
-                    _publishedVersion = version;
-                    _lastPublishedAt = DateTimeOffset.UtcNow;
-                }
+                _publishedVersion = version;
+                _lastPublishedAt = DateTimeOffset.UtcNow;
             }
         }
     }

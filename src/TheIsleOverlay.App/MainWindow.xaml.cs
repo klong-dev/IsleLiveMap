@@ -281,6 +281,8 @@ public partial class MainWindow : Window
             snapshot?.UpdatedAt,
             snapshot?.ProPlayerTrackingActive,
             snapshot?.ProPlayerSequence,
+            snapshot?.ProPlayerSessionId,
+            snapshot?.ProPlayerServerEndpoint,
             snapshot?.ProPlayerFrameObservedAt,
             snapshot?.ProPlayerFrameReceivedAt,
             snapshot?.ProPlayerSync,
@@ -316,7 +318,8 @@ public partial class MainWindow : Window
                 marker.EntityKind,
                 marker.Category,
                 marker.Point,
-                marker.IsProvisional
+                marker.IsProvisional,
+                marker.IsStale
             }).ToArray()
         };
 
@@ -554,6 +557,8 @@ public partial class MainWindow : Window
                                .WatchAsync(_shutdown.Token)
                                .ConfigureAwait(false))
             {
+                // Team networking must keep running when WPF is busy or minimized.
+                App.CurrentTeam.UpdateTelemetry(snapshot, null);
                 QueueRenderSnapshot(snapshot);
             }
         }

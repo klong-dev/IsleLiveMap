@@ -131,10 +131,12 @@ public sealed class TeamRelayClient : IAsyncDisposable
 
         try
         {
+            using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            deadline.CancelAfter(TimeSpan.FromSeconds(3));
             return await connection.InvokeAsync<bool>(
                     "PublishTelemetry",
                     telemetry,
-                    cancellationToken)
+                    deadline.Token)
                 .ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -504,7 +506,9 @@ public sealed class TeamRelayClient : IAsyncDisposable
             return;
         try
         {
-            var snapshot = await connection.InvokeAsync<TeamSnapshot>("GetSnapshot", cancellationToken)
+            using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            deadline.CancelAfter(TimeSpan.FromSeconds(3));
+            var snapshot = await connection.InvokeAsync<TeamSnapshot>("GetSnapshot", deadline.Token)
                 .ConfigureAwait(false);
             ReceiveSnapshot(snapshot);
         }
@@ -534,10 +538,12 @@ public sealed class TeamRelayClient : IAsyncDisposable
 
                 try
                 {
-                    await connection.InvokeAsync("Heartbeat", cancellationToken).ConfigureAwait(false);
+                    using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                    deadline.CancelAfter(TimeSpan.FromSeconds(3));
+                    await connection.InvokeAsync("Heartbeat", deadline.Token).ConfigureAwait(false);
                     if (DateTimeOffset.UtcNow - lastSnapshotAt >= TimeSpan.FromSeconds(10))
                     {
-                        await RequestSnapshotAsync(connection, cancellationToken).ConfigureAwait(false);
+                        await RequestSnapshotAsync(connection, deadline.Token).ConfigureAwait(false);
                         lastSnapshotAt = DateTimeOffset.UtcNow;
                     }
                 }
