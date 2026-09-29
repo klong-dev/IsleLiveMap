@@ -164,6 +164,30 @@ public sealed class UnrealDinosaurVitalsTrackerTests
     }
 
     [Fact]
+    public void ReconnectLayout_Reads1482BitGrowthFrameWithRepeatedMaximumGuards()
+    {
+        var payload = Convert.FromBase64String(
+            "iAAAVFanbWPKFAAAcCAhpQuBhIi4uwCFF8NPf4ssCFQUWRCoKJ+AIVE+AUOig848RAedeYjqCGgQ1RHQIKojoEFUR0CD6NXAGdGrgTOiVwNnRK8GzoheDZwRvRo4I3o1cEb0auCM6GCxy8/BYpefyILARZEFgYsiCwIXRRYELjrozEN00JmH6KAzD9FBZx6iyILARZEFgYsiCwIVRRYEKoosCFQUWRCoKLIgcFFkQeCiyILARZEFgYsA");
+        var batch = new UnrealIrisReplicationBatch(
+            384_446,
+            0,
+            1_482,
+            HasOwnerData: true,
+            HasExports: false);
+
+        Assert.True(UnrealDinosaurVitalsTracker.TryDecodeReconnectAttributeFrame(
+            payload,
+            batch,
+            out var decoded));
+        Assert.Equal(0.6827013d, decoded.Growth!.Value, 6);
+        Assert.Equal(6160.3477d, decoded.Health!.Value, 3);
+        Assert.Equal(6160.3477d, decoded.MaxHealth!.Value, 3);
+        Assert.Equal(755.22675d, decoded.Stamina!.Value, 3);
+        Assert.Equal(755.22675d, decoded.MaxStamina!.Value, 3);
+        Assert.Equal(3080.1738d, decoded.MaxHunger!.Value, 3);
+    }
+
+    [Fact]
     public void Reset_DropsVerifiedMaximumsEvenWhenActorHandleIsReused()
     {
         var tracker = new UnrealDinosaurVitalsTracker();

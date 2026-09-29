@@ -1,0 +1,96 @@
+<Window x:Class="TheIsleOverlay.App.UpdateReadyWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Cập nhật Isle Live Map"
+        Width="500" Height="310" MinWidth="500" MinHeight="310"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent"
+        ResizeMode="NoResize" WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
+        FontFamily="Segoe UI" UseLayoutRounding="True"
+        PreviewKeyDown="Window_PreviewKeyDown">
+    <Window.Resources>
+        <Style x:Key="PrimaryButton" TargetType="Button">
+            <Setter Property="Height" Value="44" />
+            <Setter Property="Padding" Value="18,0" />
+            <Setter Property="Foreground" Value="#10201D" />
+            <Setter Property="Background" Value="#49D5C3" />
+            <Setter Property="BorderBrush" Value="#8AF1E0" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Surface" Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="6" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Surface" Property="Opacity" Value="0.88" /></Trigger>
+                            <Trigger Property="IsPressed" Value="True"><Setter TargetName="Surface" Property="Opacity" Value="0.72" /></Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="QuietButton" TargetType="Button">
+            <Setter Property="Height" Value="44" />
+            <Setter Property="Padding" Value="18,0" />
+            <Setter Property="Foreground" Value="#9FB8B1" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="#34544D" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Surface" Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="6" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Surface" Property="Background" Value="#233A35" /><Setter TargetName="Surface" Property="BorderBrush" Value="#6B958A" /></Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+    <Border Margin="10" Background="#FC091815" BorderBrush="#607B746E" BorderThickness="1" CornerRadius="10">
+        <Border.Effect><DropShadowEffect Color="#000000" BlurRadius="28" ShadowDepth="5" Opacity="0.75" /></Border.Effect>
+        <Grid>
+            <Grid.RowDefinitions><RowDefinition Height="52" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+            <Border BorderBrush="#294943" BorderThickness="0,0,0,1"
+                    PreviewMouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+                <Grid Margin="18,0,12,0">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <Ellipse Width="8" Height="8" Fill="#49D5C3" Margin="0,0,9,0" />
+                        <TextBlock Text="CẬP NHẬT ISLE LIVE MAP" Foreground="#EAF4F0" FontSize="11" FontWeight="Bold" />
+                    </StackPanel>
+                    <Button Grid.Column="1" Content="×" Width="28" Height="28" Padding="0"
+                            Background="Transparent" BorderBrush="Transparent" Foreground="#91AAA3"
+                            FontSize="18" AutomationProperties.Name="Đóng thông báo cập nhật"
+                            Click="LaterButton_Click" />
+                </Grid>
+            </Border>
+            <StackPanel Grid.Row="1" Margin="28,25,28,24">
+                <TextBlock Text="BẢN CẬP NHẬT ĐÃ SẴN SÀNG" Foreground="#49D5C3" FontSize="11" FontWeight="Bold" />
+                <TextBlock x:Name="VersionLabel" Text="v2.4.2" Foreground="#EAF4F0" FontSize="26" FontWeight="Black" Margin="0,5,0,0" />
+                <TextBlock Text="Bản mới đã tải xong. Hãy khởi động lại launcher để hoàn tất cập nhật trước khi mở map." Foreground="#A8BBB5" FontSize="13" TextWrapping="Wrap" Margin="0,8,0,0" />
+                <Grid Margin="0,23,0,0">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                    <Button Content="ĐỂ SAU" Style="{StaticResource QuietButton}" AutomationProperties.Name="Để sau cập nhật" Click="LaterButton_Click" />
+                    <Button Grid.Column="1" Content="CẬP NHẬT &amp; KHỞI ĐỘNG LẠI" Style="{StaticResource PrimaryButton}"
+                            AutomationProperties.Name="Cập nhật và khởi động lại" IsDefault="True" Click="ApplyButton_Click" />
+                </Grid>
+            </StackPanel>
+        </Grid>
+    </Border>
+</Window>

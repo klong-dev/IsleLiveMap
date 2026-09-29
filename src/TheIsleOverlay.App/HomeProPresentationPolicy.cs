@@ -20,6 +20,8 @@ internal readonly record struct HomeProPresentationState(
 
 internal static class HomeProPresentationPolicy
 {
+    internal const string BasicMapAction = "MỞ MAP CHO MỌI SERVER (THỬ NGHIỆM)";
+    internal const string ProMapAction = "MỞ MAP PRO CHO MỌI SERVER (THỬ NGHIỆM)";
     public static HomeProPresentationState Evaluate(
         ProAccessSnapshot access,
         DateTimeOffset now)
@@ -45,7 +47,7 @@ internal static class HomeProPresentationPolicy
             hasCurrentProAccess ? "KHÔNG GIAN THEO DÕI PRO" : "MỞ TRÌNH THEO DÕI",
             hasCurrentProAccess ? "Theo dõi người chơi và AI trong cùng một không gian cao cấp." : "Mở một phiên theo dõi khi bạn yêu cầu.",
             hasCurrentProAccess ? "KHÔNG GIAN THEO DÕI PRO" : "MỞ TRÌNH THEO DÕI",
-            hasCurrentProAccess ? "MỞ MAP PRO  →" : "MỞ MAP  →",
+            hasCurrentProAccess ? ProMapAction : BasicMapAction,
             hasCurrentProAccess ? "Cao cấp" : "Miễn phí");
     }
 }

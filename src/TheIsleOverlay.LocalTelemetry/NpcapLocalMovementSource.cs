@@ -6,7 +6,7 @@ using SharpPcap;
 
 namespace TheIsleOverlay.LocalTelemetry;
 
-public sealed class NpcapLocalMovementSource : ILocalMovementSource, ILocalVitalsFeatureSource
+public sealed class NpcapLocalMovementSource : ILocalMovementSource, ILocalVitalsFeatureSource, IGameEndpointEvidenceSource
 {
     public const string DefaultGameProcessName = "TheIsleClient-Win64-Shipping";
     private static readonly TimeSpan ProcessPollInterval = TimeSpan.FromSeconds(1);
@@ -22,7 +22,10 @@ public sealed class NpcapLocalMovementSource : ILocalMovementSource, ILocalVital
     private readonly string _processName;
     private readonly WindowsUdpPortOwnerResolver _portResolver;
     private readonly LocalMovementTracker _tracker;
+    private readonly Dictionary<string, (LocalMovementTracker Tracker, DateTimeOffset LastSeen)> _movementFlows = [];
     private readonly UnrealDinosaurVitalsTracker _vitalsTracker;
+    private readonly InboundStatsAccumulator _inboundStats = new(new InboundStatsRestartCache());
+    private readonly bool _replaceIslePilotStats = LocalVitalsFeature.ReplacesIslePilot();
     private readonly LocalVitalsSessionCache _vitalsCache;
     private readonly bool _trackIrisSequenceDiagnostics;
     private readonly UnrealIrisPacketParser _irisPacketParser = new();
@@ -31,6 +34,8 @@ public sealed class NpcapLocalMovementSource : ILocalMovementSource, ILocalVital
     private readonly object _movementTrackerGate = new();
     private readonly object _vitalsTrackerGate = new();
     private readonly object _latestObservationGate = new();
+    private readonly object _outboundEndpointGate = new();
+    private readonly Dictionary<string, DateTimeOffset> _recentOutboundEndpoints = new(StringComparer.OrdinalIgnoreCase);
     private readonly CancellationTokenSource _disposeCancellation = new();
     private PacketIntakePair? _activePacketIntakes;
     private PacketLaneDiagnostics _lastLaneDiagnostics;
@@ -68,6 +73,41 @@ public sealed class NpcapLocalMovementSource : ILocalMovementSource, ILocalVital
     }
 
     public bool LocalVitalsEnabled { get; }
+
+    public bool HasRecentOutboundTraffic(string endpoint, DateTimeOffset now, TimeSpan maxAge)
+    {
+        lock (_outboundEndpointGate)
+        {
+            if (!_recentOutboundEndpoints.TryGetValue(endpoint, out var observedAt)
+                || observedAt > now
+                || now - observedAt > maxAge)
+                return false;
+
+            // A recently selected different game server on the same gameplay
+            // port invalidates old DINORP evidence immediately on reconnect.
+            var portSeparator = endpoint.LastIndexOf(':');
+            var portSuffix = portSeparator >= 0 ? endpoint[portSeparator..] : string.Empty;
+            return !_recentOutboundEndpoints.Any(entry =>
+                !entry.Key.Equals(endpoint, StringComparison.OrdinalIgnoreCase)
+                && entry.Key.EndsWith(portSuffix, StringComparison.OrdinalIgnoreCase)
+                && entry.Value > observedAt);
+        }
+    }
+
+    internal void RecordCapturedOutboundEndpoint(string endpoint, DateTimeOffset observedAt)
+    {
+        lock (_outboundEndpointGate)
+        {
+            _recentOutboundEndpoints[endpoint] = observedAt;
+            // Bound this diagnostic set even when the game/Steam uses
+            // short-lived UDP destinations during a long session.
+            if (_recentOutboundEndpoints.Count > 32)
+            {
+                var oldest = _recentOutboundEndpoints.MinBy(entry => entry.Value).Key;
+                _recentOutboundEndpoints.Remove(oldest);
+            }
+        }
+    }
 
     public async IAsyncEnumerable<LocalMovementObservation> WatchAsync(
         [System.Runtime.CompilerServices.EnumeratorCancellation]
@@ -498,7 +538,7 @@ public sealed class NpcapLocalMovementSource : ILocalMovementSource, ILocalVital
         }
     }
 
-    private void ProcessOutboundPacket(
+    internal void ProcessOutboundPacket(
         CapturedUdpDatagram packet,
         ChannelWriter<LocalMovementObservation> writer)
     {
@@ -514,9 +554,9 @@ public sealed class NpcapLocalMovementSource : ILocalMovementSource, ILocalVital
             var serverEndpoint = packet.DestinationAddress is null
                 ? null
                 : $"{packet.DestinationAddress}:{packet.DestinationPort}";
-            if (LocalVitalsEnabled)
+            if (serverEndpoint is not null)
             {
-                EstablishCapturedOutboundEndpoint(serverEndpoint);
+                RecordCapturedOutboundEndpoint(serverEndpoint, observedAt);
             }
 
             if (_trackIrisSequenceDiagnostics)
@@ -530,10 +570,26 @@ public sealed class NpcapLocalMovementSource : ILocalMovementSource, ILocalVital
             UnrealMovementCandidate movement;
             lock (_movementTrackerGate)
             {
-                if (!_tracker.TryTrack(payload, observedAt, out movement))
+                // Game-owned UDP includes Steam/service traffic. Isolate tracker
+                // hypotheses by flow; only a confirmed movement stream may
+                // select the stats endpoint. No special-case server port.
+                var flowKey = $"{serverEndpoint}|{packet.SourcePort}";
+                if (!_movementFlows.TryGetValue(flowKey, out var flow))
+                {
+                    if (_movementFlows.Count >= 64)
+                        _movementFlows.Remove(_movementFlows.MinBy(p => p.Value.LastSeen).Key);
+                    flow = (_movementFlows.Count == 0 ? _tracker : new LocalMovementTracker(), observedAt);
+                }
+                if (observedAt < flow.LastSeen) return;
+                _movementFlows[flowKey] = (flow.Tracker, observedAt);
+                if (!flow.Tracker.TryTrack(payload, observedAt, out movement))
                 {
                     return;
                 }
+            }
+            if (LocalVitalsEnabled)
+            {
+                EstablishCapturedOutboundEndpoint(serverEndpoint);
             }
 
             var publishedVitals = Volatile.Read(ref _latestVitals);
@@ -557,7 +613,12 @@ public sealed class NpcapLocalMovementSource : ILocalMovementSource, ILocalVital
         }
     }
 
-    private void ProcessInboundPacket(
+    internal void SetReplayGameSession(string session)
+    {
+        lock (_vitalsTrackerGate) _activeGameSessionId = session;
+    }
+
+    internal void ProcessInboundPacket(
         CapturedUdpDatagram packet,
         string gameSessionId,
         ChannelWriter<LocalMovementObservation> writer)
@@ -596,7 +657,7 @@ public sealed class NpcapLocalMovementSource : ILocalMovementSource, ILocalVital
             }
 
             PrepareVitalsEndpoint(serverEndpoint);
-            EnsureVitalsCacheSeeded(
+            if (!_replaceIslePilotStats) EnsureVitalsCacheSeeded(
                 gameSessionId,
                 serverEndpoint,
                 packet.ObservedAt);
@@ -618,7 +679,12 @@ public sealed class NpcapLocalMovementSource : ILocalMovementSource, ILocalVital
                     return;
                 }
 
-                if (!_vitalsTracker.TryTrack(
+                if (_replaceIslePilotStats)
+                {
+                    if (!_inboundStats.TryTrack(packet.Payload, packet.ObservedAt,
+                            $"{gameSessionId}|{serverEndpoint}|{packet.DestinationPort}", out observation)) return;
+                }
+                else if (!_vitalsTracker.TryTrack(
                         packet.Payload,
                         packet.ObservedAt,
                         out observation))
@@ -630,7 +696,7 @@ public sealed class NpcapLocalMovementSource : ILocalMovementSource, ILocalVital
 
             // Cache I/O is intentionally outside the tracker lock so a slow
             // disk cannot make the outbound movement worker wait.
-            observation = _vitalsCache.Enrich(
+            if (!_replaceIslePilotStats) observation = _vitalsCache.Enrich(
                 gameSessionId,
                 serverEndpoint,
                 observation);
@@ -697,6 +763,7 @@ public sealed class NpcapLocalMovementSource : ILocalMovementSource, ILocalVital
             }
 
             _vitalsTracker.Reset();
+            _inboundStats.Reset();
             Volatile.Write(ref _latestVitals, null);
             _activeVitalsEndpoint = serverEndpoint;
             _vitalsCacheSeeded = false;
@@ -814,14 +881,20 @@ public sealed class NpcapLocalMovementSource : ILocalMovementSource, ILocalVital
 
     private void ResetTrackers()
     {
+        lock (_outboundEndpointGate)
+        {
+            _recentOutboundEndpoints.Clear();
+        }
         lock (_movementTrackerGate)
         {
             _tracker.Reset();
+            _movementFlows.Clear();
         }
 
         lock (_vitalsTrackerGate)
         {
             _vitalsTracker.Reset();
+            _inboundStats.Reset();
             Volatile.Write(ref _latestVitals, null);
             _activeVitalsEndpoint = null;
             Volatile.Write(ref _latestCapturedOutboundEndpoint, null);

@@ -9,7 +9,8 @@ namespace TheIsleOverlay.LocalTelemetry;
 /// </summary>
 public sealed class PrewarmedLocalMovementSource :
     ILocalMovementSource,
-    ILocalVitalsFeatureSource
+    ILocalVitalsFeatureSource,
+    IGameEndpointEvidenceSource
 {
     private readonly ILocalMovementSource _inner;
     private readonly CancellationTokenSource _shutdown = new();
@@ -36,6 +37,9 @@ public sealed class PrewarmedLocalMovementSource :
     public bool LocalVitalsEnabled =>
         (_inner as ILocalVitalsFeatureSource)?.LocalVitalsEnabled
         ?? LocalVitalsFeature.IsEnabled();
+
+    public bool HasRecentOutboundTraffic(string endpoint, DateTimeOffset now, TimeSpan maxAge) =>
+        (_inner as IGameEndpointEvidenceSource)?.HasRecentOutboundTraffic(endpoint, now, maxAge) == true;
 
     public void Start()
     {

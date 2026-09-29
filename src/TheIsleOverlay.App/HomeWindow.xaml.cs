@@ -45,7 +45,7 @@ public partial class HomeWindow : Window
     private MapLaunchGateState _mapLaunchGateState = MapLaunchGateState.Checking;
     private Button? _mapActionButton;
     private TextBlock? _updateStatus;
-    private Button? _restartForUpdateButton;
+    private bool _updateReadyDialogShown;
     private TextBlock? _status;
     private static Brush B(string color) => new SolidColorBrush((Color)ColorConverter.ConvertFromString(color));
     private static TextBlock T(string text, double size = 14, Brush? foreground = null, FontWeight? weight = null) => new() { Text = text, FontSize = size, Foreground = foreground ?? B("#EAF4F0"), FontWeight = weight ?? FontWeights.Normal, TextWrapping = TextWrapping.Wrap };
@@ -165,13 +165,19 @@ public partial class HomeWindow : Window
         var mapButton = _proPresentation.HasCurrentProAccess
             ? new Button { Content = _proPresentation.MapAction, Style = (Style)FindResource("PrimaryMapAction"), HorizontalAlignment = HorizontalAlignment.Left, CommandParameter = "basic" }
             : Action(_proPresentation.MapAction, OpenMap_Click);
+        mapButton.MaxWidth = 460;
+        mapButton.MinHeight = 64;
+        mapButton.Height = double.NaN;
+        mapButton.Padding = new Thickness(16, 12, 16, 12);
+        mapButton.Content = new TextBlock { Text = _proPresentation.MapAction, TextWrapping = TextWrapping.Wrap,
+            TextAlignment = TextAlignment.Center, MaxWidth = 400 };
         if (_proPresentation.HasCurrentProAccess) mapButton.Click += OpenMap_Click;
         AutomationProperties.SetAutomationId(
             mapButton,
             _proPresentation.HasCurrentProAccess ? "OpenMapProButton" : "OpenMapBasicButton");
         AutomationProperties.SetName(
             mapButton,
-            _proPresentation.HasCurrentProAccess ? "MỞ MAP PRO" : "MỞ MAP");
+            _proPresentation.MapAction);
         AutomationProperties.SetHelpText(
             mapButton,
             "Mở Live Map sau khi kiểm tra cập nhật và Npcap");
@@ -180,19 +186,17 @@ public partial class HomeWindow : Window
         mapButton.IsEnabled = MapLaunchGatePolicy.AllowsMap(_mapLaunchGateState) && _mapOpenStarted == 0;
         _mapActionButton = mapButton;
         primary.Children.Add(mapButton);
+        var updateAction = Action("MỞ THÔNG BÁO CẬP NHẬT", (_, _) => ShowUpdateReadyDialog(_updateService.PendingVersion));
+        AutomationProperties.SetAutomationId(updateAction, "ReopenUpdateReadyDialog");
+        updateAction.Visibility = _mapLaunchGateState == MapLaunchGateState.UpdateRequired ? Visibility.Visible : Visibility.Collapsed;
+        _reopenUpdateAction = updateAction;
+        primary.Children.Add(updateAction);
         copy.Children.Add(primary);
 
-        var supportedLabel = T("Hoặc các server được hỗ trợ riêng:", 13, B("#A9BAB4"), FontWeights.SemiBold);
-        supportedLabel.Margin = new Thickness(0, 10, 0, 0);
-        copy.Children.Add(supportedLabel);
-        var servers = new WrapPanel { Margin = new Thickness(0, 10, 0, 0) };
+        // Dedicated server shortcuts temporarily hidden for universal inbound rollout.
+        // Keep handlers and saved credentials intact for a later re-enable.
         _serverActionButtons.Clear();
         _serverButtonLabels.Clear();
-        // Three equal branded actions; wrap only at the smallest viewport.
-        servers.Children.Add(ServerButton("Assets/GachaLogo.png", "GACHA", GachaServer_Click, "#415D3E", "#A8D17A"));
-        servers.Children.Add(ServerButton("Assets/OriginLogo.png", "ORIGIN 5X", OriginServer_Click, "#344F71", "#9CC8FF"));
-        servers.Children.Add(ServerButton("Assets/SDVNIcon.png", "SDVN", SdvnServer_Click, "#303F7D", "#A6B8FF"));
-        copy.Children.Add(servers);
         _status = T(_launchStatus, 12, B("#E7D9AB"), FontWeights.SemiBold);
         _status.Margin = new Thickness(0, 4, 0, 0);
         copy.Children.Add(_status);
@@ -206,22 +210,27 @@ public partial class HomeWindow : Window
         _updateStatus = T(_lastUpdateStatus, 12, B(_lastUpdateColor), FontWeights.SemiBold);
         _updateStatus.Margin = new Thickness(0, 12, 0, 0);
         p.Children.Add(_updateStatus);
-        _restartForUpdateButton = Action("KHỞI ĐỘNG LẠI ĐỂ CẬP NHẬT", (_, _) => _updateService.ApplyAndRestart(), true);
-        _restartForUpdateButton.Visibility = _mapLaunchGateState == MapLaunchGateState.UpdateRequired ? Visibility.Visible : Visibility.Collapsed;
-        _restartForUpdateButton.Margin = new Thickness(0, 8, 0, 0);
-        p.Children.Add(_restartForUpdateButton);
         RefreshLaunchButtons();
     }
 
-    private Button ServerButton(string logo, string label, RoutedEventHandler action, string surface, string border)
+    private Button ServerButton(string? logo, string label, RoutedEventHandler action, string surface, string border)
     {
-        var button = new Button { Style = (Style)FindResource("ServerAction"), Background = B(surface), BorderBrush = B(border), ToolTip = $"Mở {label}", Width = 132, Height = 76, Padding = new Thickness(6), Margin = new Thickness(0, 0, 8, 8) };
+        var button = new Button { Style = (Style)FindResource("ServerAction"), Background = B(surface), BorderBrush = B(border), ToolTip = label == "DINORP" ? "GPS qua DINORP voice bridge; stats Hub chưa được tích hợp" : $"Mở {label}", Width = 132, Height = 76, Padding = new Thickness(6), Margin = new Thickness(0, 0, 8, 8) };
         AutomationProperties.SetAutomationId(button, "Server" + label.Replace(" ", "") + "Button");
         AutomationProperties.SetName(button, $"Mở server {label}");
         AutomationProperties.SetHelpText(button, $"Mở {label} trong workspace riêng");
         var content = new StackPanel { VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center };
-        var logoImage = new Image { Source = new BitmapImage(new Uri($"/IsleLiveMap;component/{logo}", UriKind.Relative)), Width = 36, Height = 36, Stretch = Stretch.Uniform, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
-        content.Children.Add(logoImage);
+        if (logo is not null)
+        {
+            var logoImage = new Image { Source = new BitmapImage(new Uri($"/IsleLiveMap;component/{logo}", UriKind.Relative)), Width = 36, Height = 36, Stretch = Stretch.Uniform, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+            content.Children.Add(logoImage);
+        }
+        else
+        {
+            var monogram = T("DR", 26, B(border), FontWeights.Black);
+            monogram.HorizontalAlignment = HorizontalAlignment.Center;
+            content.Children.Add(monogram);
+        }
         var name = T(label, 13, B("#FFFFFF"), FontWeights.Black);
         name.HorizontalAlignment = HorizontalAlignment.Center;
         name.VerticalAlignment = VerticalAlignment.Center;
@@ -407,6 +416,15 @@ public partial class HomeWindow : Window
 
             if (!await PrepareMapLaunchAsync()) return;
 
+            if (LocalVitalsFeature.ReplacesIslePilot())
+            {
+                // Inbound stats need the game connection, not an IslePilot account.
+                // PrepareMapLaunchAsync and TakeProPlayerSourceAsync still enforce
+                // update/Npcap and Pro entitlement through the normal flow.
+                handedOffToOverlay = await OpenOverlaySessionAsync(null, "INBOUND");
+                return;
+            }
+
             var store = new IslePilotCredentialStore(AppPaths.IslePilotCredential);
             using var authHttp = new System.Net.Http.HttpClient(
                 new System.Net.Http.HttpClientHandler { AllowAutoRedirect = false })
@@ -552,32 +570,64 @@ public partial class HomeWindow : Window
         {
             _mapLaunchGateState = MapLaunchGatePolicy.FromUpdate(result.State);
             RefreshLaunchButtons();
-            if (_restartForUpdateButton is not null)
-                _restartForUpdateButton.Visibility = _mapLaunchGateState == MapLaunchGateState.UpdateRequired ? Visibility.Visible : Visibility.Collapsed;
 
             switch (result.State)
             {
                 case UpdatePreparationState.Ready:
-                    SetMapActionText(_proPresentation.HasCurrentProAccess ? "MỞ MAP PRO  →" : "MỞ MAP  →");
+                    SetMapActionText(_proPresentation.MapAction);
                     SetUpdateStatus($"Đã tải bản cập nhật v{result.Version}. Khởi động lại để hoàn tất trước khi mở map.", "#F0C36A");
                     break;
                 case UpdatePreparationState.Current:
-                    SetMapActionText(_proPresentation.HasCurrentProAccess ? "MỞ MAP PRO  →" : "MỞ MAP  →");
+                    SetMapActionText(_proPresentation.MapAction);
                     SetUpdateStatus("Bản cập nhật đã kiểm tra · phiên bản hiện tại", "#79D5B0");
                     break;
                 case UpdatePreparationState.DevelopmentBuild:
-                    SetMapActionText(_proPresentation.HasCurrentProAccess ? "MỞ MAP PRO  →" : "MỞ MAP  →");
+                    SetMapActionText(_proPresentation.MapAction);
                     SetUpdateStatus("Bản phát triển · bỏ qua kiểm tra cập nhật", "#91AAA3");
                     break;
                 default:
                     // Network/update service failures are deliberately
                     // non-blocking, as requested. Users can still open map.
-                    SetMapActionText(_proPresentation.HasCurrentProAccess ? "MỞ MAP PRO  →" : "MỞ MAP  →");
+                    SetMapActionText(_proPresentation.MapAction);
                     SetUpdateStatus("Không kiểm tra được cập nhật · vẫn cho phép mở map", "#E7B74E");
                     break;
             }
+
+            if (result.State == UpdatePreparationState.Ready)
+            {
+                ShowUpdateReadyDialog(result.Version);
+            }
         });
     }
+
+    private void ShowUpdateReadyDialog(string? version)
+    {
+        if (_updateReadyDialogShown || !IsVisible)
+        {
+            return;
+        }
+
+        _updateReadyDialogShown = true;
+        try
+        {
+            var dialog = new UpdateReadyWindow(version) { Owner = this };
+            dialog.ShowDialog();
+            if (dialog.ApplyRequested)
+            {
+                _updateService.ApplyAndRestart();
+            }
+        }
+        catch (Exception)
+        {
+            SetUpdateStatus("Chưa thể khởi động lại để cập nhật. Hãy mở lại thông báo cập nhật và thử lại.", "#E7B74E");
+        }
+        finally
+        {
+            _updateReadyDialogShown = false;
+        }
+    }
+
+    private Button? _reopenUpdateAction;
 
     private void SetUpdateStatus(string text, string color)
     {
@@ -591,7 +641,12 @@ public partial class HomeWindow : Window
     private void SetMapActionText(string text)
     {
         if (_mapActionButton is not null)
-            _mapActionButton.Content = text;
+        {
+            if (_mapActionButton.Content is TextBlock label) label.Text = text;
+            else _mapActionButton.Content = new TextBlock { Text = text, TextWrapping = TextWrapping.Wrap,
+                TextAlignment = TextAlignment.Center, MaxWidth = 400 };
+            AutomationProperties.SetName(_mapActionButton, text);
+        }
     }
     private void BuildInfo()
     {
@@ -613,7 +668,13 @@ public partial class HomeWindow : Window
         stats.Children.Add(T("THÔNG TIN DINO", 11, B(_proPresentation.HasCurrentProAccess ? "#D3A85C" : "#49D5C3"), FontWeights.Bold));
         if (snapshot?.Player is { } overviewPlayer)
         {
-            foreach (var pair in new[] { ("NGƯỜI CHƠI", overviewPlayer.Name ?? "—"), ("LOÀI", overviewPlayer.Class ?? "—"), ("SERVER", overviewPlayer.Server ?? "—"), ("GROWTH", Percent(overviewPlayer.ExactVitals?.Growth ?? overviewPlayer.GrowthPercent)), ("MÁU", Percent(overviewPlayer.ExactVitals?.Health ?? overviewPlayer.HealthPercent)), ("THỂ LỰC", Percent(overviewPlayer.ExactVitals?.Stamina ?? overviewPlayer.StaminaPercent)), ("ĐÓI", Percent(overviewPlayer.ExactVitals?.Hunger ?? overviewPlayer.HungerPercent)), ("KHÁT", Percent(overviewPlayer.ExactVitals?.Thirst ?? overviewPlayer.ThirstPercent)) })
+            var displayVitals = overviewPlayer.InboundStatsExperimental
+                ? InboundVitalsDisplay.Resolve(overviewPlayer.ExactVitals, overviewPlayer.InboundStatsLastKnown)
+                : overviewPlayer.ExactVitals;
+            string Meter(double? current, double? max, double? fallback) => current is { } c
+                ? max is > 0 ? $"{c:0.#} / {max:0.#}" : $"{c:0.#} / ?"
+                : Percent(fallback);
+            foreach (var pair in new[] { ("NGƯỜI CHƠI", overviewPlayer.Name ?? "—"), ("LOÀI", overviewPlayer.Class ?? "—"), ("SERVER", overviewPlayer.Server ?? "—"), ("GROWTH", overviewPlayer.InboundStatsExperimental ? "—" : Percent(displayVitals?.Growth ?? overviewPlayer.GrowthPercent)), ("MÁU", Meter(displayVitals?.Health, displayVitals?.MaxHealth, overviewPlayer.HealthPercent)), ("THỂ LỰC", Meter(displayVitals?.Stamina, displayVitals?.MaxStamina, overviewPlayer.StaminaPercent)), ("ĐÓI", Meter(displayVitals?.Hunger, displayVitals?.MaxHunger, overviewPlayer.HungerPercent)), ("KHÁT", Meter(displayVitals?.Thirst, displayVitals?.MaxThirst, overviewPlayer.ThirstPercent)) })
                 stats.Children.Add(CompactStat(pair.Item1, pair.Item2));
         }
         else

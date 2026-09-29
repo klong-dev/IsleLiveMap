@@ -49,7 +49,8 @@ internal static class RemotePlayerMapMarkerResolver
             duplicateCounts[baseKey] = duplicateIndex + 1;
             result.Add(new RemotePlayerMapMarker(
                 $"{baseKey}#{duplicateIndex}",
-                marker.Label,
+                marker.ProEntityIsProvisional && !marker.Label.Contains('?')
+                    ? marker.Label + " ?" : marker.Label,
                 resolvedPoint,
                 category,
                 entityKind,

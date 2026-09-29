@@ -266,6 +266,11 @@ public sealed class UnrealDinosaurVitalsTracker
         ReadOnlySpan<byte> payload,
         UnrealIrisReplicationBatch batch)
     {
+        if (TryReadShiftedSparseMaximumAttributeFrame(payload, batch))
+        {
+            return true;
+        }
+
         if (TryReadSparseMaximumAttributeFrame(payload, batch))
         {
             return true;
@@ -320,6 +325,67 @@ public sealed class UnrealDinosaurVitalsTracker
             MaxThirst = DefaultMaximumThirst
         };
         RememberVerifiedMaximums();
+        return true;
+    }
+
+    private bool TryReadShiftedSparseMaximumAttributeFrame(
+        ReadOnlySpan<byte> payload,
+        UnrealIrisReplicationBatch batch)
+    {
+        if (!TryDecodeReconnectAttributeFrame(payload, batch, out var decoded)
+            || _vitals.Hunger is { } hunger && hunger > decoded.MaxHunger * 1.1d)
+            return false;
+
+        if (_vitals.Growth == decoded.Growth && _vitals.Health == decoded.Health
+            && _vitals.MaxHealth == decoded.MaxHealth && _vitals.Stamina == decoded.Stamina
+            && _vitals.MaxStamina == decoded.MaxStamina && _vitals.MaxHunger == decoded.MaxHunger)
+            return false;
+
+        _vitals = decoded with { Hunger = _vitals.Hunger, Thirst = _vitals.Thirst };
+        RememberVerifiedMaximums();
+        return true;
+    }
+
+    internal static bool TryDecodeReconnectAttributeFrame(
+        ReadOnlySpan<byte> payload, UnrealIrisReplicationBatch batch, out ExactVitals decoded)
+    {
+        decoded = new ExactVitals();
+        // Observed reconnect layout only. Field offsets are measured from raw
+        // capture; this does not establish the owning player or prefix semantics.
+        if (!batch.HasOwnerData || batch.NetRefHandle == 0 || batch.DataBitCount != 1_482
+            || batch.DataBitOffset < 0 || batch.DataBitOffset > payload.Length * 8 - batch.DataBitCount
+            || !TryReadAttribute(payload, batch, 822, out var growth)
+            || !TryReadAttribute(payload, batch, 888, out var health)
+            || !TryReadAttribute(payload, batch, 954, out var maxHealth)
+            || !TryReadAttribute(payload, batch, 1_020, out var stamina)
+            || !TryReadAttribute(payload, batch, 1_086, out var maxStamina)
+            || !TryReadAttribute(payload, batch, 228, out var maxHunger)
+            || !TryReadAttribute(payload, batch, 1_350, out var repeatedMaxHealth)
+            || !TryReadAttribute(payload, batch, 1_383, out var repeatedMaxHealth2)
+            || !TryReadAttribute(payload, batch, 1_416, out var repeatedMaxHealth3)
+            || !NearlyEqual(maxHealth, repeatedMaxHealth)
+            || !NearlyEqual(maxHealth, repeatedMaxHealth2)
+            || !NearlyEqual(maxHealth, repeatedMaxHealth3)
+            || maxHealth < MinimumPlausibleMaximum
+            || maxStamina < MinimumPlausibleMaximum
+            || maxHunger < MinimumPlausibleMaximum
+            || growth > 1.001d
+            || health > maxHealth * 1.01d
+            || stamina > maxStamina * 1.01d)
+        {
+            return false;
+        }
+
+        decoded = new ExactVitals
+        {
+            Growth = growth,
+            Health = health,
+            MaxHealth = maxHealth,
+            Stamina = stamina,
+            MaxStamina = maxStamina,
+            MaxHunger = maxHunger,
+            MaxThirst = DefaultMaximumThirst
+        };
         return true;
     }
 

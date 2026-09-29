@@ -138,7 +138,7 @@ public sealed class ProAccessService : IDisposable
                 _session.SteamId64,
                 _session.OfflineLicenseToken!,
                 Environment.GetEnvironmentVariable(
-                    "ISLELIVEMAP_PRO_LIVE_COMPARE_PATH"));
+                    ProAgentRemotePlayerSource.HostComparisonOutputPathEnvironmentVariable));
         }
     }
 
@@ -183,6 +183,19 @@ public sealed class ProAccessService : IDisposable
         catch (ProApiException exception) when (
             exception.StatusCode is HttpStatusCode.BadRequest or HttpStatusCode.Unauthorized)
         {
+            // A failed refresh does not prove that the Pro entitlement is
+            // invalid.  The saved session may still contain a valid signed
+            // offline license, which is specifically intended to keep the
+            // Pro Agent usable while the online session is unavailable or
+            // the refresh token has expired.  Clearing the credential here
+            // caused the launcher to show the Pro shell but then fall back to
+            // Steam login when the map was opened again.
+            if (stored.HasUsableOfflineLicense(_timeProvider.GetUtcNow()))
+            {
+                return await ApplyOfflineFallbackAsync(stored, hostVersion, cancellationToken)
+                    .ConfigureAwait(false);
+            }
+
             _credentialStore.Clear();
             return SetState(null, null, ProAccessSnapshot.SignedOut with
             {

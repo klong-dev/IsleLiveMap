@@ -227,6 +227,19 @@ public sealed class RemotePlayerMapMarkerResolverTests
         Assert.Equal(RemoteEntityKind.Player, result.EntityKind);
     }
 
+    [Fact]
+    public void Resolve_PredictionUpgradeKeepsKeyAndRemovesQuestionMark()
+    {
+        var predicted = Entity("pro-entity:player:501", "Rex", RemoteEntityKind.Player,
+            "rex", CreatureDiet.Carnivore, point: new MapPoint(0.3, 0.4)) with { ProEntityIsProvisional = true };
+        var first = Assert.Single(RemotePlayerMapMarkerResolver.Resolve(new MapTelemetry { Markers = [predicted] }, null));
+        var next = Assert.Single(RemotePlayerMapMarkerResolver.Resolve(new MapTelemetry
+            { Markers = [predicted with { ProEntityIsProvisional = false }] }, null));
+        Assert.Equal("Rex ?", first.Label);
+        Assert.Equal("Rex", next.Label);
+        Assert.Equal(first.Key, next.Key);
+    }
+
     private static MapMarkerTelemetry Entity(
         string id,
         string label,

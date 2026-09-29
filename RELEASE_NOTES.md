@@ -1,4 +1,75 @@
+# Isle Live Map 2.4.4
+
+## Một nút mở map cho mọi server (thử nghiệm)
+
+- Tạm ẩn các nút GACHA, ORIGIN, SDVN và DinoRP; không xóa phiên đăng nhập đã lưu.
+- Free: MỞ MAP CHO MỌI SERVER (THỬ NGHIỆM).
+- Có Pro access: MỞ MAP PRO CHO MỌI SERVER (THỬ NGHIỆM).
+- Giữ kiểm tra cập nhật, Npcap và quyền Pro. Nhãn thử nghiệm không bảo đảm mọi định dạng packet đều đã được hỗ trợ.
+
+## Stats trực tiếp từ game
+
+- Bật stats inbound cho map tiêu chuẩn: HP, stamina, hunger và water đọc từ traffic game qua Npcap; không cần website IslePilot cung cấp bốn chỉ số này.
+- Giữ current/max theo từng field, ghép update rời rạc, không xóa chỉ vì field không được gửi lại; water dùng max 1000.
+- Sửa traffic UDP phụ làm reset stats; sửa current HP/stamina bị gán nhầm từ field khác và bổ sung MaxHunger ở layout 1482.
+- Hỗ trợ khôi phục max khi khởi động lại ngắn trong cùng phiên và đủ bằng chứng; field chưa nhận hiển thị trống thay vì 0% giả.
+- Không hiển thị growth inbound sai đã biết; growth và nhận diện loài đầy đủ sẽ được hoàn thiện ở bản sau. Không bảo đảm mọi giao thức/server đều được hỗ trợ. Các nguồn GACHA/ORIGIN/SDVN riêng giữ luồng stats của mình.
+
+## Nhóm sinh tồn và mốc cá nhân
+
+- Gửi telemetry mới độc lập với nhịp vẽ UI, tránh mất cập nhật khi overlay bận hoặc thu nhỏ; giữ snapshot hợp lệ và cải thiện retry/reconnect.
+- Phòng vẫn có các lựa chọn dung lượng 3/7/10/21 theo quyền; giữ các sửa layout và gửi requested capacity.
+- Thêm mốc vị trí cuối và xác nhận điểm chết thủ công trong Alt+M cho Free/Pro; không suy đoán chết chỉ từ mất GPS.
+- Đồng bộ mốc cá nhân là tùy chọn, mặc định tắt; dữ liệu tách theo server.
+
+## Kế thừa và giới hạn
+
+- Giữ tracking/độ rõ marker, modal cập nhật sẵn sàng và lưu đăng nhập; các lối mở server riêng được tạm ẩn theo rollout mới.
+- DinoRP tiếp tục ẩn, chưa phát hành tích hợp.
+- Bản này cập nhật launcher/client; không thay phiên bản Pro Agent hoặc triển khai backend.
+
+# Isle Live Map 2.4.3
+
+## Tracking Pro và marker dino
+
+- Hỗ trợ Pro Agent 0.3.84: tăng nhận diện dino dự đoán từ evidence gắn với actor, giữ provenance vị trí qua Agent → Host.
+- Marker dự đoán có nhãn `?` để phân biệt với marker đã xác minh; không bảo đảm nhận diện mọi dino trong game.
+- Giữ vị trí cuối theo presence hợp lệ; tọa độ cũ vẫn được đánh dấu stale, không giả là vị trí live.
+- Chấm dino dự đoán có nền màu đặc, viền liền và độ rõ 60%, ngang chấm mất tín hiệu.
+- Hiện modal khi bản cập nhật tải xong; có thể mở lại modal nếu đã đóng hoặc thao tác khởi động lại thất bại.
+- Giữ các bản sửa phiên đăng nhập IslePilot, stats khi GPS gián đoạn, nhóm sinh tồn, SDVN và server riêng từ các bản trước.
+
+Pro Agent 0.3.84 yêu cầu launcher 2.4.3 trở lên. Hãy cập nhật và khởi động lại launcher, sau đó mở map bằng tài khoản Pro.
+
+# Isle Live Map 2.4.2
+
+## IslePilot và marker stale
+
+- Giữ phiên đăng nhập IslePilot sau khi launcher khởi động lại; chỉ yêu cầu đăng nhập lại khi phiên thực sự hết hạn.
+- Giữ dino stats khi GPS local tạm gián đoạn, đồng thời không biến dữ liệu stats thành vị trí local mới.
+- Tăng độ rõ marker mất tín hiệu từ 42% lên 60%; marker live và marker provisional giữ nguyên cách phân biệt.
+- Giữ toàn bộ cải thiện tracking và thay đổi nhóm sinh tồn/server riêng từ 2.4.1.
+
+# Isle Live Map 2.4.1
+
+## Cải thiện hiển thị Player và AI
+
+- Đưa các sửa đổi tracking đã nghiệm thu vào launcher: không loại marker ngay khi tọa độ quá 2 giây nhưng vẫn còn bằng chứng hiện diện hợp lệ.
+- Nới cửa sổ nhận vị trí lên tối đa 15 giây khi entity có định danh hợp lệ và presence mới; vị trí cũ hiển thị mờ, không giả thành vị trí trực tiếp.
+- Giữ lịch sử marker theo đúng phiên/server khi nhận stats, áp dụng cho MỞ MAP PRO và GACHA/ORIGIN/SDVN; không dùng lịch sử từ phiên khác.
+- Đọc bằng chứng vị trí đã xác thực từ Pro Agent, tránh trùng frame khi bàn giao prewarm; giữ các kiểm tra định danh, tọa độ và marker trùng.
+- Giữ giấy phép Pro ngoại tuyến còn hiệu lực khi refresh phiên trực tuyến thất bại; không bỏ qua xác minh giấy phép của Agent.
+- Tương thích Pro Agent 0.3.80 đang được phân phối riêng. Giữ toàn bộ thay đổi nhóm sinh tồn và server của 2.4.0.
+
+Lưu ý: marker mờ là vị trí đã biết gần nhất, không bảo đảm dino vẫn ở đúng vị trí đó. Bản cập nhật cải thiện giữ marker, không cam kết phát hiện mọi dino.
+
 # Isle Live Map 2.4.0
+
+## Nhóm sinh tồn
+
+- Thêm hộp thoại chọn quy mô phòng 3, 7, 10 hoặc 21 người (tính cả chủ phòng); phòng 10/21 người yêu cầu Pro.
+- Gửi quy mô đã chọn tới relay và kiểm tra quy mô được cấp; không tạo nhầm phòng sai giới hạn.
+- Sửa bố cục hộp thoại để các lựa chọn luôn nằm trong khung, không bị che hoặc cắt.
 
 ## SDVN và kết nối server riêng
 
@@ -234,3 +305,4 @@
 ## Kỳ vọng sử dụng
 
 Đây là tối ưu pipeline và UI; FPS thực tế còn phụ thuộc GPU, driver, Npcap và cấu hình máy. Bản này không cam kết một mức FPS cố định.
+

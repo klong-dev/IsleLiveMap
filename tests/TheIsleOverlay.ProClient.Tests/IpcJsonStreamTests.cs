@@ -134,6 +134,31 @@ public sealed class IpcJsonStreamTests
     }
 
     [Fact]
+    public async Task RoundTrip_PreservesVerifiedPositionProofWithoutName()
+    {
+        await using var memory = new MemoryStream();
+        await using var ipc = new IpcJsonStream(memory);
+        var observedAt = DateTimeOffset.Parse("2026-09-23T07:00:00Z");
+        var expected = new ProTelemetryFrame(
+            44, observedAt, "127.0.0.1:7777", new WorldPosition(1, 2, 3), 0,
+            [new VerifiedMapEntity(
+                7, MapEntityKind.Player, null, "triceratops", "Trice",
+                MapCreatureDiet.Herbivore, null, new WorldPosition(4, 5, 6), 0,
+                3, observedAt, LocationObservedAt: observedAt,
+                ActorNetRefHandle: 7, PlayerStateNetRefHandle: 8,
+                PawnNetRefHandle: 9, HasVerifiedPosition: true)]);
+
+        await ipc.WriteAsync(expected, TestContext.Current.CancellationToken);
+        memory.Position = 0;
+        var actual = await ipc.ReadAsync<ProTelemetryFrame>(TestContext.Current.CancellationToken);
+
+        var entity = Assert.Single(actual.RemoteEntities);
+        Assert.True(entity.HasVerifiedPosition);
+        Assert.Null(entity.PlayerProofName);
+        Assert.Equal((ulong)8, entity.PlayerStateNetRefHandle);
+    }
+
+    [Fact]
     public async Task RoundTrip_PreservesCaptureHealthStatus()
     {
         await using var memory = new MemoryStream();
@@ -159,6 +184,29 @@ public sealed class IpcJsonStreamTests
             TestContext.Current.CancellationToken);
 
         Assert.Equal(expected, actual);
+    }
+
+    [Fact]
+    public async Task RoundTrip_PreservesEarlyDinoPositionEvidence()
+    {
+        var at = DateTimeOffset.UtcNow;
+        var entity = new VerifiedMapEntity(500, MapEntityKind.Player, null, "", "",
+            MapCreatureDiet.Unknown, null, new WorldPosition(100, 200, 30), 0, 1, at,
+            IsProvisional: true, LocationObservedAt: at, ActorNetRefHandle: 500,
+            HasVerifiedPosition: true, LocationEvidenceSource: "SerializedActorCreation",
+            LocationEvidenceEndBitOffset: 100);
+        var expected = new ProTelemetryFrame(1, at, "server:7777", new WorldPosition(0, 0, 0), 0, [entity]);
+        await using var memory = new MemoryStream();
+        await using var ipc = new IpcJsonStream(memory);
+        await ipc.WriteAsync(expected, TestContext.Current.CancellationToken);
+        memory.Position = 0;
+        var wire = await ipc.ReadAsync<ProTelemetryFrame>(TestContext.Current.CancellationToken);
+        var mapped = Assert.Single(ProAgentRemotePlayerSource.MapFrame(wire, "session").RemoteEntities);
+        Assert.True(mapped.IsProvisional);
+        Assert.Equal("", mapped.SpeciesId);
+        Assert.Equal("SerializedActorCreation", mapped.LocationEvidenceSource);
+        Assert.Equal(100, mapped.LocationEvidenceEndBitOffset);
+        Assert.Equal(at, mapped.LocationObservedAt);
     }
 
     [Fact]

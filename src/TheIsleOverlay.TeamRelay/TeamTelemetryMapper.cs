@@ -25,7 +25,9 @@ public static class TeamTelemetryMapper
             };
         }
 
-        var exact = player.ExactVitals;
+        var exact = player.InboundStatsExperimental
+            ? InboundVitalsDisplay.Resolve(player.ExactVitals, player.InboundStatsLastKnown)
+            : player.ExactVitals;
         var worldPoint = FinitePair(player.Location?.X, player.Location?.Y);
         var mapPoint = FiniteMapPair(player.MapLocation?.Left, player.MapLocation?.Top);
         var heading = player.ExactMapHeadingDegrees ?? fallbackHeadingDegrees;

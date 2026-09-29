@@ -24,15 +24,13 @@ public sealed class PrewarmedRemotePlayerTelemetrySource :
                 SingleReader = true,
                 SingleWriter = true
             });
-    private readonly object _latestGate = new();
-    private RemotePlayerTelemetryFrame? _latest;
     private Task? _pumpTask;
     private int _started;
     private int _watchStarted;
     private int _disposed;
-    internal bool IsCompleted => _pumpTask?.IsCompleted == true;
-
     private RemotePlayerCaptureHealth? _terminalHealth;
+
+    internal bool IsCompleted => _pumpTask?.IsCompleted == true;
 
     public RemotePlayerCaptureHealth CaptureHealth =>
         Volatile.Read(ref _terminalHealth)
@@ -70,17 +68,8 @@ public sealed class PrewarmedRemotePlayerTelemetrySource :
         }
 
         Start();
-        RemotePlayerTelemetryFrame? replay;
-        lock (_latestGate)
-        {
-            replay = _latest;
-        }
-
-        if (replay is { } current)
-        {
-            yield return current;
-        }
-
+        // The capacity-one channel already retains the latest prewarm frame.
+        // A separate replay of _latest used to deliver that frame twice.
         using var linkedCancellation = CancellationTokenSource.CreateLinkedTokenSource(
             cancellationToken,
             _shutdown.Token);
@@ -124,11 +113,6 @@ public sealed class PrewarmedRemotePlayerTelemetrySource :
                                .WatchAsync(cancellationToken)
                                .ConfigureAwait(false))
             {
-                lock (_latestGate)
-                {
-                    _latest = frame;
-                }
-
                 _updates.Writer.TryWrite(frame);
             }
 

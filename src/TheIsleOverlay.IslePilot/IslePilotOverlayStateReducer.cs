@@ -15,6 +15,7 @@ public sealed class IslePilotOverlayStateReducer
     private DateTimeOffset? _lastMapAt;
     private DateTimeOffset? _lastLiveAt;
     private TelemetrySessionState _sessionState = TelemetrySessionState.Connecting;
+    public long IdentityGeneration { get; private set; }
 
     public IslePilotOverlayStateReducer(TimeSpan? liveDataLifetime = null)
     {
@@ -31,13 +32,33 @@ public sealed class IslePilotOverlayStateReducer
     {
         ArgumentNullException.ThrowIfNull(me);
 
+        if (_lastMeAt is { } lastMe && receivedAt < lastMe) return;
+        var changed = Changed(_me?.SteamId, me.SteamId)
+                      || Changed(_me?.Server, me.Server)
+                      || (!string.IsNullOrWhiteSpace(_me?.Species)
+                          && !string.IsNullOrWhiteSpace(me.Species)
+                          && !CreatureSpeciesIdentity.AreSame(_me.Species, me.Species));
+        if (changed || me.HasData == false || me.Online == false)
+        {
+            IdentityGeneration++;
+            // REST identity is a boundary, not a partial update of the old dino.
+            _me = null;
+            _live = null;
+            _lastLiveAt = null;
+            _map = null;
+            _lastMapAt = null;
+            _calibration = null;
+            _sessionState = TelemetrySessionState.Connecting;
+        }
         _me = Merge(_me, me);
         _lastMeAt = receivedAt;
     }
 
-    public void ApplyMap(IslePilotOverlayMapDto map, DateTimeOffset receivedAt)
+    public void ApplyMap(IslePilotOverlayMapDto map, DateTimeOffset receivedAt, long? identityGeneration = null)
     {
         ArgumentNullException.ThrowIfNull(map);
+        if (identityGeneration is { } generation && generation != IdentityGeneration) return;
+        if (_lastMapAt is { } lastMap && receivedAt < lastMap) return;
 
         _map = map;
         _lastMapAt = receivedAt;
@@ -52,12 +73,32 @@ public sealed class IslePilotOverlayStateReducer
     {
         ArgumentNullException.ThrowIfNull(live);
 
+        if (_lastLiveAt is { } lastLive && receivedAt < lastLive) return;
+        if (Changed(_me?.SteamId, live.SteamId)) return;
+        if (live.HasDino == false)
+        {
+            IdentityGeneration++;
+            if (_map is not null) _map = _map with { Markers = [] };
+            // Keep account/server metadata, but never reuse a despawned
+            // dinosaur baseline when a partial live frame announces respawn.
+            _me = new IslePilotOverlayMeDto
+            {
+                SteamId = _me?.SteamId, PersonaName = _me?.PersonaName,
+                Name = _me?.Name, Server = _me?.Server,
+                HasData = _me?.HasData, Online = _me?.Online
+            };
+            _live = null;
+        }
         _live = Merge(_live, live);
         _lastLiveAt = receivedAt;
         _sessionState = TelemetrySessionState.Live;
     }
 
     public void SetSessionState(TelemetrySessionState state) => _sessionState = state;
+
+    private static bool Changed(string? previous, string? current) =>
+        !string.IsNullOrWhiteSpace(previous) && !string.IsNullOrWhiteSpace(current)
+        && !string.Equals(previous.Trim(), current.Trim(), StringComparison.OrdinalIgnoreCase);
 
     public TelemetrySnapshot BuildSnapshot(DateTimeOffset now)
     {

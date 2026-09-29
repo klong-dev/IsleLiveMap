@@ -73,8 +73,9 @@ public sealed class ServerConnectionsTests
                     var root = (FrameworkElement)home.Content;
                     Render(root, width, 600, Path.Combine(output, $"home-{width}.png"));
                     var buttons = Children(root).OfType<Button>().Where(b => AutomationProperties.GetAutomationId(b).StartsWith("Server")).ToArray();
-                    Assert.Equal(3, buttons.Length);
-                    Assert.Single(buttons, b => AutomationProperties.GetAutomationId(b) == "ServerSDVNButton");
+                    Assert.Empty(buttons);
+                    var action = Assert.Single(Children(root).OfType<Button>(), b => AutomationProperties.GetAutomationId(b) == "OpenMapBasicButton");
+                    Assert.Equal(HomeProPresentationPolicy.BasicMapAction, AutomationProperties.GetName(action));
                     foreach (var button in buttons)
                     {
                         Assert.True(button.ActualWidth >= 100);
