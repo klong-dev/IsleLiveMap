@@ -18,6 +18,7 @@ public partial class MainWindow
 
     private void InitializePersonalHistory()
     {
+        if (!PersonalHistoryFeature.Enabled) return;
         _historyStarted = DateTimeOffset.UtcNow;
         _historyTimer = new DispatcherTimer(TimeSpan.FromSeconds(1), DispatcherPriority.Background,
             PersonalHistoryTick, Dispatcher);
@@ -26,6 +27,7 @@ public partial class MainWindow
 
     private async void PersonalHistoryTick(object? sender, EventArgs e)
     {
+        if (!PersonalHistoryFeature.Enabled) return;
         var now = DateTimeOffset.UtcNow;
         var oldServer = _historyTracker.ServerKey;
         var latest = LatestTelemetrySnapshotStore.Shared.ReceivedAt >= _historyStarted
@@ -61,6 +63,7 @@ public partial class MainWindow
 
     private void SetHistoryRelayEnabled(bool enabled)
     {
+        if (!PersonalHistoryFeature.Enabled) return;
         _historyCleanupPending |= _historyRelayEnabled && !enabled;
         _historyRelayEnabled = enabled;
         _historyStatus = enabled ? "Đang đồng bộ mốc cá nhân…" : "Mốc riêng trên máy · relay chưa bật";
@@ -70,7 +73,7 @@ public partial class MainWindow
     private void DetachPersonalHistory()
     {
         _historyTimer?.Stop();
-        if (_historyTracker.Finish() is { } last)
+        if (PersonalHistoryFeature.Enabled && _historyTracker.Finish() is { } last)
             _mapNoteStore.AddHistory(last.Location, last.ServerKey, last.ObservedAt);
         _historyStop.Cancel();
         _historySync.Dispose();
@@ -78,6 +81,6 @@ public partial class MainWindow
 
     private IReadOnlyList<MapNote> VisibleLocalNotes() => _mapNoteStore.Notes
         .Where(n => n.IsPersonalHistory
-            ? n.ExpiresAt > DateTimeOffset.UtcNow && n.ServerKey == _historyTracker.ServerKey
+            ? PersonalHistoryFeature.Enabled && n.ExpiresAt > DateTimeOffset.UtcNow && n.ServerKey == _historyTracker.ServerKey
             : HasCurrentProFeatures).ToArray();
 }

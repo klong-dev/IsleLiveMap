@@ -65,11 +65,13 @@ public partial class MapNotesWindow : Window
         InitializeComponent();
         HistoryRelayToggle.IsChecked = relayEnabled;
         HistoryRelayToggle.IsEnabled = relayChanged is not null;
+        if (!PersonalHistoryFeature.Enabled)
+            ((FrameworkElement)HistoryRelayToggle.Parent).Visibility = Visibility.Collapsed;
         if (!allowManualNotes)
         {
             CoordinateEntryPanel.Visibility = Visibility.Collapsed;
             ((Grid)CoordinateEntryPanel.Parent).RowDefinitions[1].Height = new GridLength(0);
-            MapModeLabel.Text = "VỊ TRÍ CUỐI / MỐC ĐÃ CHẾT";
+            MapModeLabel.Text = PersonalHistoryFeature.Enabled ? "VỊ TRÍ CUỐI / MỐC ĐÃ CHẾT" : "BẢN ĐỒ";
         }
         CloseShortcutLabel.Text =
             $"{new ShortcutSettingsStore().Load().MapNotes.ToUpperInvariant()} / ESC ĐỂ ĐÓNG";
@@ -1081,7 +1083,7 @@ public partial class MapNotesWindow : Window
 
     private IReadOnlyList<MapNotePresentation> VisibleNotes() =>
         MapNotePresentationBuilder.Merge(_store.Notes.Where(n => n.IsPersonalHistory
-            ? n.ServerKey == _historyServer && n.ExpiresAt > DateTimeOffset.UtcNow
+            ? PersonalHistoryFeature.Enabled && n.ServerKey == _historyServer && n.ExpiresAt > DateTimeOffset.UtcNow
             : _allowManualNotes).ToArray(), _allowManualNotes ? _teamState : null);
 
     public void UpdateHistoryContext(string? server, string status)
@@ -1093,7 +1095,7 @@ public partial class MapNotesWindow : Window
     }
 
     private void HistoryRelayToggle_Click(object sender, RoutedEventArgs e) =>
-        _relayChanged?.Invoke(HistoryRelayToggle.IsChecked == true);
+        _relayChanged?.Invoke(PersonalHistoryFeature.Enabled && HistoryRelayToggle.IsChecked == true);
 
     private void ApplyTeamPing(TeamMapPingSnapshot ping)
     {
