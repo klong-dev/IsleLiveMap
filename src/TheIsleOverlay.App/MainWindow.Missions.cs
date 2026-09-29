@@ -13,7 +13,7 @@ public partial class MainWindow
     private bool _hasMissions;
     private bool _missionToastPumpRunning;
 
-    private void RenderPrimeMissions(PrimeTelemetry? prime)
+    private void RenderPrimeMissions(PrimeTelemetry? prime, bool stale = false)
     {
         var quests = prime?.Quests?
             .Where(quest => !string.IsNullOrWhiteSpace(quest.Name))
@@ -40,6 +40,8 @@ public partial class MainWindow
             ? "ĐANG ĐỒNG BỘ PRIME"
             : $"{Math.Max(0, done)} / {Math.Max(0, required)}";
 
+        if (stale && prime is not null) MissionProgressLabel.Text += " · ISLEPILOT ĐANG KẾT NỐI LẠI";
+        if (stale) return;
         foreach (var completed in _primeQuestCompletionTracker.Capture(quests))
         {
             EnqueueMissionToast(PrimeQuestVietnamese.Translate(completed.Name));

@@ -20,8 +20,12 @@ public static class LocalPositionSnapshotMerger
         RemotePlayerTelemetryFrame? verifiedLocalFallback = null,
         bool allowLocalVitals = false,
         bool requireFreshLocalMovement = false,
-        bool replaceIslePilotStats = false)
+        bool replaceIslePilotStats = false,
+        bool enableIslePilotFallback = false)
     {
+        if (enableIslePilotFallback && allowLocalVitals && !replaceIslePilotStats)
+            return IslePilotInboundFallback.Merge(remote, local, now, sourceName, remotePlayers,
+                verifiedLocalSpeciesId, verifiedLocalFallback, requireFreshLocalMovement);
         var localObservation = local.GetValueOrDefault();
         var fallback = verifiedLocalFallback;
         // Opt-in in-map replacement: do not mix missing inbound values with
@@ -40,13 +44,7 @@ public static class LocalPositionSnapshotMerger
                 }
             };
         }
-        // Authentication is authoritative for the provider lane. A local
-        // packet (or its absence) must never turn an expired IslePilot
-        // session back into Live/Connecting.
-        if (remote?.SessionState == TelemetrySessionState.AuthenticationRequired)
-        {
-            return remote;
-        }
+        if (remote?.SessionState == TelemetrySessionState.AuthenticationRequired) return remote;
         var hasFreshLocal = local.HasValue
                             && localObservation.HasMovement
                             && IsFresh(
@@ -288,6 +286,9 @@ public static class LocalPositionSnapshotMerger
         ExactVitals = null,
         ExactVitalsSource = null,
         InboundStatsExperimental = false,
+        InboundStatsFallback = false,
+        PrimeDataStale = false,
+        ProviderAuthenticationRequired = false,
         InboundStatsOwnerHandle = null,
         InboundStatsLastKnown = null,
         InboundStatsFieldTimes = null,

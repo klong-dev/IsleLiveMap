@@ -23,7 +23,7 @@ public sealed class HomeProPresentationPolicyTests
         Assert.Equal("PRO ĐANG HOẠT ĐỘNG · TRỢ LÝ SẴN SÀNG", presentation.StatusLabel);
         Assert.False(presentation.ShowPromotion);
         Assert.Equal("KHÔNG GIAN THEO DÕI PRO", presentation.MapTitle);
-        Assert.Equal("MỞ MAP PRO CHO MỌI SERVER (THỬ NGHIỆM)", presentation.MapAction);
+        Assert.Equal("MỞ MAP PRO", presentation.MapAction);
     }
 
     [Fact]
@@ -58,7 +58,7 @@ public sealed class HomeProPresentationPolicyTests
         Assert.True(presentation.ShowPromotion);
         Assert.False(presentation.IsPremiumMode);
         Assert.Equal("MỞ TRÌNH THEO DÕI", presentation.MapTitle);
-        Assert.Equal("MỞ MAP CHO MỌI SERVER (THỬ NGHIỆM)", presentation.MapAction);
+        Assert.Equal("MỞ MAP", presentation.MapAction);
     }
 
     [Fact]

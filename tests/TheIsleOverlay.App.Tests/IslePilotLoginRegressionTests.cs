@@ -41,7 +41,8 @@ public sealed class IslePilotLoginRegressionTests
                 var pro = new IslePilotSteamLoginWindow { AllowLocalOnly = true };
                 var button = (Button)pro.FindName("LocalOnlyButton");
                 Assert.Equal(Visibility.Visible, button.Visibility);
-                Assert.Contains("KHÔNG STATS", button.Content.ToString());
+                Assert.Contains("DÙNG STATS INBOUND", button.Content.ToString());
+                Assert.Contains("Prime", button.ToolTip.ToString());
                 Assert.False(pro.LocalOnlyRequested);
                 var capture = Environment.GetEnvironmentVariable("ISLE_LOGIN_UI_CAPTURE");
                 if (!string.IsNullOrWhiteSpace(capture))

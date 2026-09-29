@@ -1,3 +1,17 @@
+# Isle Live Map 2.4.5
+
+## IslePilot chính, inbound dự phòng
+
+- Khôi phục IslePilot làm nguồn stats chính, bao gồm loài, growth và nhiệm vụ Prime khi dữ liệu hợp lệ.
+- Inbound tiếp tục chạy nền; bốn stats HP, stamina, hunger và water chuyển sang nguồn dự phòng khi IslePilot không khả dụng. Khi phiên IslePilot đang chạy nhận lại dữ liệu hợp lệ, tự ưu tiên nguồn chính.
+- Giữ đăng nhập IslePilot đã lưu. Khi cần đăng nhập, cả Free và Pro có thể chọn dùng stats inbound; Prime cần phiên IslePilot hợp lệ. Phiên hết hạn vẫn phải đăng nhập lại.
+- Giữ danh sách Prime qua gián đoạn kết nối với nhãn trạng thái cũ; cập nhật chỉ chứa tiến độ không làm mất quest. Đổi dino/server không mang theo nhiệm vụ cũ.
+- Timestamp stats và Prime độc lập: cập nhật GPS/map không làm mới giả dữ liệu cũ.
+- Đổi nhãn nút về MỞ MAP và MỞ MAP PRO theo quyền truy cập. Các nút server riêng tiếp tục tạm ẩn.
+- Giữ các cải thiện stats delta, tracking, nhóm sinh tồn và mốc cá nhân của 2.4.4. Không thay đổi backend hoặc bản phân phối Pro Agent.
+
+Lưu ý: growth inbound chưa được xác minh nên không hiển thị khi dùng nguồn dự phòng. Khả năng đọc inbound phụ thuộc giao thức server; không bảo đảm mọi server đều hỗ trợ. Bản này được kiểm thử tự động và kiểm tra UI Prime; chưa có phiên game live mới để nghiệm thu failover/Prime trên server thật.
+
 # Isle Live Map 2.4.4
 
 ## Một nút mở map cho mọi server (thử nghiệm)

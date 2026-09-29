@@ -7,6 +7,8 @@ public sealed record TelemetrySnapshot
     public bool ServerOnline { get; init; }
     public bool PlayerOnline { get; init; }
     public DateTimeOffset? UpdatedAt { get; init; }
+    public DateTimeOffset? ProviderStatsObservedAt { get; init; }
+    public DateTimeOffset? ProviderPrimeObservedAt { get; init; }
     public PlayerTelemetry? Player { get; init; }
     public MapTelemetry? Map { get; init; }
     public TelemetrySessionState SessionState { get; init; } = TelemetrySessionState.Polling;
@@ -42,6 +44,9 @@ public sealed record PlayerTelemetry
     public double? ThirstPercent { get; init; }
     public ExactVitals? ExactVitals { get; init; }
     public string? ExactVitalsSource { get; init; }
+    public bool InboundStatsFallback { get; init; }
+    public bool PrimeDataStale { get; init; }
+    public bool ProviderAuthenticationRequired { get; init; }
     public bool InboundStatsExperimental { get; init; }
     public ulong? InboundStatsOwnerHandle { get; init; }
     // Historical display only. Never fed into live percentage/freshness calculations.

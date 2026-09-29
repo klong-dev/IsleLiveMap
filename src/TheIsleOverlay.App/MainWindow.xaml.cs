@@ -301,6 +301,9 @@ public partial class MainWindow : Window
                     diagnosticPlayer.ThirstPercent,
                     diagnosticPlayer.ExactVitalsSource,
                     diagnosticPlayer.InboundStatsExperimental,
+                    diagnosticPlayer.InboundStatsFallback,
+                    diagnosticPlayer.PrimeDataStale,
+                    diagnosticPlayer.ProviderAuthenticationRequired,
                     diagnosticPlayer.InboundStatsOwnerHandle,
                     diagnosticPlayer.InboundStatsLastKnown,
                     diagnosticPlayer.InboundStatsFieldTimes,
@@ -669,7 +672,9 @@ public partial class MainWindow : Window
             var degraded = snapshot.SessionState is TelemetrySessionState.Reconnecting or TelemetrySessionState.Stale;
             SetTelemetryOpacity(degraded ? 0.58d : 1d);
             SetConnectionState(
-                player.InboundStatsExperimental
+                player.InboundStatsFallback
+                    ? player.ProviderAuthenticationRequired ? "INBOUND DỰ PHÒNG · ISLEPILOT CẦN ĐĂNG NHẬP" : "INBOUND DỰ PHÒNG · ISLEPILOT ĐANG CHỜ"
+                    : player.InboundStatsExperimental
                     ? "INBOUND · STATS"
                     : ConnectionText(snapshot.SessionState, player.ExactVitalsSource),
                 degraded ? WaitingBrush : OnlineBrush);
@@ -678,7 +683,8 @@ public partial class MainWindow : Window
 
             // Inbound growth semantics are deferred; do not present the known
             // mismatched candidate as the player's in-game growth percentage.
-            var growth = player.InboundStatsExperimental ? null : exact?.Growth ?? player.GrowthPercent;
+            var growth = player.InboundStatsExperimental && player.ExactVitalsSource == LocalVitalsFeature.SourceName
+                ? null : exact?.Growth ?? player.GrowthPercent;
             GrowthLabel.Text = growth is null
                 ? "—"
                 : $"{NormalizePercent(growth):0.#}%";
@@ -696,7 +702,7 @@ public partial class MainWindow : Window
                 SetVitalTimestampTooltip(HungerValue, "Hunger", "MaxHunger", fieldTimes);
                 SetVitalTimestampTooltip(WaterValue, "Thirst", null, fieldTimes);
             }
-            RenderPrimeMissions(player.Prime);
+            RenderPrimeMissions(player.Prime, player.PrimeDataStale);
 
             UpdatedLabel.Text = $"SYNC {(snapshot.UpdatedAt ?? DateTimeOffset.Now).ToLocalTime():HH:mm:ss}";
 
@@ -898,10 +904,8 @@ public partial class MainWindow : Window
         TelemetrySessionState state,
         string? directVitalsSource = null)
     {
-        if (LocalVitalsFeature.ReplacesIslePilot()
-            && (string.Equals(_configuredSource, "IslePilot", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(_configuredSource, "INBOUND", StringComparison.OrdinalIgnoreCase)
-                || directVitalsSource == LocalVitalsFeature.SourceName))
+        if (directVitalsSource == LocalVitalsFeature.SourceName
+            || string.Equals(_configuredSource, "INBOUND", StringComparison.OrdinalIgnoreCase))
             return "INBOUND · ĐANG CHỜ STATS";
         var source = string.IsNullOrWhiteSpace(directVitalsSource)
             ? _configuredSource

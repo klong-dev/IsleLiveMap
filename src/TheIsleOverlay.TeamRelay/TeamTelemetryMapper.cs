@@ -25,7 +25,7 @@ public static class TeamTelemetryMapper
             };
         }
 
-        var exact = player.InboundStatsExperimental
+        var exact = player.InboundStatsExperimental && player.ExactVitalsSource == "LocalIris"
             ? InboundVitalsDisplay.Resolve(player.ExactVitals, player.InboundStatsLastKnown)
             : player.ExactVitals;
         var worldPoint = FinitePair(player.Location?.X, player.Location?.Y);

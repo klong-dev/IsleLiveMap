@@ -5,11 +5,11 @@ namespace TheIsleOverlay.Tests;
 public sealed class InboundReleasePolicyTests
 {
     [Theory]
-    [InlineData(null, true)]
+    [InlineData(null, false)]
     [InlineData("0", false)]
     [InlineData("1", true)]
-    public void ReplacementShipsEnabledWithExplicitRollback(string? value, bool expected)
-        => Assert.Equal(expected, LocalVitalsFeature.ReplacementEnabled(value));
+    public void ReplacementRequiresExplicitOptIn(string? value, bool expected)
+        => Assert.Equal(expected, LocalVitalsFeature.IsEnabledForReplacement(value));
 
     [Fact]
     public void TeamStatsUseSameCurrentAndRetainedMaxAsOverlay()
@@ -20,6 +20,7 @@ public sealed class InboundReleasePolicyTests
             Player = new PlayerTelemetry
             {
                 InboundStatsExperimental = true,
+                ExactVitalsSource = LocalVitalsFeature.SourceName,
                 ExactVitals = new ExactVitals { Health = 50, Hunger = 20, Thirst = 840 },
                 InboundStatsLastKnown = new ExactVitals { MaxHealth = 100, MaxHunger = 40, MaxThirst = 1000 }
             }

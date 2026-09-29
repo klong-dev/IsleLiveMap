@@ -14,7 +14,7 @@ namespace TheIsleOverlay.App;
 public partial class HomeWindow
 {
     private readonly List<Button> _serverActionButtons = [];
-    private string _launchStatus = "Đọc stats trực tiếp từ game · hỗ trợ mọi server đang thử nghiệm.";
+    private string _launchStatus = "Ưu tiên IslePilot và nhiệm vụ Prime · inbound chạy nền dự phòng.";
     private readonly Dictionary<Button, string> _serverButtonLabels = [];
     private string? _launchingServer;
     private string _lastUpdateStatus = "ĐANG KIỂM TRA BẢN CẬP NHẬT…";

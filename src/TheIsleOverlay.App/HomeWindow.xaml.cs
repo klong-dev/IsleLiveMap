@@ -416,33 +416,35 @@ public partial class HomeWindow : Window
 
             if (!await PrepareMapLaunchAsync()) return;
 
-            if (LocalVitalsFeature.ReplacesIslePilot())
-            {
-                // Inbound stats need the game connection, not an IslePilot account.
-                // PrepareMapLaunchAsync and TakeProPlayerSourceAsync still enforce
-                // update/Npcap and Pro entitlement through the normal flow.
-                handedOffToOverlay = await OpenOverlaySessionAsync(null, "INBOUND");
-                return;
-            }
-
             var store = new IslePilotCredentialStore(AppPaths.IslePilotCredential);
             using var authHttp = new System.Net.Http.HttpClient(
                 new System.Net.Http.HttpClientHandler { AllowAutoRedirect = false })
                 { Timeout = TimeSpan.FromSeconds(8) };
             var localOnlyRequested = false;
-            var credentials = await new IslePilotOverlayLoginFlow(authHttp, store).ResolveAsync(_ =>
+            IslePilotOverlayAuthResult? credentials;
+            try
             {
-                // Pro grants tracking, not an IslePilot login. Never silently
-                // open without stats just because the saved login is missing.
-                var login = new IslePilotSteamLoginWindow
+                credentials = await new IslePilotOverlayLoginFlow(authHttp, store).ResolveAsync(_ =>
                 {
-                    Owner = this,
-                    AllowLocalOnly = HomeProPresentationPolicy.Evaluate(_pro, DateTimeOffset.UtcNow).HasCurrentProAccess
-                };
-                var loggedIn = login.ShowDialog() == true;
-                localOnlyRequested = login.LocalOnlyRequested;
-                return Task.FromResult(loggedIn ? login.Credentials : null);
-            }, SetStatus, _shutdown.Token);
+                    // Login restores website stats and Prime. Free and Pro may
+                    // explicitly continue with inbound if IslePilot is unavailable.
+                    var login = new IslePilotSteamLoginWindow
+                    {
+                        Owner = this,
+                        AllowLocalOnly = LocalVitalsFeature.IsEnabled()
+                    };
+                    var loggedIn = login.ShowDialog() == true;
+                    localOnlyRequested = login.LocalOnlyRequested;
+                    return Task.FromResult(loggedIn ? login.Credentials : null);
+                }, SetStatus, _shutdown.Token);
+            }
+            catch (Exception error) when (!_shutdown.IsCancellationRequested
+                && error is System.Net.Http.HttpRequestException or TimeoutException or TaskCanceledException)
+            {
+                SetStatus("IslePilot tạm không kết nối được; dùng stats inbound dự phòng.");
+                handedOffToOverlay = await OpenOverlaySessionAsync(null, "INBOUND");
+                return;
+            }
             if (credentials is null)
             {
                 if (localOnlyRequested)
@@ -484,7 +486,7 @@ public partial class HomeWindow : Window
 
     private async Task<bool> OpenProOnlyOverlayAsync()
     {
-        return await OpenOverlaySessionAsync(null, "PRO");
+        return await OpenOverlaySessionAsync(null, "INBOUND");
     }
 
     private async Task<IRemotePlayerTelemetrySource?> TakeProPlayerSourceAsync()

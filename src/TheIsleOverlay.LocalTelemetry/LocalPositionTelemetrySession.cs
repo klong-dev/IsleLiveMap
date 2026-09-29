@@ -101,6 +101,11 @@ public sealed class LocalPositionTelemetrySession : ITelemetrySession
                     case RemoteSnapshotEvent remoteEvent:
                         remote = remoteEvent.Snapshot;
                         break;
+                    case RemoteFailureEvent:
+                        if (remote?.SessionState == TelemetrySessionState.AuthenticationRequired) break;
+                        remote = (remote ?? new TelemetrySnapshot { Source = _sourceName }) with
+                        { SessionState = TelemetrySessionState.Reconnecting, LiveDataStale = true };
+                        break;
                     case LocalMovementEvent localEvent:
                         local = LocalMovementObservation.Coalesce(
                             local,
@@ -192,6 +197,7 @@ public sealed class LocalPositionTelemetrySession : ITelemetrySession
                     usableRemotePlayerFrame,
                     allowLocalVitals: _enableLocalVitals,
                     replaceIslePilotStats: _replaceIslePilotStats,
+                    enableIslePilotFallback: !_replaceIslePilotStats,
                     requireFreshLocalMovement: true);
 
                 var lifecycle = usableRemotePlayerFrame is { } lifecycleFrame
@@ -358,9 +364,15 @@ public sealed class LocalPositionTelemetrySession : ITelemetrySession
                         cancellationToken)
                     .ConfigureAwait(false);
             }
+            if (!cancellationToken.IsCancellationRequested)
+                await writer.WriteAsync(new RemoteFailureEvent(), cancellationToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
+        }
+        catch (Exception)
+        {
+            await writer.WriteAsync(new RemoteFailureEvent(), cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -450,6 +462,7 @@ public sealed class LocalPositionTelemetrySession : ITelemetrySession
 
     private abstract record SessionEvent;
     private sealed record RemoteSnapshotEvent(TelemetrySnapshot Snapshot) : SessionEvent;
+    private sealed record RemoteFailureEvent : SessionEvent;
     private sealed record LocalMovementEvent(LocalMovementObservation Observation) : SessionEvent;
     private sealed record LocalFailureEvent(string Message) : SessionEvent;
     private sealed record RemotePlayersEvent(RemotePlayerTelemetryFrame Frame) : SessionEvent;

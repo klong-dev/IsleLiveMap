@@ -47,7 +47,7 @@ public sealed class LauncherWorkspaceTests
         Assert.DoesNotContain("ServerButton(null, \"DINORP\"", code, StringComparison.Ordinal);
         Assert.DoesNotContain("flow đăng nhập riêng", code, StringComparison.Ordinal);
         Assert.DoesNotContain("servers.Children.Add(ServerButton", code, StringComparison.Ordinal);
-        Assert.Contains("OpenOverlaySessionAsync(null, \"INBOUND\")", code, StringComparison.Ordinal);
+        Assert.Contains("new IslePilotOverlayLoginFlow(authHttp, store).ResolveAsync", code, StringComparison.Ordinal);
         Assert.Contains("ServerAction", xaml, StringComparison.Ordinal);
     }
 

@@ -81,7 +81,7 @@ public sealed record IslePilotPrimeDto
     public bool? Eligible { get; init; }
     public int? Done { get; init; }
     public int? Required { get; init; }
-    public IReadOnlyList<IslePilotPrimeQuestDto>? Quests { get; init; } = [];
+    public IReadOnlyList<IslePilotPrimeQuestDto>? Quests { get; init; }
 }
 
 public sealed record IslePilotPrimeQuestDto

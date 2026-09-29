@@ -25,7 +25,9 @@ public sealed class NpcapLocalMovementSource : ILocalMovementSource, ILocalVital
     private readonly Dictionary<string, (LocalMovementTracker Tracker, DateTimeOffset LastSeen)> _movementFlows = [];
     private readonly UnrealDinosaurVitalsTracker _vitalsTracker;
     private readonly InboundStatsAccumulator _inboundStats = new(new InboundStatsRestartCache());
-    private readonly bool _replaceIslePilotStats = LocalVitalsFeature.ReplacesIslePilot();
+    // Decoder selection is independent of provider priority. Always keep the
+    // modern delta accumulator warm when inbound stats are enabled.
+    private readonly bool _replaceIslePilotStats = LocalVitalsFeature.IsEnabled();
     private readonly LocalVitalsSessionCache _vitalsCache;
     private readonly bool _trackIrisSequenceDiagnostics;
     private readonly UnrealIrisPacketParser _irisPacketParser = new();

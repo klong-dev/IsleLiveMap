@@ -20,8 +20,8 @@ internal readonly record struct HomeProPresentationState(
 
 internal static class HomeProPresentationPolicy
 {
-    internal const string BasicMapAction = "MỞ MAP CHO MỌI SERVER (THỬ NGHIỆM)";
-    internal const string ProMapAction = "MỞ MAP PRO CHO MỌI SERVER (THỬ NGHIỆM)";
+    internal const string BasicMapAction = "MỞ MAP";
+    internal const string ProMapAction = "MỞ MAP PRO";
     public static HomeProPresentationState Evaluate(
         ProAccessSnapshot access,
         DateTimeOffset now)

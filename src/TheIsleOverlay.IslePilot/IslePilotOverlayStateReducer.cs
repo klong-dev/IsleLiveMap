@@ -14,6 +14,8 @@ public sealed class IslePilotOverlayStateReducer
     private DateTimeOffset? _lastMeAt;
     private DateTimeOffset? _lastMapAt;
     private DateTimeOffset? _lastLiveAt;
+    private DateTimeOffset? _lastStatsAt;
+    private DateTimeOffset? _lastPrimeAt;
     private TelemetrySessionState _sessionState = TelemetrySessionState.Connecting;
     public long IdentityGeneration { get; private set; }
 
@@ -45,12 +47,17 @@ public sealed class IslePilotOverlayStateReducer
             _me = null;
             _live = null;
             _lastLiveAt = null;
+            _lastStatsAt = null;
+            _lastPrimeAt = null;
             _map = null;
             _lastMapAt = null;
             _calibration = null;
             _sessionState = TelemetrySessionState.Connecting;
         }
         _me = Merge(_me, me);
+        if (me.Health is not null || me.Stamina is not null || me.Hunger is not null || me.Thirst is not null)
+            _lastStatsAt = receivedAt;
+        if (me.Prime is not null) _lastPrimeAt = receivedAt;
         _lastMeAt = receivedAt;
     }
 
@@ -77,6 +84,8 @@ public sealed class IslePilotOverlayStateReducer
         if (Changed(_me?.SteamId, live.SteamId)) return;
         if (live.HasDino == false)
         {
+            _lastStatsAt = null;
+            _lastPrimeAt = null;
             IdentityGeneration++;
             if (_map is not null) _map = _map with { Markers = [] };
             // Keep account/server metadata, but never reuse a despawned
@@ -90,6 +99,8 @@ public sealed class IslePilotOverlayStateReducer
             _live = null;
         }
         _live = Merge(_live, live);
+        if (live.Health is not null || live.Stamina is not null || live.Hunger is not null || live.Thirst is not null)
+            _lastStatsAt = receivedAt;
         _lastLiveAt = receivedAt;
         _sessionState = TelemetrySessionState.Live;
     }
@@ -116,6 +127,8 @@ public sealed class IslePilotOverlayStateReducer
                 not TelemetrySessionState.Stopped,
             PlayerOnline = playerOnline,
             UpdatedAt = LatestTimestamp(),
+            ProviderStatsObservedAt = _lastStatsAt,
+            ProviderPrimeObservedAt = _lastPrimeAt,
             Player = player,
             Map = BuildMap(),
             SessionState = sessionState,
@@ -453,7 +466,20 @@ public sealed class IslePilotOverlayStateReducer
             Stamina = current.Stamina ?? previous.Stamina,
             MaxStamina = current.MaxStamina ?? previous.MaxStamina,
             Nutrition = Merge(previous.Nutrition, current.Nutrition),
-            Prime = current.Prime ?? previous.Prime
+            Prime = MergePrime(previous.Prime, current.Prime)
+        };
+    }
+
+    private static IslePilotPrimeDto? MergePrime(IslePilotPrimeDto? previous, IslePilotPrimeDto? current)
+    {
+        if (current is null) return previous;
+        if (previous is null) return current;
+        return current with
+        {
+            Done = current.Done ?? previous.Done, Required = current.Required ?? previous.Required,
+            Eligible = current.Eligible ?? previous.Eligible, Elder = current.Elder ?? previous.Elder,
+            // Omitted quest list is a partial update; explicit [] clears it.
+            Quests = current.Quests ?? previous.Quests
         };
     }
 
