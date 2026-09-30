@@ -46,11 +46,24 @@ public sealed class LauncherWorkspaceTests
         Assert.Contains("TextWrapping = TextWrapping.Wrap", code, StringComparison.Ordinal);
         Assert.DoesNotContain("ServerButton(null, \"DINORP\"", code, StringComparison.Ordinal);
         Assert.DoesNotContain("flow đăng nhập riêng", code, StringComparison.Ordinal);
-        Assert.DoesNotContain("servers.Children.Add(ServerButton", code, StringComparison.Ordinal);
+        Assert.Contains("Hoặc các server được hỗ trợ riêng:", code, StringComparison.Ordinal);
+        Assert.Contains("GachaServer_Click,", code, StringComparison.Ordinal);
+        Assert.Contains("OriginServer_Click,", code, StringComparison.Ordinal);
+        Assert.Contains("SdvnServer_Click,", code, StringComparison.Ordinal);
         Assert.Contains("new IslePilotOverlayLoginFlow(authHttp, store).ResolveAsync", code, StringComparison.Ordinal);
         Assert.Contains("ServerAction", xaml, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void SettingsClearLoginUsesAsyncResetAndVisibleStatus()
+    {
+        var code = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "TestAssets", "HomeWindow.xaml.cs"));
+        Assert.Contains("ClearServerLogin_Click", code);
+        Assert.Contains("ClearServerLoginButton", code);
+        Assert.Contains("LoginResetStatus", code);
+        Assert.Contains("telemetryStack.Children.Add(_loginResetStatus)", code);
+        Assert.DoesNotContain("new IslePilotCredentialStore(AppPaths.IslePilotCredential).Clear(); _snapshots.Clear();", code);
+    }
     [Fact]
     public void SnapshotStore_RepresentsEmptyAndLatestState()
     {

@@ -1,3 +1,19 @@
+# Isle Live Map 2.4.6
+
+## ORIGIN và stats inbound song song
+
+- Khôi phục GACHA, ORIGIN 5X, SDVN cùng nhãn server hỗ trợ riêng; DinoRP vẫn tạm ẩn.
+- ORIGIN bổ sung current/max của bốn stats; inbound cập nhật từng field mới nhận. Giữ max đã biết khi dino ngừng lớn, không xóa field chỉ vì packet không gửi lại.
+- Giãn yêu cầu stats ORIGIN tối thiểu 20 giây. Response cũ không ghi đè inbound mới hơn; hỗ trợ đúng các field stamina `stam` / `maxStam`.
+- Tách state theo phiên/actor đã quan sát, giữ giá trị nhưng đánh dấu cũ khi nguồn ngừng cập nhật. Không suy đoán growth từ inbound.
+- Giữ luồng IslePilot và nhiệm vụ Prime; không thay bản phân phối Pro Agent hoặc triển khai backend trong bản này.
+
+## Đăng nhập và mốc cá nhân
+
+- “Xóa thông tin đăng nhập” xóa phiên các server hỗ trợ riêng trong ứng dụng, gồm cookie trình duyệt nhúng; báo thành công hoặc lỗi từng nguồn. Không xóa giấy phép Pro hoặc đăng xuất Steam/game.
+- Tạm tắt “Vị trí cuối / Mốc đã chết”: không tự tạo, hiển thị hoặc bật đồng bộ mốc lịch sử; giữ nguyên dữ liệu đã lưu và mốc thủ công.
+- Bao gồm commit `ced8096` và bàn giao `6b9f72d`; kiểm tra cờ tắt trong gói phát hành, không chỉ ở source.
+
 # Isle Live Map 2.4.5
 
 ## IslePilot chính, inbound dự phòng

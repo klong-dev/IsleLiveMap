@@ -21,7 +21,7 @@ public sealed class OriginRealtimeTests
             Prime = (_, ct) => Wait(ct)
         };
         await using var session = new OriginStatsSession(fake);
-        using var ct = new CancellationTokenSource(TimeSpan.FromSeconds(8));
+        using var ct = new CancellationTokenSource(TimeSpan.FromSeconds(50));
         await using var reader = session.WatchAsync(ct.Token).GetAsyncEnumerator(ct.Token);
         Assert.True(await reader.MoveNextAsync());
         var stopwatch = Stopwatch.StartNew();
@@ -30,25 +30,26 @@ public sealed class OriginRealtimeTests
         Assert.True(first.Player!.Prime!.IsSynchronizing);
         Assert.Equal(80, first.Player.StaminaPercent);
         var second = await Until(reader, s => s.UpdatedAt > first.UpdatedAt);
-        Assert.InRange((second.UpdatedAt!.Value - first.UpdatedAt!.Value).TotalSeconds, 2.3, 3.5);
+        Assert.InRange((second.UpdatedAt!.Value - first.UpdatedAt!.Value).TotalSeconds, 19.9, 24);
         Assert.Equal(1, fake.MaximumConcurrentHealthPerServer);
-        Assert.Equal(1, fake.PrimeCalls);
+        Assert.True(fake.PrimeCalls >= 1);
     }
 
     [Fact]
-    public async Task StaleFallbackExpiresWithoutRefreshingItsOwnTimestamp()
+    public async Task StaleBaselineRemainsForInboundFusionWithoutRefreshingTimestamp()
     {
         var calls = 0;
         var fake = new FakeClient { Health = (_, _) => Task.FromResult(Interlocked.Increment(ref calls) == 1
             ? Health() : new OriginCommandResult("pending", null, "slow")) };
         await using var session = new OriginStatsSession(fake, OriginServer.All[0]);
-        using var ct = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+        using var ct = new CancellationTokenSource(TimeSpan.FromSeconds(35));
         await using var reader = session.WatchAsync(ct.Token).GetAsyncEnumerator(ct.Token);
         var first = await Until(reader, s => s.Player is not null);
         var stale = await Until(reader, s => s.LiveDataStale && s.Player is not null);
         Assert.Equal(first.UpdatedAt, stale.UpdatedAt);
-        var expired = await Until(reader, s => s.LiveDataStale && s.Player is null);
-        Assert.False(expired.PlayerOnline);
+        Assert.True(stale.PlayerOnline);
+        Assert.NotNull(stale.Player!.ExactVitals);
+        Assert.Equal(first.ProviderStatsRequestedAt, stale.ProviderStatsRequestedAt);
         Assert.Equal(1, fake.MaximumConcurrentHealthPerServer);
     }
 
@@ -61,13 +62,35 @@ public sealed class OriginRealtimeTests
             : Interlocked.Increment(ref mainCalls) == 1 ? Health(10)
             : new OriginCommandResult("completed", JsonSerializer.SerializeToElement(new { success = false }), "no dino"));
         await using var session = new OriginStatsSession(fake, OriginServer.All[0]);
-        using var ct = new CancellationTokenSource(TimeSpan.FromSeconds(8));
+        using var ct = new CancellationTokenSource(TimeSpan.FromSeconds(55));
         await using var reader = session.WatchAsync(ct.Token).GetAsyncEnumerator(ct.Token);
         await Until(reader, s => s.Player?.ExactVitals?.Health == 10);
         var switched = await Until(reader, s => s.Player?.ExactVitals?.Health == 90);
         Assert.Equal(OriginServer.All[1].DisplayName, switched.Player!.Server);
     }
 
+    [Fact]
+    public async Task RepeatedVoiceFailuresRediscoverMainWithoutTreatingFailureAsDeath()
+    {
+        var calls = 0;
+        var fake = new FakeClient
+        {
+            Health = (server, _) => Task.FromResult(server.Id == OriginServerId.Main ? Health(90)
+                : Interlocked.Increment(ref calls) == 1 ? Health(70)
+                : new OriginCommandResult("failed", JsonSerializer.SerializeToElement(new { success = false }), null))
+        };
+        await using var session = new OriginStatsSession(fake, OriginServer.All[1]);
+        using var ct = new CancellationTokenSource(TimeSpan.FromSeconds(95));
+        await using var reader = session.WatchAsync(ct.Token).GetAsyncEnumerator();
+        var initial = await Until(reader, s => s.Player?.ExactVitals?.Health == 70);
+        var stale = await Until(reader, s => s.LiveDataStale);
+        Assert.Equal(initial.UpdatedAt, stale.UpdatedAt);
+        Assert.Equal(70, stale.Player!.ExactVitals!.Health);
+        Assert.False(stale.ProviderStatsReset);
+        var recovered = await Until(reader, s => s.Player?.ExactVitals?.Health == 90);
+        Assert.Equal(OriginServer.All[0].DisplayName, recovered.Player!.Server);
+        Assert.InRange((recovered.UpdatedAt!.Value - initial.UpdatedAt!.Value).TotalSeconds, 79, 90);
+    }
     [Fact]
     public async Task AuthenticationFailureIsPublishedThenSessionStops()
     {
@@ -110,18 +133,21 @@ public sealed class OriginRealtimeTests
         using var client = new OriginStatsClient("session=fixture", http);
         await client.ExecuteHealthAsync(OriginServer.All[0]);
         await client.ExecuteHealthAsync(OriginServer.All[0]);
+        await client.ExecuteHealthAsync(OriginServer.All[1]);
         Assert.Equal(1, calls);
     }
 
     [Fact]
-    public async Task OldQueuedHealthResultCannotResetFreshness()
+    public async Task OldQueuedHealthResultKeepsRequestTimeForFieldMerge()
     {
         var fake = new FakeClient { Health = (_, _) => Task.FromResult(Health() with { RequestedAt = DateTimeOffset.UtcNow.AddSeconds(-30) }) };
         await using var session = new OriginStatsSession(fake, OriginServer.All[0]);
         using var ct = new CancellationTokenSource(TimeSpan.FromSeconds(3));
         await using var reader = session.WatchAsync(ct.Token).GetAsyncEnumerator(ct.Token);
         var snapshot = await Until(reader, s => s.LiveDataStale);
-        Assert.Null(snapshot.Player);
+        Assert.NotNull(snapshot.Player);
+        Assert.True(snapshot.UpdatedAt < DateTimeOffset.UtcNow.AddSeconds(-25));
+        Assert.Equal(snapshot.UpdatedAt, snapshot.ProviderStatsRequestedAt);
     }
 
     [Fact]
@@ -132,13 +158,39 @@ public sealed class OriginRealtimeTests
             ? Json("{\"id\":\"cmd-" + ++posts + "\"}")
             : posts == 1 ? new HttpResponseMessage(HttpStatusCode.NotFound)
             : Json("""{"status":"completed","result":{"species":"Rex"}}""")));
-        using var client = new OriginStatsClient("session=fixture", http);
+        var clock = new AdjustableClock();
+        using var client = new OriginStatsClient("session=fixture", http, clock);
         Assert.Equal("failed", (await client.ExecuteHealthAsync(OriginServer.All[0])).Status);
+        clock.Advance(TimeSpan.FromSeconds(21));
         Assert.True((await client.ExecuteHealthAsync(OriginServer.All[0])).IsCompletedSuccessfully);
         Assert.Equal(2, posts);
     }
 
     private static HttpResponseMessage Json(string text) => new(HttpStatusCode.OK) { Content = new StringContent(text) };
+    private sealed class AdjustableClock : TimeProvider
+    {
+        private DateTimeOffset _now = DateTimeOffset.UtcNow;
+        public override DateTimeOffset GetUtcNow() => _now;
+        public void Advance(TimeSpan delta) => _now += delta;
+    }
+
+    [Fact]
+    public async Task HealthCooldownAppliesAcrossBothServersAndDoesNotBlockPrime()
+    {
+        var clock = new AdjustableClock(); var posts = 0;
+        using var http = new HttpClient(new Handler(request => request.Method == HttpMethod.Post
+            ? Json("{\"id\":\"cmd-" + ++posts + "\"}")
+            : Json("""{"status":"completed","result":{"species":"Rex"}}""")));
+        using var client = new OriginStatsClient("session=fixture", http, clock);
+        Assert.True((await client.ExecuteHealthAsync(OriginServer.All[0])).IsCompletedSuccessfully);
+        Assert.Equal("pending", (await client.ExecuteHealthAsync(OriginServer.All[1])).Status);
+        Assert.Equal(1, posts);
+        Assert.True((await client.ExecutePrimeAsync(OriginServer.All[0])).IsCompletedSuccessfully);
+        Assert.Equal(2, posts);
+        clock.Advance(TimeSpan.FromSeconds(20));
+        Assert.True((await client.ExecuteHealthAsync(OriginServer.All[1])).IsCompletedSuccessfully);
+        Assert.Equal(3, posts);
+    }
     private sealed class Handler(Func<HttpRequestMessage, HttpResponseMessage> respond) : HttpMessageHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)

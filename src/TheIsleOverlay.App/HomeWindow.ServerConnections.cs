@@ -43,7 +43,7 @@ public partial class HomeWindow
     {
         if (_reopenUpdateAction is not null)
             _reopenUpdateAction.Visibility = _mapLaunchGateState == MapLaunchGateState.UpdateRequired ? Visibility.Visible : Visibility.Collapsed;
-        var available = MapLaunchGatePolicy.AllowsMap(_mapLaunchGateState) && _mapOpenStarted == 0;
+        var available = MapLaunchGatePolicy.AllowsMap(_mapLaunchGateState) && _mapOpenStarted == 0 && !_clearingServerLogin;
         if (_mapActionButton is not null) _mapActionButton.IsEnabled = available;
         foreach (var button in _serverActionButtons)
         {
@@ -56,6 +56,7 @@ public partial class HomeWindow
 
     private async Task<bool> PrepareMapLaunchAsync()
     {
+        if (_clearingServerLogin) { SetStatus("Đang xóa phiên đăng nhập; vui lòng chờ hoàn tất."); return false; }
         if (_mapLaunchGateState == MapLaunchGateState.Checking)
         {
             SetStatus("Đang kiểm tra cập nhật; vui lòng chờ…");

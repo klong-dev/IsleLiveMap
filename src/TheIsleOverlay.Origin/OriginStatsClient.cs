@@ -57,6 +57,8 @@ public sealed class OriginStatsClient : IOriginStatsClient
     private readonly string _cookieHeader;
     private readonly TimeProvider _clock;
     private readonly System.Collections.Concurrent.ConcurrentDictionary<string, CommandLane> _lanes = new();
+    private readonly SemaphoreSlim _healthGate = new(1, 1);
+    private DateTimeOffset _nextHealthCommandAt;
     private int _disposed;
 
     public OriginStatsClient(string cookieHeader, HttpClient? httpClient = null, TimeProvider? timeProvider = null)
@@ -125,6 +127,12 @@ public sealed class OriginStatsClient : IOriginStatsClient
         catch (OriginRateLimitException exception)
         {
             lane.RetryAt = _clock.GetUtcNow() + exception.RetryAfter;
+            if (command == "health")
+            {
+                await _healthGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+                try { if (_nextHealthCommandAt < lane.RetryAt) _nextHealthCommandAt = lane.RetryAt; }
+                finally { _healthGate.Release(); }
+            }
             return new OriginCommandResult("pending", null, "Origin đang giới hạn tần suất; sẽ tự thử lại.", lane.Pending?.CommandId);
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
@@ -144,7 +152,7 @@ public sealed class OriginStatsClient : IOriginStatsClient
     /// <summary>
     /// Resolves whether this authenticated account currently has an active
     /// dinosaur on either Origin server. The dashboard's active-server cookie
-    /// is checked first, with a parallel fallback for the remaining server.
+    /// is checked first, then other servers sequentially under the health cooldown.
     /// </summary>
     public async Task<OriginServer?> DetectActiveServerAsync(
         CancellationToken cancellationToken = default)
@@ -163,13 +171,15 @@ public sealed class OriginStatsClient : IOriginStatsClient
         var candidates = OriginServer.All
             .Where(server => PreferredServer is null || !Equals(server, PreferredServer))
             .ToArray();
-        var probes = await Task.WhenAll(candidates.Select(async server =>
+        foreach (var server in candidates)
         {
             try
             {
+                var remaining = _nextHealthCommandAt - _clock.GetUtcNow();
+                if (remaining > TimeSpan.Zero) await Task.Delay(remaining, _clock, cancellationToken).ConfigureAwait(false);
                 var result = await ExecuteHealthAsync(server, cancellationToken)
                     .ConfigureAwait(false);
-                return (Server: server, Active: HasActiveDinosaur(result));
+                if (HasActiveDinosaur(result)) return server;
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -181,10 +191,9 @@ public sealed class OriginStatsClient : IOriginStatsClient
             }
             catch
             {
-                return (Server: server, Active: false);
             }
-        })).ConfigureAwait(false);
-        return probes.FirstOrDefault(probe => probe.Active).Server;
+        }
+        return null;
     }
 
     public async Task<OriginCommandResult> ExecuteCommandAsync(
@@ -193,6 +202,19 @@ public sealed class OriginStatsClient : IOriginStatsClient
         CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
+        // All health submissions (including direct callers and discovery) share
+        // the same account cooldown. Result polling resumes the existing id.
+        if (command == "health")
+        {
+            await _healthGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+            try
+            {
+                var remaining = _nextHealthCommandAt - _clock.GetUtcNow();
+                if (remaining > TimeSpan.Zero) throw new OriginRateLimitException(remaining);
+                _nextHealthCommandAt = _clock.GetUtcNow() + OriginStatsSession.PollInterval;
+            }
+            finally { _healthGate.Release(); }
+        }
         var requestedAt = _clock.GetUtcNow();
         using var request = CreateRequest(HttpMethod.Post, "api/commands/execute");
         request.Content = new StringContent(

@@ -307,6 +307,8 @@ public partial class MainWindow : Window
                     diagnosticPlayer.InboundStatsOwnerHandle,
                     diagnosticPlayer.InboundStatsLastKnown,
                     diagnosticPlayer.InboundStatsFieldTimes,
+                    diagnosticPlayer.StatsFieldTimes,
+                    diagnosticPlayer.StatsFieldSources,
                     diagnosticPlayer.ExactVitals,
                     diagnosticPlayer.Nutrition,
                     diagnosticPlayer.Prime
@@ -678,6 +680,10 @@ public partial class MainWindow : Window
                     ? "INBOUND · STATS"
                     : ConnectionText(snapshot.SessionState, player.ExactVitalsSource),
                 degraded ? WaitingBrush : OnlineBrush);
+            if (player.ExactVitalsSource == "OriginInbound")
+                SetConnectionState(player.ProviderAuthenticationRequired
+                    ? "ORIGIN + INBOUND · ORIGIN CẦN ĐĂNG NHẬP"
+                    : snapshot.StatusMessage ?? "ORIGIN + INBOUND", degraded ? WaitingBrush : OnlineBrush);
             SpeciesLabel.Text = FriendlySpecies(player.Class);
             PlayerNameLabel.Text = string.IsNullOrWhiteSpace(player.Name) ? "ACTIVE PLAYER" : player.Name;
 

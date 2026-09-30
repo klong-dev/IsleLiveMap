@@ -9,6 +9,10 @@ public sealed record TelemetrySnapshot
     public DateTimeOffset? UpdatedAt { get; init; }
     public DateTimeOffset? ProviderStatsObservedAt { get; init; }
     public DateTimeOffset? ProviderPrimeObservedAt { get; init; }
+    // Provider identity generation and request-start time for asynchronous delta fusion.
+    public string? ProviderStatsScope { get; init; }
+    public DateTimeOffset? ProviderStatsRequestedAt { get; init; }
+    public bool ProviderStatsReset { get; init; }
     public PlayerTelemetry? Player { get; init; }
     public MapTelemetry? Map { get; init; }
     public TelemetrySessionState SessionState { get; init; } = TelemetrySessionState.Polling;
@@ -45,6 +49,8 @@ public sealed record PlayerTelemetry
     public ExactVitals? ExactVitals { get; init; }
     public string? ExactVitalsSource { get; init; }
     public bool InboundStatsFallback { get; init; }
+    public IReadOnlyDictionary<string, DateTimeOffset>? StatsFieldTimes { get; init; }
+    public IReadOnlyDictionary<string, string>? StatsFieldSources { get; init; }
     public bool PrimeDataStale { get; init; }
     public bool ProviderAuthenticationRequired { get; init; }
     public bool InboundStatsExperimental { get; init; }

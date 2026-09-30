@@ -73,7 +73,10 @@ public sealed class ServerConnectionsTests
                     var root = (FrameworkElement)home.Content;
                     Render(root, width, 600, Path.Combine(output, $"home-{width}.png"));
                     var buttons = Children(root).OfType<Button>().Where(b => AutomationProperties.GetAutomationId(b).StartsWith("Server")).ToArray();
-                    Assert.Empty(buttons);
+                    Assert.Equal(3, buttons.Length);
+                    Assert.Single(buttons, b => AutomationProperties.GetAutomationId(b) == "ServerGACHAButton");
+                    Assert.Single(buttons, b => AutomationProperties.GetAutomationId(b) == "ServerORIGIN5XButton");
+                    Assert.Single(buttons, b => AutomationProperties.GetAutomationId(b) == "ServerSDVNButton");
                     var action = Assert.Single(Children(root).OfType<Button>(), b => AutomationProperties.GetAutomationId(b) == "OpenMapBasicButton");
                     Assert.Equal(HomeProPresentationPolicy.BasicMapAction, AutomationProperties.GetName(action));
                     foreach (var button in buttons)

@@ -193,10 +193,16 @@ public partial class HomeWindow : Window
         primary.Children.Add(updateAction);
         copy.Children.Add(primary);
 
-        // Dedicated server shortcuts temporarily hidden for universal inbound rollout.
-        // Keep handlers and saved credentials intact for a later re-enable.
         _serverActionButtons.Clear();
         _serverButtonLabels.Clear();
+        var supportedLabel = T("Hoặc các server được hỗ trợ riêng:", 13, B("#A9BAB4"), FontWeights.SemiBold);
+        supportedLabel.Margin = new Thickness(0, 10, 0, 0);
+        copy.Children.Add(supportedLabel);
+        var servers = new WrapPanel { Margin = new Thickness(0, 10, 0, 0) };
+        servers.Children.Add(ServerButton("Assets/GachaLogo.png", "GACHA", GachaServer_Click, "#415D3E", "#A8D17A"));
+        servers.Children.Add(ServerButton("Assets/OriginLogo.png", "ORIGIN 5X", OriginServer_Click, "#344F71", "#9CC8FF"));
+        servers.Children.Add(ServerButton("Assets/SDVNIcon.png", "SDVN", SdvnServer_Click, "#303F7D", "#A6B8FF"));
+        copy.Children.Add(servers);
         _status = T(_launchStatus, 12, B("#E7D9AB"), FontWeights.SemiBold);
         _status.Margin = new Thickness(0, 4, 0, 0);
         copy.Children.Add(_status);
@@ -876,7 +882,10 @@ public partial class HomeWindow : Window
         var telemetrySection = Section("DỮ LIỆU PHIÊN", "Nguồn dữ liệu và phiên hiện tại.");
         var telemetryStack = (StackPanel)telemetrySection.Child;
         telemetryStack.Children.Add(T(NpcapAvailabilityProbe.Check().IsAvailable ? "Npcap / GPS: Sẵn sàng" : "Npcap / GPS: Chưa sẵn sàng", 14, B("#91AAA3")));
-        var clearCredentials = Action("XÓA THÔNG TIN ĐĂNG NHẬP", (_, _) => { new IslePilotCredentialStore(AppPaths.IslePilotCredential).Clear(); _snapshots.Clear(); SetStatus("Đã xóa thông tin đăng nhập và dữ liệu phiên hiện tại."); }, false);
+        var clearCredentials = Action("XÓA THÔNG TIN ĐĂNG NHẬP", ClearServerLogin_Click, false);
+        _loginResetButton = clearCredentials;
+        clearCredentials.IsEnabled = !_clearingServerLogin;
+        AutomationProperties.SetAutomationId(clearCredentials, "ClearServerLoginButton");
         clearCredentials.MinWidth = 250;
         clearCredentials.MinHeight = 48;
         clearCredentials.Height = 48;
@@ -887,7 +896,9 @@ public partial class HomeWindow : Window
         clearCredentials.BorderBrush = B("#F08A8A");
         clearCredentials.Margin = new Thickness(0, 12, 10, 0);
         telemetryStack.Children.Add(clearCredentials);
-        telemetryStack.Children.Add(T("Đăng xuất khỏi tài khoản đang chơi để đổi tài khoản khác tránh lấy sai chỉ số dino", 12, B("#C9AAA5")));
+        _loginResetStatus = T(_loginResetMessage, 12, B("#C9AAA5"));
+        AutomationProperties.SetAutomationId(_loginResetStatus, "LoginResetStatus");
+        telemetryStack.Children.Add(_loginResetStatus);
         p.Children.Add(telemetrySection);
     }
     private void SaveLayer(MapLayerGroup group, bool value) { _layers.SetEnabled(group, value); _layers.Version = MapLayerPreferences.CurrentVersion; _layerStore.TrySave(_layers, out _); }

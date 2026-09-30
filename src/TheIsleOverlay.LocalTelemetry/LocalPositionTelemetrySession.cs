@@ -14,6 +14,7 @@ public sealed class LocalPositionTelemetrySession : ITelemetrySession
     private readonly string? _expectedServerEndpoint;
     private readonly bool _enableLocalVitals;
     private readonly bool _replaceIslePilotStats;
+    private readonly OriginInboundStatsFusion? _originFusion;
     private readonly CancellationTokenSource _disposeCancellation = new();
     private readonly object _latestRemoteFrameGate = new();
     private readonly RemoteEntityLifecycleTracker _remoteLifecycle = new();
@@ -39,6 +40,7 @@ public sealed class LocalPositionTelemetrySession : ITelemetrySession
                               ?? (_localSource as ILocalVitalsFeatureSource)?.LocalVitalsEnabled
                               ?? LocalVitalsFeature.IsEnabled();
         _replaceIslePilotStats = LocalVitalsFeature.ReplacesIslePilot();
+        _originFusion = sourceName.StartsWith("ORIGIN", StringComparison.OrdinalIgnoreCase) ? new OriginInboundStatsFusion() : null;
     }
 
     public async IAsyncEnumerable<TelemetrySnapshot> WatchAsync(
@@ -100,13 +102,16 @@ public sealed class LocalPositionTelemetrySession : ITelemetrySession
                 {
                     case RemoteSnapshotEvent remoteEvent:
                         remote = remoteEvent.Snapshot;
+                        _originFusion?.ObserveProvider(remoteEvent.Snapshot, DateTimeOffset.UtcNow);
                         break;
                     case RemoteFailureEvent:
                         if (remote?.SessionState == TelemetrySessionState.AuthenticationRequired) break;
                         remote = (remote ?? new TelemetrySnapshot { Source = _sourceName }) with
                         { SessionState = TelemetrySessionState.Reconnecting, LiveDataStale = true };
+                        _originFusion?.ObserveProvider(remote, DateTimeOffset.UtcNow);
                         break;
                     case LocalMovementEvent localEvent:
+                        _originFusion?.ObserveLocal(localEvent.Observation, DateTimeOffset.UtcNow);
                         local = LocalMovementObservation.Coalesce(
                             local,
                             localEvent.Observation);
@@ -188,14 +193,14 @@ public sealed class LocalPositionTelemetrySession : ITelemetrySession
                     previousMap = null;
                 }
                 var merged = LocalPositionSnapshotMerger.Merge(
-                    PrepareMergeInput(remote, lastMergedSnapshot, usableRemotePlayerFrame),
+                    PrepareMergeInput(_originFusion?.Build(now) ?? remote, lastMergedSnapshot, usableRemotePlayerFrame),
                     local,
                     now,
                     _sourceName,
                     remotePlayers,
-                    verifiedLocalSpeciesId,
+                    _originFusion is null ? verifiedLocalSpeciesId : null,
                     usableRemotePlayerFrame,
-                    allowLocalVitals: _enableLocalVitals,
+                    allowLocalVitals: _enableLocalVitals && _originFusion is null,
                     replaceIslePilotStats: _replaceIslePilotStats,
                     enableIslePilotFallback: !_replaceIslePilotStats,
                     requireFreshLocalMovement: true);
