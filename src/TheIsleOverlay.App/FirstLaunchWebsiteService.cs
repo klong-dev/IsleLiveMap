@@ -1,74 +1,58 @@
 using System.Diagnostics;
 using System.IO;
-using System.Text;
 
 namespace TheIsleOverlay.App;
 
-/// <summary>
-/// Opens the one-time 2.4.7 website notice in the user's default browser.
-/// The marker is deliberately version-independent: later updates do not open
-/// the site again unless this feature is explicitly re-enabled in code.
-/// </summary>
+/// <summary>Version-independent, at-most-once website dispatch per Windows user.</summary>
 internal sealed class FirstLaunchWebsiteService
 {
     internal const string WebsiteUri = "https://islecheat.org/";
-
     private readonly string _markerPath;
-    private readonly Func<ProcessStartInfo, Process?> _startProcess;
-    private readonly object _gate = new();
+    private readonly Action<ProcessStartInfo> _openBrowser;
 
-    internal FirstLaunchWebsiteService(
-        string? markerPath = null,
-        Func<ProcessStartInfo, Process?>? startProcess = null)
+    internal FirstLaunchWebsiteService(string? markerPath = null, Action<ProcessStartInfo>? openBrowser = null)
     {
         _markerPath = markerPath ?? AppPaths.FirstLaunchWebsiteMarker;
-        _startProcess = startProcess ?? Process.Start;
+        _openBrowser = openBrowser ?? OpenBrowser;
     }
 
     internal bool TryOpenOnce()
     {
-        lock (_gate)
+        try
         {
-            if (File.Exists(_markerPath))
-                return false;
-
-            try
+            Directory.CreateDirectory(Path.GetDirectoryName(_markerPath)!);
+            // CreateNew is the cross-process claim, not an Exists/check race.
+            // Persist BEFORE shell dispatch. Keep the claim even on crash or
+            // shell failure: never risk reopening on subsequent launches.
+            // Any existing marker (including an empty one) means consumed.
+            using (var claim = new FileStream(_markerPath, FileMode.CreateNew, FileAccess.Write, FileShare.None))
             {
-                var process = _startProcess(new ProcessStartInfo
-                {
-                    FileName = WebsiteUri,
-                    UseShellExecute = true
-                });
-                if (process is null)
-                    return false;
+                claim.WriteByte(1);
+                claim.Flush(flushToDisk: true);
+            }
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException
+            or System.Security.SecurityException or ArgumentException or NotSupportedException)
+        {
+            return false; // Fail closed if durable state cannot be acquired.
+        }
 
-                Directory.CreateDirectory(Path.GetDirectoryName(_markerPath)!);
-                WriteMarkerAtomically();
-                return true;
-            }
-            catch
-            {
-                // A browser launch failure must not consume the one-time
-                // opportunity; the next application start may retry it.
-                return false;
-            }
+        try
+        {
+            _openBrowser(new ProcessStartInfo(WebsiteUri) { UseShellExecute = true });
+            return true;
+        }
+        catch (Exception error) when (error is System.ComponentModel.Win32Exception
+            or InvalidOperationException or IOException or UnauthorizedAccessException
+            or System.Security.SecurityException or NotSupportedException)
+        {
+            return false;
         }
     }
 
-    private void WriteMarkerAtomically()
+    private static void OpenBrowser(ProcessStartInfo info)
     {
-        var temporaryPath = _markerPath + ".tmp-" + Guid.NewGuid().ToString("N");
-        try
-        {
-            File.WriteAllText(temporaryPath,
-                $"openedAt={DateTimeOffset.UtcNow:O}{Environment.NewLine}uri={WebsiteUri}{Environment.NewLine}",
-                Encoding.UTF8);
-            File.Move(temporaryPath, _markerPath, overwrite: false);
-        }
-        finally
-        {
-            if (File.Exists(temporaryPath))
-                File.Delete(temporaryPath);
-        }
+        // ShellExecute may legitimately return null when reusing a browser.
+        using var process = Process.Start(info);
     }
 }

@@ -43,6 +43,8 @@ public static class AppPaths
         Root,
         "release-highlights.json");
 
+    // Keep this key across releases. Change it only when the product owner
+    // explicitly authorizes another one-time website opening campaign.
     public static string FirstLaunchWebsiteMarker { get; } = Path.Combine(
         Root,
         "islecheat-website-opened.marker");

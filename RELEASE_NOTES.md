@@ -1,10 +1,11 @@
 # Isle Live Map 2.4.7
 
-## One-time website opening
+## Mở website một lần duy nhất
 
-- On the first launch of Isle Live Map after this update, open `https://islecheat.org/` in the user's default browser.
-- Store a persistent local marker after a successful browser launch, so restarting the app and future updates do not open the site again.
-- A browser launch failure does not consume the one-time attempt; no credentials, game input or browser profile data is changed.
+- Khi mở Isle Live Map lần đầu sau cập nhật, gửi yêu cầu mở `https://islecheat.org/` trong trình duyệt mặc định.
+- Ghi cờ bền vững trước khi mở, chống mở trùng khi chạy nhiều launcher. Cờ không phụ thuộc phiên bản: cập nhật sau và xóa đăng nhập server không mở lại website.
+- Ưu tiên không mở lặp: nếu trình duyệt lỗi hoặc ứng dụng bị ngắt sau khi ghi cờ, không tự thử lại. Nếu không lưu được cờ thì không mở website.
+- Không thay đổi stats, tracking, Pro Agent hoặc backend. Cờ áp dụng trên tài khoản Windows hiện tại; xóa dữ liệu ứng dụng hoặc chuyển máy/tài khoản Windows sẽ làm mất cờ.
 
 # Isle Live Map 2.4.6
 
