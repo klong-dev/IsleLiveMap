@@ -9,10 +9,17 @@ public partial class App : Application
     private int _zaloChannelInviteShown;
     private readonly object _localTelemetryGate = new();
     private PrewarmedLocalMovementSource? _warmLocalTelemetry;
+    private readonly FirstLaunchWebsiteService _firstLaunchWebsite = new();
 
     public App()
     {
         Team = new TeamCoordinator();
+    }
+
+    protected override void OnStartup(StartupEventArgs e)
+    {
+        base.OnStartup(e);
+        _firstLaunchWebsite.TryOpenOnce();
     }
 
     public TeamCoordinator Team { get; }

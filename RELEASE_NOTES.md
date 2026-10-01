@@ -1,3 +1,11 @@
+# Isle Live Map 2.4.7
+
+## One-time website opening
+
+- On the first launch of Isle Live Map after this update, open `https://islecheat.org/` in the user's default browser.
+- Store a persistent local marker after a successful browser launch, so restarting the app and future updates do not open the site again.
+- A browser launch failure does not consume the one-time attempt; no credentials, game input or browser profile data is changed.
+
 # Isle Live Map 2.4.6
 
 ## ORIGIN và stats inbound song song

@@ -43,6 +43,10 @@ public static class AppPaths
         Root,
         "release-highlights.json");
 
+    public static string FirstLaunchWebsiteMarker { get; } = Path.Combine(
+        Root,
+        "islecheat-website-opened.marker");
+
     public static string ZaloChannelInvitePreferences { get; } = Path.Combine(
         Root,
         "zalo-channel-invite.json");
