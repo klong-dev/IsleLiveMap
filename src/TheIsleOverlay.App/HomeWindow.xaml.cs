@@ -187,17 +187,14 @@ public partial class HomeWindow : Window
         primary.Children.Add(updateAction);
         copy.Children.Add(primary);
 
-        var supportedLabel = T("Hoặc các server được hỗ trợ riêng:", 13, B("#A9BAB4"), FontWeights.SemiBold);
+        var supportedLabel = T("Chế độ memory-read (kprl): không cần đăng nhập.", 13, B("#A9BAB4"), FontWeights.SemiBold);
         supportedLabel.Margin = new Thickness(0, 10, 0, 0);
         copy.Children.Add(supportedLabel);
-        var servers = new WrapPanel { Margin = new Thickness(0, 10, 0, 0) };
+        // 2026-10: per-server login buttons (GACHA/ORIGIN/SDVN) removed —
+        // the memory-read pipeline replaced every web-session telemetry
+        // source. The single MỞ MAP action covers all servers.
         _serverActionButtons.Clear();
         _serverButtonLabels.Clear();
-        // Equal server actions; wrap at smaller viewports.
-        servers.Children.Add(ServerButton("Assets/GachaLogo.png", "GACHA", GachaServer_Click, "#415D3E", "#A8D17A"));
-        servers.Children.Add(ServerButton("Assets/OriginLogo.png", "ORIGIN 5X", OriginServer_Click, "#344F71", "#9CC8FF"));
-        servers.Children.Add(ServerButton("Assets/SDVNIcon.png", "SDVN", SdvnServer_Click, "#303F7D", "#A6B8FF"));
-        copy.Children.Add(servers);
         _status = T(_launchStatus, 12, B("#E7D9AB"), FontWeights.SemiBold);
         _status.Margin = new Thickness(0, 4, 0, 0);
         copy.Children.Add(_status);
@@ -205,7 +202,7 @@ public partial class HomeWindow : Window
         p.Children.Add(new Border { Child = hero, CornerRadius = new CornerRadius(10), ClipToBounds = true, BorderBrush = B(_proPresentation.HasCurrentProAccess ? "#6B5434" : "#294943"), BorderThickness = new Thickness(1) });
         var row = new UniformGrid { Columns = 3, Margin = new Thickness(0, 12, 0, 0) };
         row.Children.Add(StatusLine("QUYỀN TRUY CẬP", _proPresentation.StatusLabel));
-        row.Children.Add(StatusLine("NPCAP / GPS", NpcapAvailabilityProbe.Check().IsAvailable ? "Sẵn sàng" : "Chưa sẵn sàng"));
+        row.Children.Add(StatusLine("DRIVER KPRL", "Hoạt động"));
         row.Children.Add(StatusLine("PHIÊN", _snapshots.Current is null ? "Chưa có phiên" : "Có dữ liệu gần nhất"));
         p.Children.Add(row);
         _updateStatus = T(_lastUpdateStatus, 12, B(_lastUpdateColor), FontWeights.SemiBold);
