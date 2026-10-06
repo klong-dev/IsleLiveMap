@@ -98,8 +98,10 @@ public sealed class LocalPositionTelemetrySessionHealthTests
                 42)));
         Assert.True(await watch.MoveNextAsync());
 
-        Assert.Null(watch.Current.Player?.ExactVitals);
-        Assert.Null(watch.Current.Player?.ExactVitalsSource);
+        // Hard-truth mode: vitals arriving on the local lane are applied
+        // regardless of the legacy canary switch.
+        Assert.Equal(75, watch.Current.Player?.HealthPercent);
+        Assert.Equal("LocalIris", watch.Current.Player?.ExactVitalsSource);
         Assert.Equal(100, watch.Current.Player?.Location?.X);
     }
 

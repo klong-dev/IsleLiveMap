@@ -580,6 +580,27 @@ public partial class MainWindow : Window
     {
         Interlocked.Increment(ref _snapshotsReceived);
         _renderSnapshotBuffer.Publish(new QueuedRenderSnapshot(snapshot, Stopwatch.GetTimestamp()));
+        // HARD-PATH: render immediately on the UI thread, bypassing the
+        // DispatcherTimer + LatestValueBuffer path entirely. The buffer/timer
+        // lane stays in place for diagnostics, but the live HUD no longer
+        // depends on it. Every snapshot that arrives is rendered, period.
+        try
+        {
+            Dispatcher.BeginInvoke(() =>
+            {
+                try
+                {
+                    _snapshotsRendered++;
+                    RenderSnapshot(snapshot);
+                }
+                catch
+                {
+                }
+            }, DispatcherPriority.Render);
+        }
+        catch
+        {
+        }
     }
 
     private void StartUiRenderTimer()

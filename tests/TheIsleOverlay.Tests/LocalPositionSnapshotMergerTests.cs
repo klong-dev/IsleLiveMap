@@ -131,8 +131,9 @@ public sealed class LocalPositionSnapshotMergerTests
 
         var merged = LocalPositionSnapshotMerger.Merge(remote, local, Now);
 
-        Assert.Same(islePilotVitals, merged.Player?.ExactVitals);
-        Assert.Equal("IslePilotOverlayV2", merged.Player?.ExactVitalsSource);
+        // Hard-truth mode: local memory-read vitals override provider stats.
+        Assert.Equal(1, merged.Player?.ExactVitals?.Health);
+        Assert.Equal("LocalIris", merged.Player?.ExactVitalsSource);
     }
 
     [Fact]
@@ -148,8 +149,10 @@ public sealed class LocalPositionSnapshotMergerTests
 
         var merged = LocalPositionSnapshotMerger.Merge(null, local, Now);
 
-        Assert.Null(merged.Player?.ExactVitals);
-        Assert.Null(merged.Player?.ExactVitalsSource);
+        // Hard-truth mode: local memory-read vitals are the source of truth
+        // and display regardless of provider availability.
+        Assert.NotNull(merged.Player?.ExactVitals);
+        Assert.Equal("LocalIris", merged.Player?.ExactVitalsSource);
     }
 
     [Fact]
@@ -239,8 +242,10 @@ public sealed class LocalPositionSnapshotMergerTests
             Now,
             allowLocalVitals: true);
 
-        Assert.Null(merged.Player?.ExactVitals);
-        Assert.Null(merged.Player?.ExactVitalsSource);
+        // Hard-truth mode: the memory source owns freshness/hold logic; the
+        // merger applies whatever vitals arrive without a second expiry gate.
+        Assert.Equal("LocalIris", merged.Player?.ExactVitalsSource);
+        Assert.Equal(75, merged.Player?.HealthPercent);
         Assert.Equal(100, merged.Player?.Location?.X);
     }
 
@@ -272,9 +277,10 @@ public sealed class LocalPositionSnapshotMergerTests
             Now,
             allowLocalVitals: true);
 
-        Assert.Same(providerVitals, merged.Player?.ExactVitals);
-        Assert.Equal("IslePilotOverlayV2", merged.Player?.ExactVitalsSource);
-        Assert.Equal(80, merged.Player?.HealthPercent);
+        // Hard-truth mode: local memory-read vitals win over the provider's.
+        Assert.Equal(1, merged.Player?.ExactVitals?.Health);
+        Assert.Equal("LocalIris", merged.Player?.ExactVitalsSource);
+        Assert.Equal(1, merged.Player?.HealthPercent);
     }
 
     [Fact]
@@ -320,7 +326,11 @@ public sealed class LocalPositionSnapshotMergerTests
             },
             Now);
 
-        Assert.Same(remote, merged);
+        // Expired local position is not used; the provider snapshot's own
+        // location passes through (no stripping in hard-truth mode).
+        Assert.True(merged.PlayerOnline);
+        Assert.Equal(10, merged.Player?.Location?.X);
+        Assert.Equal(20, merged.Player?.Location?.Y);
     }
 
     [Fact]
@@ -395,7 +405,9 @@ public sealed class LocalPositionSnapshotMergerTests
             Now,
             verifiedLocalFallback: frame);
 
-        Assert.Same(remote, merged);
+        // An expired Pro frame must not fabricate a local position; the
+        // remote snapshot's connecting state passes through.
+        Assert.False(merged.PlayerOnline);
     }
 
     [Fact]

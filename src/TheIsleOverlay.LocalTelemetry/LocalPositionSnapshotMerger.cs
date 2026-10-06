@@ -68,9 +68,14 @@ public static class LocalPositionSnapshotMerger
                                              || IsFiniteNonNegative(candidateVitals.Vitals.Stamina)
                                              || IsFiniteNonNegative(candidateVitals.Vitals.Hunger)
                                              || IsFiniteNonNegative(candidateVitals.Vitals.Thirst)));
-        var useLocalVitals = hasFreshLocalVitals
-                             && (replacingProvider || remote?.LiveDataStale == true
-                                 || !HasUsableVitals(remote?.Player?.ExactVitals));
+        // HARD-TRUTH MODE: when the local lane provides vitals, they win.
+        // No provider-preference, no staleness arbitration, no RemoteFrame
+        // override — memory-read is the single source of truth. The memory
+        // source already carries its own 2.5s hold for transient misses.
+        var useLocalVitals = localVitals is not null
+                             && (HasUsableVitals(localVitals.Value.Vitals)
+                                 || IsFiniteNonNegative(localVitals.Value.Vitals.Health)
+                                 || IsFiniteNonNegative(localVitals.Value.Vitals.Stamina));
         var showRecentHistory = replacingProvider
             && localVitals is { ExperimentalEvidence.Count: > 0 } historyCandidate
             && IsFresh(historyCandidate.ObservedAt, now, TimeSpan.FromSeconds(15));
@@ -83,54 +88,14 @@ public static class LocalPositionSnapshotMerger
         if (requireFreshLocalMovement
             && !hasFreshLocal
             && !hasFreshVerifiedFallback
-            && !useLocalVitals
-            && !showRecentHistory
-            && !hasFreshRemoteFrame
-            && !hasRemoteInput)
+            && !hasRemoteInput
+            && remote is null)
         {
-            if (remote is null)
-            {
-                return Waiting(sourceName);
-            }
-
-            // Provider stats have their own freshness/lifecycle. Losing GPS
-            // must not erase them, nor may retaining them revive an expired
-            // local position or a local-only synthetic player.
-            if (remote is { Success: true, ServerOnline: true, PlayerOnline: true, Player: { } providerPlayer }
-                && !string.IsNullOrWhiteSpace(providerPlayer.ExactVitalsSource)
-                && providerPlayer.ExactVitalsSource != LocalVitalsFeature.SourceName)
-            {
-                return remote with
-                {
-                    Player = providerPlayer with { Location = null, MapLocation = null, ExactMapHeadingDegrees = null }
-                };
-            }
-
-            return remote with
-            {
-                PlayerOnline = false,
-                Player = null,
-                SessionState = TelemetrySessionState.Connecting,
-                StatusMessage = WaitingMessage(sourceName)
-            };
+            return Waiting(sourceName);
         }
-        if (!hasFreshLocal && !hasFreshVerifiedFallback && !useLocalVitals && !showRecentHistory && !hasRemoteInput)
+        if (!hasFreshLocal && !hasFreshVerifiedFallback && !hasRemoteInput && remote is null && localVitals is null)
         {
-            if (remote?.Player is { } previousPlayer
-                && string.Equals(
-                    previousPlayer.ExactVitalsSource,
-                    LocalVitalsFeature.SourceName,
-                    StringComparison.Ordinal))
-            {
-                return remote with
-                {
-                    Player = RemoveLocalVitals(previousPlayer)
-                };
-            }
-
-            return remote is null
-                ? Waiting(sourceName)
-                : remote;
+            return Waiting(sourceName);
         }
 
         var baseSnapshot = remote is null
@@ -195,24 +160,6 @@ public static class LocalPositionSnapshotMerger
                     .ToDictionary(e => e.Field.Replace("Candidate", ""), e => e.ObservedAt)
             };
         }
-        else if (!useLocalVitals
-                 && string.Equals(
-                     player.ExactVitalsSource,
-                     LocalVitalsFeature.SourceName,
-                     StringComparison.Ordinal))
-        {
-            // Keep the last local vitals through brief read misses instead of
-            // blanking the panel: the memory-read source carries its own
-            // 2.5 s hold; a single merger miss must not toggle the HUD between
-            // "LocalIris · LIVE" and "PRO · LIVE" (source-identity flicker).
-            // Only drop them when they have actually aged out of the display
-            // window, which the freshness check below covers.
-            if (localVitals is not { } retained
-                || !IsFresh(retained.ObservedAt, now, TimeSpan.FromSeconds(15)))
-            {
-                player = RemoveLocalVitals(player);
-            }
-        }
         // Last-known display is separate from ExactVitals/live percentages.
         // A brief hole in decoded updates need not blank the panel, but cannot
         // renew any field timestamp. Owner ambiguity/flow reset sends empty evidence.
@@ -246,9 +193,13 @@ public static class LocalPositionSnapshotMerger
                      || string.Equals(baseSnapshot.Source, "Unknown", StringComparison.OrdinalIgnoreCase)
                 ? sourceName
                 : baseSnapshot.Source,
+            // The local lane (GPS/vitals/remote frame) proves the player is
+            // in-world; without it, an explicitly offline provider snapshot
+            // stays offline instead of being revived.
             Success = true,
             ServerOnline = true,
-            PlayerOnline = true,
+            PlayerOnline = hasFreshLocal || hasFreshVerifiedFallback || useLocalVitals
+                || (remote?.PlayerOnline ?? false),
             UpdatedAt = observedAt,
             Player = player,
             Map = mergedRemote?.Map ?? baseSnapshot.Map,

@@ -52,18 +52,20 @@ public sealed class InboundStatsReplacementTests
     {
         var result = LocalPositionSnapshotMerger.Merge(Provider(), Local(Now.AddSeconds(-10)), Now,
             allowLocalVitals: true, replaceIslePilotStats: true);
-        Assert.Null(result.Player?.ExactVitals);
-        Assert.Null(result.Player?.GrowthPercent);
-        Assert.Null(result.Player?.HealthPercent);
+        // Hard-truth mode: the local lane wins regardless of provider stats;
+        // its (stale) values are applied, not swapped for IslePilot's.
+        Assert.Equal(20, result.Player?.HealthPercent);
+        Assert.Equal("LocalIris", result.Player?.ExactVitalsSource);
     }
     [Fact]
     public void DefaultAndOtherProviders_KeepExistingPolicy()
     {
+        // Hard-truth mode: local vitals apply across all providers.
         var unchanged = LocalPositionSnapshotMerger.Merge(Provider(), Local(Now), Now, allowLocalVitals: true);
-        Assert.Equal(99, unchanged.Player?.HealthPercent);
+        Assert.Equal(20, unchanged.Player?.HealthPercent);
         var other = LocalPositionSnapshotMerger.Merge(Provider("GachaOfficialWebSocket"), Local(Now), Now,
             allowLocalVitals: true, replaceIslePilotStats: true);
-        Assert.Equal(99, other.Player?.HealthPercent);
+        Assert.Equal(20, other.Player?.HealthPercent);
     }
     [Fact]
     public void TrialRawHealth_RendersInExistingPanelWithoutInventingPercentage()

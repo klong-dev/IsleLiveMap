@@ -17,7 +17,7 @@ await foreach (var obs in src.WatchAsync(cts.Token))
     {
         vitalsText = "NO VITALS";
     }
-    Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] f{n} pos=({obs.Movement.X:F0},{obs.Movement.Y:F0}) {vitalsText}");
-    if (n >= 30) break;
+    if (n % 25 == 1) Console.WriteLine($"[f{n}] {vitalsText}");
+    if (n >= 400) break;
 }
 Console.WriteLine(n >= 20 ? "PASS" : "FAIL");

@@ -95,9 +95,10 @@ public sealed class DinoRpPositionFileSourceTests
 
         var expired = LocalPositionSnapshotMerger.Merge(
             live, local, now.AddSeconds(3), "DINORP", requireFreshLocalMovement: true);
-        Assert.False(expired.PlayerOnline);
-        Assert.Null(expired.Player);
-        Assert.Contains("voice bridge", expired.StatusMessage);
+        // Hard-truth mode: expired GPS no longer strips the snapshot down to
+        // the waiting state — the last player passes through.
+        Assert.True(expired.PlayerOnline);
+        Assert.NotNull(expired.Player);
     }
 
     [Fact]

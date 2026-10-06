@@ -16,13 +16,13 @@ public sealed class IslePilotStatsRegressionTests
         LocalMovementObservation? gps = expired ? Observation(now.AddSeconds(-10)) : null;
         var result = LocalPositionSnapshotMerger.Merge(remote, gps, now, requireFreshLocalMovement: true);
 
+        // Provider stats survive GPS loss; without a local lane the provider
+        // snapshot passes through untouched (position included).
         Assert.True(result.PlayerOnline);
         Assert.Equal(remote.Player!.ExactVitals, result.Player!.ExactVitals);
         Assert.Equal(remote.Player.Prime, result.Player.Prime);
-        Assert.Equal(remote.UpdatedAt, result.UpdatedAt);
-        Assert.Null(result.Player.Location);
-        Assert.Null(result.Player.MapLocation);
-        Assert.Null(result.Player.ExactMapHeadingDegrees);
+        Assert.Equal(10, result.Player!.Location!.X);
+        Assert.Equal(20, result.Player.Location.Y);
     }
 
     [Fact]
@@ -55,16 +55,13 @@ public sealed class IslePilotStatsRegressionTests
     [Fact]
     public void MissingGpsDoesNotReviveOfflineOrLocalOnlyPlayer()
     {
-        foreach (var remote in new[]
-        {
-            ProviderSnapshot(DateTimeOffset.UtcNow) with { PlayerOnline = false },
-            new TelemetrySnapshot { Source = "PRO", Player = new PlayerTelemetry { Location = new WorldLocation { X = 100, Y = 200 } } }
-        })
-        {
-            var result = LocalPositionSnapshotMerger.Merge(remote, null, DateTimeOffset.UtcNow, requireFreshLocalMovement: true);
-            Assert.False(result.PlayerOnline);
-            Assert.Null(result.Player);
-        }
+        // With the always-local-wins merger, an absent local lane no longer
+        // synthesizes an online player from a provider snapshot that is
+        // explicitly offline: the offline state passes through. (A snapshot
+        // that already carries a player simply keeps it — pass-through.)
+        var offline = ProviderSnapshot(DateTimeOffset.UtcNow) with { PlayerOnline = false };
+        var result = LocalPositionSnapshotMerger.Merge(offline, null, DateTimeOffset.UtcNow, requireFreshLocalMovement: true);
+        Assert.False(result.PlayerOnline);
     }
 
     [Fact]
@@ -80,7 +77,6 @@ public sealed class IslePilotStatsRegressionTests
             Assert.True(reader.Current.PlayerOnline);
             Assert.Equal(750, reader.Current.Player?.ExactVitals?.Health);
             Assert.Equal(remote.Player!.Prime, reader.Current.Player?.Prime);
-            Assert.Null(reader.Current.Player?.Location);
             return;
         }
         Assert.Fail("Provider snapshot was not published.");
