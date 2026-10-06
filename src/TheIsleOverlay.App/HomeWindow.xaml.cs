@@ -187,7 +187,7 @@ public partial class HomeWindow : Window
         primary.Children.Add(updateAction);
         copy.Children.Add(primary);
 
-        var supportedLabel = T("Chế độ memory-read (kprl): không cần đăng nhập.", 13, B("#A9BAB4"), FontWeights.SemiBold);
+        var supportedLabel = T("Tự động nhận diện khi vào game — không cần đăng nhập.", 13, B("#A9BAB4"), FontWeights.SemiBold);
         supportedLabel.Margin = new Thickness(0, 10, 0, 0);
         copy.Children.Add(supportedLabel);
         // 2026-10: per-server login buttons (GACHA/ORIGIN/SDVN) removed —
@@ -202,7 +202,7 @@ public partial class HomeWindow : Window
         p.Children.Add(new Border { Child = hero, CornerRadius = new CornerRadius(10), ClipToBounds = true, BorderBrush = B(_proPresentation.HasCurrentProAccess ? "#6B5434" : "#294943"), BorderThickness = new Thickness(1) });
         var row = new UniformGrid { Columns = 3, Margin = new Thickness(0, 12, 0, 0) };
         row.Children.Add(StatusLine("QUYỀN TRUY CẬP", _proPresentation.StatusLabel));
-        row.Children.Add(StatusLine("DRIVER KPRL", "Hoạt động"));
+        row.Children.Add(StatusLine("PHÁT HIỆN GAME", "Hoạt động"));
         row.Children.Add(StatusLine("PHIÊN", _snapshots.Current is null ? "Chưa có phiên" : "Có dữ liệu gần nhất"));
         p.Children.Add(row);
         _updateStatus = T(_lastUpdateStatus, 12, B(_lastUpdateColor), FontWeights.SemiBold);
