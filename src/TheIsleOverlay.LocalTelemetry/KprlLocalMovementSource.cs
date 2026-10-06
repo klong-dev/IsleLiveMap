@@ -317,7 +317,13 @@ public sealed class KprlLocalMovementSource : ILocalMovementSource, ILocalVitals
         {
             var asc = ReadU64(pawn + 0x0AE0);
             if (!UserPtr(asc)) return null;
-            set = ReadU64(asc + 0x10A8);
+            // SpawnedAttributes is a TArray: +0x10A8 holds the DATA POINTER;
+            // the first AttributeSet is stored at that address (one more
+            // dereference). Reading +0x10A8 directly yields the array buffer
+            // pointer, not the AttributeSet itself.
+            var arrData = ReadU64(asc + 0x10A8);
+            if (!UserPtr(arrData)) return null;
+            set = ReadU64(arrData);
             if (!UserPtr(set)) return null;
         }
         var buf = ReadMem(set + 0x30, 0xB0);
