@@ -225,8 +225,9 @@ public sealed class IslePilotRealtimeSession : ITelemetrySession
 
         try
         {
+            var generation = ReadIdentityGeneration();
             var map = await _apiClient.GetMapAsync(cancellationToken);
-            UpdateState(reducer => reducer.ApplyMap(map, _utcNow()));
+            UpdateState(reducer => reducer.ApplyMap(map, _utcNow(), generation));
         }
         catch (TelemetryAuthenticationException)
         {
@@ -264,8 +265,9 @@ public sealed class IslePilotRealtimeSession : ITelemetrySession
             await Task.Delay(_options.MapRefreshInterval, cancellationToken);
             try
             {
+                var generation = ReadIdentityGeneration();
                 var map = await _apiClient.GetMapAsync(cancellationToken);
-                UpdateState(reducer => reducer.ApplyMap(map, _utcNow()));
+                UpdateState(reducer => reducer.ApplyMap(map, _utcNow(), generation));
             }
             catch (TelemetryAuthenticationException)
             {
@@ -374,6 +376,11 @@ public sealed class IslePilotRealtimeSession : ITelemetrySession
         {
             return _reducer.PersonaName;
         }
+    }
+
+    private long ReadIdentityGeneration()
+    {
+        lock (_stateGate) return _reducer.IdentityGeneration;
     }
 
     private static bool IsRecoverableRestFailure(

@@ -19,10 +19,27 @@ public static class LocalPositionSnapshotMerger
         string? verifiedLocalSpeciesId = null,
         RemotePlayerTelemetryFrame? verifiedLocalFallback = null,
         bool allowLocalVitals = false,
-        bool requireFreshLocalMovement = false)
+        bool requireFreshLocalMovement = false,
+        bool replaceIslePilotStats = false)
     {
         var localObservation = local.GetValueOrDefault();
         var fallback = verifiedLocalFallback;
+        // Opt-in in-map replacement: do not mix missing inbound values with
+        // IslePilot values from a potentially different actor/server/life.
+        var replacingProvider = replaceIslePilotStats && allowLocalVitals
+            && (remote is null || IsIslePilot(remote)
+                || remote.Player?.ExactVitalsSource == LocalVitalsFeature.SourceName);
+        if (replacingProvider && remote?.Player is { } islePilotPlayer)
+        {
+            remote = remote with
+            {
+                Player = RemoveLocalVitals(islePilotPlayer) with
+                {
+                    // Packet-verified species can be supplied below.
+                    Class = null
+                }
+            };
+        }
         // Authentication is authoritative for the provider lane. A local
         // packet (or its absence) must never turn an expired IslePilot
         // session back into Live/Connecting.
@@ -37,16 +54,26 @@ public static class LocalPositionSnapshotMerger
                                 now,
                                 LocalFreshness);
         var localVitals = localObservation.DinosaurVitals;
+        if (localVitals is { ExperimentalEvidence: { } fieldEvidence } experimental)
+            localVitals = experimental with { Vitals = InboundStatsAccumulator.FreshVitals(fieldEvidence, now) };
         var hasFreshLocalVitals = allowLocalVitals
                                   && localVitals is { } candidateVitals
                                   && IsFresh(
                                       candidateVitals.ObservedAt,
                                       now,
                                       LocalVitalsFreshness)
-                                  && HasUsableVitals(candidateVitals.Vitals);
+                                  && (HasUsableVitals(candidateVitals.Vitals)
+                                      || replacingProvider && candidateVitals.ExperimentalEvidence is not null
+                                         && (IsFiniteNonNegative(candidateVitals.Vitals.Health)
+                                             || IsFiniteNonNegative(candidateVitals.Vitals.Stamina)
+                                             || IsFiniteNonNegative(candidateVitals.Vitals.Hunger)
+                                             || IsFiniteNonNegative(candidateVitals.Vitals.Thirst)));
         var useLocalVitals = hasFreshLocalVitals
-                             && (remote?.LiveDataStale == true
+                             && (replacingProvider || remote?.LiveDataStale == true
                                  || !HasUsableVitals(remote?.Player?.ExactVitals));
+        var showRecentHistory = replacingProvider
+            && localVitals is { ExperimentalEvidence.Count: > 0 } historyCandidate
+            && IsFresh(historyCandidate.ObservedAt, now, TimeSpan.FromSeconds(15));
         var hasFreshVerifiedFallback = fallback is not null
                                        && IsRemoteFrameFresh(fallback, now)
                                        && IsFinite(fallback.LocalLocation)
@@ -57,6 +84,7 @@ public static class LocalPositionSnapshotMerger
             && !hasFreshLocal
             && !hasFreshVerifiedFallback
             && !useLocalVitals
+            && !showRecentHistory
             && !hasFreshRemoteFrame
             && !hasRemoteInput)
         {
@@ -83,10 +111,10 @@ public static class LocalPositionSnapshotMerger
                 PlayerOnline = false,
                 Player = null,
                 SessionState = TelemetrySessionState.Connecting,
-                StatusMessage = "Đang chờ The Isle và dữ liệu movement cục bộ."
+                StatusMessage = WaitingMessage(sourceName)
             };
         }
-        if (!hasFreshLocal && !hasFreshVerifiedFallback && !useLocalVitals && !hasRemoteInput)
+        if (!hasFreshLocal && !hasFreshVerifiedFallback && !useLocalVitals && !showRecentHistory && !hasRemoteInput)
         {
             if (remote?.Player is { } previousPlayer
                 && string.Equals(
@@ -141,6 +169,8 @@ public static class LocalPositionSnapshotMerger
                 ? remotePlayer?.ServerEndpoint
                 : serverEndpoint,
             Class = string.IsNullOrWhiteSpace(verifiedLocalSpeciesId)
+                    || (remotePlayer?.ExactVitalsSource == "IslePilotOverlayV2"
+                        && !string.IsNullOrWhiteSpace(remotePlayer.Class))
                 ? remotePlayer?.Class
                 : verifiedLocalSpeciesId.Trim(),
             Location = hasFreshLocal || hasFreshVerifiedFallback
@@ -155,6 +185,15 @@ public static class LocalPositionSnapshotMerger
         if (useLocalVitals)
         {
             player = ApplyLocalVitals(player, localVitals!.Value.Vitals);
+            player = player with
+            {
+                InboundStatsExperimental = localVitals.Value.ExperimentalEvidence is not null,
+                InboundStatsOwnerHandle = localVitals.Value.NetRefHandle,
+                InboundStatsLastKnown = localVitals.Value.ExperimentalEvidence is { } retainedFields
+                    ? InboundStatsAccumulator.LastKnownVitals(retainedFields, now) : null,
+                InboundStatsFieldTimes = localVitals.Value.ExperimentalEvidence?
+                    .ToDictionary(e => e.Field.Replace("Candidate", ""), e => e.ObservedAt)
+            };
         }
         else if (!useLocalVitals
                  && string.Equals(
@@ -163,6 +202,19 @@ public static class LocalPositionSnapshotMerger
                      StringComparison.Ordinal))
         {
             player = RemoveLocalVitals(player);
+        }
+        // Last-known display is separate from ExactVitals/live percentages.
+        // A brief hole in decoded updates need not blank the panel, but cannot
+        // renew any field timestamp. Owner ambiguity/flow reset sends empty evidence.
+        if (showRecentHistory && localVitals is { ExperimentalEvidence: { } historyFields } historicalObservation)
+        {
+            player = player with
+            {
+                InboundStatsExperimental = true,
+                InboundStatsOwnerHandle = historicalObservation.NetRefHandle,
+                InboundStatsLastKnown = InboundStatsAccumulator.LastKnownVitals(historyFields, now),
+                InboundStatsFieldTimes = historyFields.ToDictionary(e => e.Field.Replace("Candidate", ""), e => e.ObservedAt)
+            };
         }
 
         // Local movement freshness only proves that the GPS lane is alive.
@@ -192,6 +244,8 @@ public static class LocalPositionSnapshotMerger
             Map = mergedRemote?.Map ?? baseSnapshot.Map,
             ProPlayerTrackingActive = remotePlayers is not null,
             ProPlayerSequence = verifiedLocalFallback?.Sequence,
+            ProPlayerSessionId = verifiedLocalFallback?.SessionId,
+            ProPlayerServerEndpoint = verifiedLocalFallback?.ServerEndpoint,
             ProPlayerFrameObservedAt = verifiedLocalFallback?.ObservedAt,
             ProPlayerFrameReceivedAt = verifiedLocalFallback?.ReceivedAt,
             ProPlayerSync = verifiedLocalFallback?.PlayerSync,
@@ -200,10 +254,14 @@ public static class LocalPositionSnapshotMerger
                 ? baseSnapshot.SessionState
                 : TelemetrySessionState.Live,
             LiveDataStale = preserveRemoteStaleness,
-            StatusMessage = (hasFreshLocal || hasFreshVerifiedFallback)
-                            && baseSnapshot.SessionState == TelemetrySessionState.UnsupportedServer
-                ? "Map trực tiếp đang hoạt động; status và nhiệm vụ IslePilot không khả dụng trên server này."
-                : baseSnapshot.StatusMessage
+            StatusMessage = string.Equals(sourceName, "DINORP", StringComparison.OrdinalIgnoreCase)
+                ? hasFreshLocal || hasFreshVerifiedFallback
+                    ? "GPS DINORP đang hoạt động; stats Hub chưa được tích hợp."
+                    : WaitingMessage(sourceName)
+                : (hasFreshLocal || hasFreshVerifiedFallback)
+                  && baseSnapshot.SessionState == TelemetrySessionState.UnsupportedServer
+                    ? "Map trực tiếp đang hoạt động; status và nhiệm vụ IslePilot không khả dụng trên server này."
+                    : baseSnapshot.StatusMessage
         };
     }
 
@@ -220,10 +278,19 @@ public static class LocalPositionSnapshotMerger
         ThirstPercent = PercentOrNull(vitals.Thirst, vitals.MaxThirst)
     };
 
+    private static bool IsIslePilot(TelemetrySnapshot snapshot) =>
+        snapshot.Player?.ExactVitalsSource?.StartsWith("IslePilot", StringComparison.OrdinalIgnoreCase) == true
+        || (string.IsNullOrWhiteSpace(snapshot.Player?.ExactVitalsSource)
+            && snapshot.Source.StartsWith("ISLEPILOT", StringComparison.OrdinalIgnoreCase));
+
     private static PlayerTelemetry RemoveLocalVitals(PlayerTelemetry player) => player with
     {
         ExactVitals = null,
         ExactVitalsSource = null,
+        InboundStatsExperimental = false,
+        InboundStatsOwnerHandle = null,
+        InboundStatsLastKnown = null,
+        InboundStatsFieldTimes = null,
         GrowthPercent = null,
         HealthPercent = null,
         StaminaPercent = null,
@@ -295,6 +362,17 @@ public static class LocalPositionSnapshotMerger
             return new RemoteMergeResult(map, RemoteTrackingDiagnostics.NoFrame);
         }
 
+        var previousProMarkers = (map?.Markers ?? [])
+            .Where(marker => marker.SteamId is not null
+                             && (marker.SteamId.StartsWith(
+                                     "pro-player:",
+                                     StringComparison.Ordinal)
+                                 || marker.SteamId.StartsWith(
+                                     "pro-entity:",
+                                     StringComparison.Ordinal)))
+            .ToDictionary(
+                marker => marker.SteamId!,
+                StringComparer.Ordinal);
         var providerMarkers = (map?.Markers ?? [])
             .Where(marker => marker.SteamId is null
                              || (!marker.SteamId.StartsWith(
@@ -315,11 +393,12 @@ public static class LocalPositionSnapshotMerger
         var staleCount = 0;
         foreach (var entity in remotePlayers)
         {
+            var staleLocation = IsStaleLocation(entity, now);
             if (!TryGetRejectionReason(entity, seen, now, out var reason))
             {
                 eligible++;
                 var speciesLabel = string.IsNullOrWhiteSpace(entity.SpeciesShortName)
-                    ? "Player ?"
+                    ? entity.IsProvisional ? "Dino ?" : "Player ?"
                     : entity.SpeciesShortName;
                 proMarkers.Add(new MapMarkerTelemetry
                 {
@@ -334,17 +413,44 @@ public static class LocalPositionSnapshotMerger
                     CreatureSpeciesShortName = entity.SpeciesShortName,
                     ProCreatureDiet = entity.Diet,
                     CreatureMassKg = entity.MassKg,
-                    ProEntityIsProvisional = entity.IsProvisional
+                    ProEntityIsProvisional = entity.IsProvisional,
+                    // A retained stale marker is deliberately dimmed by the
+                    // renderer and is never counted by live/fresh gates.
+                    ProEntityIsStale = staleLocation
+                });
+                if (staleLocation)
+                {
+                    staleCount++;
+                }
+                continue;
+            }
+
+            // A previously rendered identity is continuity evidence even if
+            // the current sparse frame no longer carries structural handles.
+            // Retain only the exact key and only inside the same stale TTL;
+            // never manufacture a new marker from a stale, unproven entity.
+            if (reason == RemoteEntityRejectionReason.StaleLocation
+                && previousProMarkers.TryGetValue(
+                    $"pro-entity:{entity.Kind.ToString().ToLowerInvariant()}:{entity.TrackId}",
+                    out var previousMarker)
+                && previousMarker.Location == entity.Location
+                && ((staleLocation && IsFresh(entity.ObservedAt, now, RemotePlayerFreshness))
+                    || CanRetainAdmittedPlayer(entity, previousMarker, now))
+                && seen.Add($"{entity.Kind}:{entity.TrackId}"))
+            {
+                eligible++;
+                staleCount++;
+                proMarkers.Add(previousMarker with
+                {
+                    ProEntityIsStale = true
                 });
                 continue;
             }
 
             rejectionCounts[reason] = rejectionCounts.GetValueOrDefault(reason) + 1;
 
-            // Presence and movement are separate signals. An actor with an
-            // old coordinate is retained in diagnostics only; projecting its
-            // old coordinate, even as a dim marker, makes users walk to a
-            // location where the dino is no longer present.
+            // Positions outside both admission and bounded retention remain
+            // diagnostic-only; presence must not refresh location time.
             if (reason == RemoteEntityRejectionReason.StaleLocation)
             {
                 staleCount++;
@@ -412,8 +518,23 @@ public static class LocalPositionSnapshotMerger
         // provide LocationObservedAt, which prevents presence refreshes from
         // making an old coordinate look live.
         var locationObservedAt = entity.LocationObservedAt ?? entity.ObservedAt;
+        var locationAge = now - locationObservedAt;
+        var retainVerifiedPosition = CanRetainVerifiedPosition(entity, now) || CanRetainProvisionalPosition(entity, now);
+        var admitRecentPosition = HasReliableEntityIdentity(entity)
+            && IsFresh(entity.ObservedAt, now, RemotePlayerFreshness)
+            && entity.ObservedAt >= locationObservedAt
+            && IsFresh(locationObservedAt, now,
+                VerifiedRemoteEntityTelemetry.InitialPositionAdmission);
+        if (entity.HasVerifiedPosition && !IsFresh(entity.ObservedAt, now,
+                VerifiedRemoteEntityTelemetry.PresenceRetention))
+        {
+            reason = RemoteEntityRejectionReason.PresenceTimeout;
+            return true;
+        }
         if (locationObservedAt > now
-            || now - locationObservedAt > VerifiedRemoteEntityTelemetry.LocationFreshness)
+            || locationAge > RemotePlayerFreshness && !retainVerifiedPosition && !admitRecentPosition
+            || locationAge > VerifiedRemoteEntityTelemetry.LocationFreshness
+                && !HasReliableEntityIdentity(entity))
         {
             reason = RemoteEntityRejectionReason.StaleLocation;
             return true;
@@ -431,7 +552,9 @@ public static class LocalPositionSnapshotMerger
             && (!HasStablePlayerIdentity(entity)
                 || entity.IsProvisional
                 && (string.IsNullOrWhiteSpace(entity.SpeciesId)
-                    || string.IsNullOrWhiteSpace(entity.SpeciesShortName))))
+                    || string.IsNullOrWhiteSpace(entity.SpeciesShortName))
+                && (!(entity.HasVerifiedPosition || entity.LocationEvidenceSource == "AnchoredOwnerMovement") || entity.ActorNetRefHandle == 0
+                    || entity.LocationObservedAt is null)))
         {
             reason = RemoteEntityRejectionReason.MissingPlayerProof;
             return true;
@@ -452,6 +575,61 @@ public static class LocalPositionSnapshotMerger
         entity.ActorNetRefHandle > 0
         || entity.PlayerStateNetRefHandle > 0
         || entity.PawnNetRefHandle > 0;
+
+    private static bool HasReliableEntityIdentity(VerifiedRemoteEntityTelemetry entity) =>
+        entity.Kind == RemoteEntityKind.Player
+            ? HasStablePlayerIdentity(entity)
+            : !string.IsNullOrWhiteSpace(entity.SpeciesId)
+              && !string.IsNullOrWhiteSpace(entity.SpeciesShortName);
+
+    private static bool IsStaleLocation(
+        VerifiedRemoteEntityTelemetry entity,
+        DateTimeOffset now)
+    {
+        var locationObservedAt = entity.LocationObservedAt ?? entity.ObservedAt;
+        return locationObservedAt <= now
+               && now - locationObservedAt
+               > VerifiedRemoteEntityTelemetry.LocationFreshness
+               && now - locationObservedAt
+               <= (CanRetainVerifiedPosition(entity, now) || CanRetainProvisionalPosition(entity, now)
+                   ? VerifiedRemoteEntityTelemetry.MaximumPositionRetention
+                   : VerifiedRemoteEntityTelemetry.InitialPositionAdmission);
+    }
+
+    private static bool CanRetainProvisionalPosition(VerifiedRemoteEntityTelemetry entity, DateTimeOffset now) =>
+        entity.Kind == RemoteEntityKind.Player && entity.IsProvisional
+        && entity.ActorNetRefHandle > 0 && entity.LocationEvidenceEndBitOffset is > 0
+        && (entity.LocationEvidenceSource == "SerializedActorCreation" && entity.HasVerifiedPosition
+            || entity.LocationEvidenceSource == "AnchoredOwnerMovement" && !entity.HasVerifiedPosition)
+        && entity.LocationObservedAt is { } locationAt
+        && IsFresh(locationAt, now, VerifiedRemoteEntityTelemetry.MaximumPositionRetention)
+        && entity.ObservedAt >= locationAt
+        && IsFresh(entity.ObservedAt, now, TimeSpan.FromSeconds(15));
+
+    private static bool CanRetainVerifiedPosition(
+        VerifiedRemoteEntityTelemetry entity, DateTimeOffset now) =>
+        entity.HasVerifiedPosition
+        && !entity.IsProvisional
+        && HasVerifiedIdentity(entity)
+        && entity.LocationObservedAt is { } positionAt
+        && IsFresh(positionAt, now, VerifiedRemoteEntityTelemetry.MaximumPositionRetention)
+        && entity.ObservedAt >= positionAt
+        && IsFresh(entity.ObservedAt, now, VerifiedRemoteEntityTelemetry.PresenceRetention);
+
+    // Admission and position verification are different facts. An admitted
+    // player may have an unverified movement sample followed by owner-only
+    // updates. Keep the exact previously displayed position as STALE, never
+    // admit an unseen candidate here and never refresh its location timestamp.
+    private static bool CanRetainAdmittedPlayer(
+        VerifiedRemoteEntityTelemetry entity, MapMarkerTelemetry previous, DateTimeOffset now) =>
+        entity.Kind == RemoteEntityKind.Player
+        && !entity.IsProvisional && !previous.ProEntityIsProvisional
+        && HasStablePlayerIdentity(entity)
+        && previous.Location == entity.Location
+        && entity.LocationObservedAt is { } positionAt
+        && IsFresh(positionAt, now, VerifiedRemoteEntityTelemetry.MaximumPositionRetention)
+        && entity.ObservedAt >= positionAt
+        && IsFresh(entity.ObservedAt, now, VerifiedRemoteEntityTelemetry.PresenceRetention);
 
     private static bool IsFinite(WorldLocation location) =>
         double.IsFinite(location.X)
@@ -475,6 +653,11 @@ public static class LocalPositionSnapshotMerger
         PlayerOnline = false,
         UpdatedAt = DateTimeOffset.Now,
         SessionState = TelemetrySessionState.Connecting,
-        StatusMessage = statusMessage ?? "Đang chờ The Isle và dữ liệu movement cục bộ."
+        StatusMessage = statusMessage ?? WaitingMessage(sourceName)
     };
+
+    private static string WaitingMessage(string sourceName) =>
+        string.Equals(sourceName, "DINORP", StringComparison.OrdinalIgnoreCase)
+            ? "Đang chờ DINORP voice bridge và packet game tới server DINORP; stats Hub chưa được tích hợp."
+            : "Đang chờ The Isle và dữ liệu movement cục bộ.";
 }

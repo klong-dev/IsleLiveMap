@@ -17,6 +17,8 @@ public sealed record TelemetrySnapshot
     // snapshot. It is diagnostic metadata only; consumers should not use it
     // as a gameplay timestamp.
     public long? ProPlayerSequence { get; init; }
+    public string? ProPlayerSessionId { get; init; }
+    public string? ProPlayerServerEndpoint { get; init; }
     public DateTimeOffset? ProPlayerFrameObservedAt { get; init; }
     public DateTimeOffset? ProPlayerFrameReceivedAt { get; init; }
     public RemotePlayerSyncState? ProPlayerSync { get; init; }
@@ -40,6 +42,11 @@ public sealed record PlayerTelemetry
     public double? ThirstPercent { get; init; }
     public ExactVitals? ExactVitals { get; init; }
     public string? ExactVitalsSource { get; init; }
+    public bool InboundStatsExperimental { get; init; }
+    public ulong? InboundStatsOwnerHandle { get; init; }
+    // Historical display only. Never fed into live percentage/freshness calculations.
+    public ExactVitals? InboundStatsLastKnown { get; init; }
+    public IReadOnlyDictionary<string, DateTimeOffset>? InboundStatsFieldTimes { get; init; }
     public NutritionTelemetry? Nutrition { get; init; }
     public WorldLocation? Location { get; init; }
     public MapPoint? MapLocation { get; init; }

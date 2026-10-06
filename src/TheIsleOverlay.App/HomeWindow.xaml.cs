@@ -45,7 +45,7 @@ public partial class HomeWindow : Window
     private MapLaunchGateState _mapLaunchGateState = MapLaunchGateState.Checking;
     private Button? _mapActionButton;
     private TextBlock? _updateStatus;
-    private Button? _restartForUpdateButton;
+    private bool _updateReadyDialogShown;
     private TextBlock? _status;
     private static Brush B(string color) => new SolidColorBrush((Color)ColorConverter.ConvertFromString(color));
     private static TextBlock T(string text, double size = 14, Brush? foreground = null, FontWeight? weight = null) => new() { Text = text, FontSize = size, Foreground = foreground ?? B("#EAF4F0"), FontWeight = weight ?? FontWeights.Normal, TextWrapping = TextWrapping.Wrap };
@@ -180,6 +180,11 @@ public partial class HomeWindow : Window
         mapButton.IsEnabled = MapLaunchGatePolicy.AllowsMap(_mapLaunchGateState) && _mapOpenStarted == 0;
         _mapActionButton = mapButton;
         primary.Children.Add(mapButton);
+        var updateAction = Action("MỞ THÔNG BÁO CẬP NHẬT", (_, _) => ShowUpdateReadyDialog(_updateService.PendingVersion));
+        AutomationProperties.SetAutomationId(updateAction, "ReopenUpdateReadyDialog");
+        updateAction.Visibility = _mapLaunchGateState == MapLaunchGateState.UpdateRequired ? Visibility.Visible : Visibility.Collapsed;
+        _reopenUpdateAction = updateAction;
+        primary.Children.Add(updateAction);
         copy.Children.Add(primary);
 
         var supportedLabel = T("Hoặc các server được hỗ trợ riêng:", 13, B("#A9BAB4"), FontWeights.SemiBold);
@@ -188,7 +193,7 @@ public partial class HomeWindow : Window
         var servers = new WrapPanel { Margin = new Thickness(0, 10, 0, 0) };
         _serverActionButtons.Clear();
         _serverButtonLabels.Clear();
-        // Three equal branded actions; wrap only at the smallest viewport.
+        // Equal server actions; wrap at smaller viewports.
         servers.Children.Add(ServerButton("Assets/GachaLogo.png", "GACHA", GachaServer_Click, "#415D3E", "#A8D17A"));
         servers.Children.Add(ServerButton("Assets/OriginLogo.png", "ORIGIN 5X", OriginServer_Click, "#344F71", "#9CC8FF"));
         servers.Children.Add(ServerButton("Assets/SDVNIcon.png", "SDVN", SdvnServer_Click, "#303F7D", "#A6B8FF"));
@@ -206,22 +211,27 @@ public partial class HomeWindow : Window
         _updateStatus = T(_lastUpdateStatus, 12, B(_lastUpdateColor), FontWeights.SemiBold);
         _updateStatus.Margin = new Thickness(0, 12, 0, 0);
         p.Children.Add(_updateStatus);
-        _restartForUpdateButton = Action("KHỞI ĐỘNG LẠI ĐỂ CẬP NHẬT", (_, _) => _updateService.ApplyAndRestart(), true);
-        _restartForUpdateButton.Visibility = _mapLaunchGateState == MapLaunchGateState.UpdateRequired ? Visibility.Visible : Visibility.Collapsed;
-        _restartForUpdateButton.Margin = new Thickness(0, 8, 0, 0);
-        p.Children.Add(_restartForUpdateButton);
         RefreshLaunchButtons();
     }
 
-    private Button ServerButton(string logo, string label, RoutedEventHandler action, string surface, string border)
+    private Button ServerButton(string? logo, string label, RoutedEventHandler action, string surface, string border)
     {
-        var button = new Button { Style = (Style)FindResource("ServerAction"), Background = B(surface), BorderBrush = B(border), ToolTip = $"Mở {label}", Width = 132, Height = 76, Padding = new Thickness(6), Margin = new Thickness(0, 0, 8, 8) };
+        var button = new Button { Style = (Style)FindResource("ServerAction"), Background = B(surface), BorderBrush = B(border), ToolTip = label == "DINORP" ? "GPS qua DINORP voice bridge; stats Hub chưa được tích hợp" : $"Mở {label}", Width = 132, Height = 76, Padding = new Thickness(6), Margin = new Thickness(0, 0, 8, 8) };
         AutomationProperties.SetAutomationId(button, "Server" + label.Replace(" ", "") + "Button");
         AutomationProperties.SetName(button, $"Mở server {label}");
         AutomationProperties.SetHelpText(button, $"Mở {label} trong workspace riêng");
         var content = new StackPanel { VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center };
-        var logoImage = new Image { Source = new BitmapImage(new Uri($"/IsleLiveMap;component/{logo}", UriKind.Relative)), Width = 36, Height = 36, Stretch = Stretch.Uniform, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
-        content.Children.Add(logoImage);
+        if (logo is not null)
+        {
+            var logoImage = new Image { Source = new BitmapImage(new Uri($"/IsleLiveMap;component/{logo}", UriKind.Relative)), Width = 36, Height = 36, Stretch = Stretch.Uniform, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+            content.Children.Add(logoImage);
+        }
+        else
+        {
+            var monogram = T("DR", 26, B(border), FontWeights.Black);
+            monogram.HorizontalAlignment = HorizontalAlignment.Center;
+            content.Children.Add(monogram);
+        }
         var name = T(label, 13, B("#FFFFFF"), FontWeights.Black);
         name.HorizontalAlignment = HorizontalAlignment.Center;
         name.VerticalAlignment = VerticalAlignment.Center;
@@ -392,6 +402,10 @@ public partial class HomeWindow : Window
     }
     private async void OpenMap_Click(object? sender, RoutedEventArgs e)
     {
+        // Memory-read mode (2026-10): the kprl driver supplies GPS, vitals,
+        // species, and remote markers straight from the game process. The
+        // IslePilot web login/inbound selection is no longer required — the
+        // overlay opens directly with the Pro agent as the single source.
         // UI Automation and a fast double click can otherwise start two map
         // flows. The first flow closes Home after creating MainWindow; the
         // second then resumes against a closed/disposed launcher lifetime.
@@ -404,48 +418,8 @@ public partial class HomeWindow : Window
         RefreshLaunchButtons();
         try
         {
-
             if (!await PrepareMapLaunchAsync()) return;
-
-            var store = new IslePilotCredentialStore(AppPaths.IslePilotCredential);
-            using var authHttp = new System.Net.Http.HttpClient(
-                new System.Net.Http.HttpClientHandler { AllowAutoRedirect = false })
-                { Timeout = TimeSpan.FromSeconds(8) };
-            var localOnlyRequested = false;
-            var credentials = await new IslePilotOverlayLoginFlow(authHttp, store).ResolveAsync(_ =>
-            {
-                // Pro grants tracking, not an IslePilot login. Never silently
-                // open without stats just because the saved login is missing.
-                var login = new IslePilotSteamLoginWindow
-                {
-                    Owner = this,
-                    AllowLocalOnly = HomeProPresentationPolicy.Evaluate(_pro, DateTimeOffset.UtcNow).HasCurrentProAccess
-                };
-                var loggedIn = login.ShowDialog() == true;
-                localOnlyRequested = login.LocalOnlyRequested;
-                return Task.FromResult(loggedIn ? login.Credentials : null);
-            }, SetStatus, _shutdown.Token);
-            if (credentials is null)
-            {
-                if (localOnlyRequested)
-                    handedOffToOverlay = await OpenProOnlyOverlayAsync();
-                else
-                    SetStatus("Đã hủy đăng nhập IslePilot. Cần đăng nhập để nhận dino stats và nhiệm vụ.");
-                return;
-            }
-
-            var session = new AuthenticationInvalidatingTelemetrySession(
-                IslePilotRealtimeSession.Create(new IslePilotOverlayOptions
-                {
-                    OverlayToken = credentials.OverlayToken,
-                    PlayerCookie = credentials.PlayerCookie
-                }),
-                store.Clear);
-            // The Pro grant controls entitlement-gated UI, while the Agent
-            // source carries the actual Player/AI telemetry. Both must be
-            // supplied to the overlay; passing only the grant leaves Pro
-            // users looking premium while tracking remains permanently off.
-            handedOffToOverlay = await OpenOverlaySessionAsync(session, "ISLEPILOT");
+            handedOffToOverlay = await OpenProOnlyOverlayAsync();
         }
         catch (OperationCanceledException) when (_shutdown.IsCancellationRequested)
         {
@@ -552,8 +526,6 @@ public partial class HomeWindow : Window
         {
             _mapLaunchGateState = MapLaunchGatePolicy.FromUpdate(result.State);
             RefreshLaunchButtons();
-            if (_restartForUpdateButton is not null)
-                _restartForUpdateButton.Visibility = _mapLaunchGateState == MapLaunchGateState.UpdateRequired ? Visibility.Visible : Visibility.Collapsed;
 
             switch (result.State)
             {
@@ -576,8 +548,42 @@ public partial class HomeWindow : Window
                     SetUpdateStatus("Không kiểm tra được cập nhật · vẫn cho phép mở map", "#E7B74E");
                     break;
             }
+
+            if (result.State == UpdatePreparationState.Ready)
+            {
+                ShowUpdateReadyDialog(result.Version);
+            }
         });
     }
+
+    private void ShowUpdateReadyDialog(string? version)
+    {
+        if (_updateReadyDialogShown || !IsVisible)
+        {
+            return;
+        }
+
+        _updateReadyDialogShown = true;
+        try
+        {
+            var dialog = new UpdateReadyWindow(version) { Owner = this };
+            dialog.ShowDialog();
+            if (dialog.ApplyRequested)
+            {
+                _updateService.ApplyAndRestart();
+            }
+        }
+        catch (Exception)
+        {
+            SetUpdateStatus("Chưa thể khởi động lại để cập nhật. Hãy mở lại thông báo cập nhật và thử lại.", "#E7B74E");
+        }
+        finally
+        {
+            _updateReadyDialogShown = false;
+        }
+    }
+
+    private Button? _reopenUpdateAction;
 
     private void SetUpdateStatus(string text, string color)
     {

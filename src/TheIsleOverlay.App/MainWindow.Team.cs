@@ -79,9 +79,6 @@ public partial class MainWindow
             _localServerEndpoint = null;
             _localServerName = null;
         }
-        App.CurrentTeam.UpdateTelemetry(
-            snapshot,
-            _hasMovementHeading ? _headingDegrees : null);
     }
 
     private void RenderTeamState(TeamRelayState state)

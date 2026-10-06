@@ -300,6 +300,10 @@ public partial class MainWindow : Window
                     diagnosticPlayer.HungerPercent,
                     diagnosticPlayer.ThirstPercent,
                     diagnosticPlayer.ExactVitalsSource,
+                    diagnosticPlayer.InboundStatsExperimental,
+                    diagnosticPlayer.InboundStatsOwnerHandle,
+                    diagnosticPlayer.InboundStatsLastKnown,
+                    diagnosticPlayer.InboundStatsFieldTimes,
                     diagnosticPlayer.ExactVitals,
                     diagnosticPlayer.Nutrition,
                     diagnosticPlayer.Prime
@@ -658,12 +662,16 @@ public partial class MainWindow : Window
             }
 
             var player = snapshot.Player;
-            var exact = player.ExactVitals;
+            var exact = player.InboundStatsExperimental
+                ? InboundVitalsDisplay.Resolve(player.ExactVitals, player.InboundStatsLastKnown)
+                : player.ExactVitals;
 
             var degraded = snapshot.SessionState is TelemetrySessionState.Reconnecting or TelemetrySessionState.Stale;
             SetTelemetryOpacity(degraded ? 0.58d : 1d);
             SetConnectionState(
-                ConnectionText(snapshot.SessionState, player.ExactVitalsSource),
+                player.InboundStatsExperimental
+                    ? $"INBOUND · TEST · OWNER {player.InboundStatsOwnerHandle} (chưa xác minh)"
+                    : ConnectionText(snapshot.SessionState, player.ExactVitalsSource),
                 degraded ? WaitingBrush : OnlineBrush);
             SpeciesLabel.Text = FriendlySpecies(player.Class);
             PlayerNameLabel.Text = string.IsNullOrWhiteSpace(player.Name) ? "ACTIVE PLAYER" : player.Name;
@@ -678,6 +686,16 @@ public partial class MainWindow : Window
 
             RenderVital(HungerBar, HungerValue, exact?.Hunger, exact?.MaxHunger, player.HungerPercent);
             RenderVital(WaterBar, WaterValue, exact?.Thirst, exact?.MaxThirst, player.ThirstPercent);
+            if (player.InboundStatsExperimental && player.InboundStatsLastKnown is { } historical
+                && player.InboundStatsFieldTimes is { } fieldTimes)
+            {
+                if (player.ExactVitals?.Growth is null && historical.Growth is { } previousGrowth)
+                    GrowthLabel.Text = $"{previousGrowth * 100:0.#}%";
+                SetVitalTimestampTooltip(HealthValue, "Health", "MaxHealth", fieldTimes);
+                SetVitalTimestampTooltip(StaminaValue, "Stamina", "MaxStamina", fieldTimes);
+                SetVitalTimestampTooltip(HungerValue, "Hunger", "MaxHunger", fieldTimes);
+                SetVitalTimestampTooltip(WaterValue, "Thirst", null, fieldTimes);
+            }
             RenderPrimeMissions(player.Prime);
 
             UpdatedLabel.Text = $"SYNC {(snapshot.UpdatedAt ?? DateTimeOffset.Now).ToLocalTime():HH:mm:ss}";
@@ -799,6 +817,19 @@ public partial class MainWindow : Window
             return;
         }
 
+        // A raw candidate without a decoded denominator is not a percentage.
+        if (current is null && maximum is > 0 && fallback is null)
+        {
+            bar.Value = 0d;
+            label.Text = $"— / {FormatNumber(maximum.Value)}";
+            return;
+        }
+        if (current is not null && maximum is not > 0 && fallback is null)
+        {
+            bar.Value = 0d;
+            label.Text = $"{FormatNumber(current.Value)} / ?";
+            return;
+        }
         var percent = VitalMath.Percent(current, maximum, fallback);
         bar.Value = percent;
         label.Text = current is not null && maximum is > 0
@@ -806,6 +837,14 @@ public partial class MainWindow : Window
             : current is not null
                 ? FormatNumber(current.Value)
             : $"{percent:0.#}%";
+    }
+
+    private static void SetVitalTimestampTooltip(System.Windows.Controls.TextBlock label, string field, string? maximum,
+        IReadOnlyDictionary<string, DateTimeOffset> times)
+    {
+        label.ToolTip = $"Current nhận lúc: {(times.TryGetValue(field, out var at) ? at.ToLocalTime().ToString("HH:mm:ss") : "chưa nhận")}"
+            + (maximum is null ? "; max water cố định 1000"
+                : $"; Max nhận lúc: {(times.TryGetValue(maximum, out var maxAt) ? maxAt.ToLocalTime().ToString("HH:mm:ss") : "chưa nhận")}");
     }
 
     private void ClearVitals()
@@ -859,6 +898,10 @@ public partial class MainWindow : Window
         TelemetrySessionState state,
         string? directVitalsSource = null)
     {
+        if (LocalVitalsFeature.ReplacesIslePilot()
+            && (string.Equals(_configuredSource, "IslePilot", StringComparison.OrdinalIgnoreCase)
+                || directVitalsSource == LocalVitalsFeature.SourceName))
+            return "INBOUND · TEST · ĐANG CHỜ STATS MỚI";
         var source = string.IsNullOrWhiteSpace(directVitalsSource)
             ? _configuredSource
             : directVitalsSource.Trim();

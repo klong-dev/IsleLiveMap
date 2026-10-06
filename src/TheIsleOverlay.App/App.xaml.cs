@@ -45,6 +45,15 @@ public partial class App : Application
     {
         lock (_localTelemetryGate)
         {
+            // Memory-read source (kprl driver) replaces the Npcap prewarm:
+            // lossless GPS + replicated vitals straight from the game process.
+            // Falls back to Npcap only when the KPRL device is unavailable
+            // (service not installed) so Free-tier machines still work.
+            var memory = new KprlLocalMovementSource();
+            if (memory.TryOpenDeviceForProbe())
+            {
+                return memory;
+            }
             if (_warmLocalTelemetry is null)
             {
                 _warmLocalTelemetry = new PrewarmedLocalMovementSource();

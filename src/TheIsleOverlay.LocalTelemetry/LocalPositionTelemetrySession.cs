@@ -11,7 +11,9 @@ public sealed class LocalPositionTelemetrySession : ITelemetrySession
     private readonly ILocalMovementSource _localSource;
     private readonly IRemotePlayerTelemetrySource? _remotePlayerSource;
     private readonly string _sourceName;
+    private readonly string? _expectedServerEndpoint;
     private readonly bool _enableLocalVitals;
+    private readonly bool _replaceIslePilotStats;
     private readonly CancellationTokenSource _disposeCancellation = new();
     private readonly object _latestRemoteFrameGate = new();
     private readonly RemoteEntityLifecycleTracker _remoteLifecycle = new();
@@ -25,15 +27,18 @@ public sealed class LocalPositionTelemetrySession : ITelemetrySession
         ILocalMovementSource? localSource = null,
         string sourceName = "LOCAL",
         IRemotePlayerTelemetrySource? remotePlayerSource = null,
-        bool? enableLocalVitals = null)
+        bool? enableLocalVitals = null,
+        string? expectedServerEndpoint = null)
     {
         _remoteSession = remoteSession;
         _localSource = localSource ?? new NpcapLocalMovementSource(trackIrisSequenceDiagnostics: false);
         _sourceName = sourceName;
+        _expectedServerEndpoint = expectedServerEndpoint;
         _remotePlayerSource = remotePlayerSource;
         _enableLocalVitals = enableLocalVitals
                               ?? (_localSource as ILocalVitalsFeatureSource)?.LocalVitalsEnabled
                               ?? LocalVitalsFeature.IsEnabled();
+        _replaceIslePilotStats = LocalVitalsFeature.ReplacesIslePilot();
     }
 
     public async IAsyncEnumerable<TelemetrySnapshot> WatchAsync(
@@ -151,6 +156,11 @@ public sealed class LocalPositionTelemetrySession : ITelemetrySession
                                               && LocalPositionSnapshotMerger.IsRemoteFrameFresh(
                                                   candidateFrame,
                                                   now)
+                                              && (_expectedServerEndpoint is null
+                                                  || string.Equals(
+                                                      candidateFrame.ServerEndpoint,
+                                                      _expectedServerEndpoint,
+                                                      StringComparison.OrdinalIgnoreCase))
                                               && IsRemoteFrameCompatibleWithLocal(
                                                   candidateFrame,
                                                   local,
@@ -167,8 +177,13 @@ public sealed class LocalPositionTelemetrySession : ITelemetrySession
                     ? localSpeciesFrame.LocalSpeciesId
                     : null;
                 var previousMap = lastMergedSnapshot?.Map;
+                if (usableRemotePlayerFrame is { } currentFrame
+                    && !SameProScope(lastMergedSnapshot, currentFrame))
+                {
+                    previousMap = null;
+                }
                 var merged = LocalPositionSnapshotMerger.Merge(
-                    remote ?? lastMergedSnapshot,
+                    PrepareMergeInput(remote, lastMergedSnapshot, usableRemotePlayerFrame),
                     local,
                     now,
                     _sourceName,
@@ -176,11 +191,11 @@ public sealed class LocalPositionTelemetrySession : ITelemetrySession
                     verifiedLocalSpeciesId,
                     usableRemotePlayerFrame,
                     allowLocalVitals: _enableLocalVitals,
+                    replaceIslePilotStats: _replaceIslePilotStats,
                     requireFreshLocalMovement: true);
 
                 var lifecycle = usableRemotePlayerFrame is { } lifecycleFrame
-                                && lifecycleFrame.Sequence != _lastLifecycleSequence
-                    ? _remoteLifecycle.ApplyFrame(lifecycleFrame, now)
+                    ? _remoteLifecycle.ApplyFrame(lifecycleFrame, now, rendered: false)
                     : _remoteLifecycle.AdvanceWithoutFrame(now);
                 if (usableRemotePlayerFrame is { } appliedFrame)
                 {
@@ -252,6 +267,41 @@ public sealed class LocalPositionTelemetrySession : ITelemetrySession
             }
         }
     }
+
+    // Provider stats and Pro markers have independent update cadences. Using
+    // the provider snapshot alone loses the admission history needed to keep
+    // an already displayed player stale while owner presence continues.
+    internal static TelemetrySnapshot? PrepareMergeInput(
+        TelemetrySnapshot? provider, TelemetrySnapshot? previous,
+        RemotePlayerTelemetryFrame? frame)
+    {
+        var input = provider ?? previous;
+        if (input is null) return null;
+        if (frame is null) return input;
+        var sameScope = SameProScope(previous, frame);
+        var providerMarkers = (input.Map?.Markers ?? []).Where(m => !IsProMarker(m));
+        var history = sameScope
+            ? (previous?.Map?.Markers ?? []).Where(IsProMarker)
+            : Enumerable.Empty<MapMarkerTelemetry>();
+        var markers = providerMarkers.Concat(history).ToArray();
+        return input with
+        {
+            Map = input.Map is not null || markers.Length > 0
+                ? (input.Map ?? new MapTelemetry()) with { Markers = markers }
+                : null
+        };
+    }
+
+    private static bool SameProScope(TelemetrySnapshot? previous, RemotePlayerTelemetryFrame frame) =>
+        previous is not null
+        && !string.IsNullOrWhiteSpace(frame.SessionId)
+        && !string.IsNullOrWhiteSpace(frame.ServerEndpoint)
+        && string.Equals(previous.ProPlayerSessionId, frame.SessionId, StringComparison.Ordinal)
+        && string.Equals(previous.ProPlayerServerEndpoint, frame.ServerEndpoint, StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsProMarker(MapMarkerTelemetry marker) =>
+        marker.SteamId?.StartsWith("pro-entity:", StringComparison.Ordinal) == true
+        || marker.SteamId?.StartsWith("pro-player:", StringComparison.Ordinal) == true;
 
     internal static bool IsRemoteFrameCompatibleWithLocal(
         RemotePlayerTelemetryFrame frame,
@@ -431,10 +481,11 @@ public sealed class LocalPositionTelemetrySession : ITelemetrySession
                     return true;
                 }
 
+                // A missing frame is not proof that the entity was destroyed.
+                // Keep its last marker (dimmed below) through the lifecycle
+                // TTL; only an explicit Removed state may remove it.
                 return !byTrack.TryGetValue((kind, trackId), out var state)
-                       || state.State is not (RemoteEntityLifecycleState.Removed
-                           or RemoteEntityLifecycleState.TemporarilyMissing
-                           or RemoteEntityLifecycleState.Stale);
+                       || state.State != RemoteEntityLifecycleState.Removed;
             })
             .Select(marker =>
             {
@@ -457,7 +508,46 @@ public sealed class LocalPositionTelemetrySession : ITelemetrySession
             })
             .ToArray();
 
+        // MergeRemotePlayers builds the current frame only, so recover the
+        // previous marker for an entity omitted by a partial/empty frame.
+        // Without this step the lifecycle tracker knows the entity is merely
+        // missing, but the renderer has no visual to dim and retain.
+        if (previousMap?.Markers is { Count: > 0 })
+        {
+            var currentKeys = markers
+                .Select(marker => MarkerTrackKey(marker))
+                .Where(key => key is not null)
+                .ToHashSet(StringComparer.Ordinal);
+            foreach (var state in lifecycle.Where(item =>
+                         item.State is RemoteEntityLifecycleState.TemporarilyMissing
+                             or RemoteEntityLifecycleState.Stale))
+            {
+                var previous = previousMap.Markers.FirstOrDefault(marker =>
+                    MarkerTrackKey(marker) == $"{state.Kind}:{state.TrackId}");
+                if (previous is null || !currentKeys.Add($"{state.Kind}:{state.TrackId}"))
+                {
+                    continue;
+                }
+
+                markers = markers.Append(previous with
+                {
+                    ProEntityIsStale = true
+                }).ToArray();
+            }
+        }
+
         return map with { Markers = markers };
+    }
+
+    private static string? MarkerTrackKey(MapMarkerTelemetry marker)
+    {
+        if (marker.ProEntityKind is not { } kind
+            || !TryGetTrackId(marker.SteamId, out var trackId))
+        {
+            return null;
+        }
+
+        return $"{kind}:{trackId}";
     }
 
     private static bool TryGetTrackId(string? steamId, out long trackId)

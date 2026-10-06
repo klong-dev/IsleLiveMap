@@ -9,8 +9,12 @@ public static class LocalVitalsFeature
 {
     public const string EnvironmentVariable = "ISLELIVEMAP_LOCAL_VITALS_CANARY";
     public const string SourceName = "LocalIris";
+    public const string ReplaceIslePilotEnvironmentVariable = "ISLELIVEMAP_INBOUND_STATS_REPLACE_ISLEPILOT";
 
-    public static bool IsEnabled() => IsEnabled(
+    public static bool ReplacesIslePilot() => IsEnabled(
+        Environment.GetEnvironmentVariable(ReplaceIslePilotEnvironmentVariable));
+
+    public static bool IsEnabled() => ReplacesIslePilot() || IsEnabled(
         Environment.GetEnvironmentVariable(EnvironmentVariable));
 
     internal static bool IsEnabled(string? value) =>

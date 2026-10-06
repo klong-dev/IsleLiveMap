@@ -36,6 +36,8 @@ public sealed class RemoteEntityLifecycleTracker
 
     private readonly Dictionary<string, Entry> _entries = new(StringComparer.Ordinal);
     private string? _serverEndpoint;
+    private string? _sessionId;
+    private long? _lastSequence;
     private long _sessionGeneration;
 
     public long SessionGeneration => _sessionGeneration;
@@ -43,13 +45,18 @@ public sealed class RemoteEntityLifecycleTracker
     public IReadOnlyList<RemoteEntityLifecycleSnapshot> ApplyFrame(
         RemotePlayerTelemetryFrame frame,
         DateTimeOffset now,
-        bool rendered = true)
+        bool rendered = false)
     {
         var endpoint = NormalizeEndpoint(frame.ServerEndpoint);
-        if (!string.Equals(endpoint, _serverEndpoint, StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(endpoint, _serverEndpoint, StringComparison.OrdinalIgnoreCase)
+            || !string.Equals(frame.SessionId, _sessionId, StringComparison.Ordinal))
         {
             Reset(endpoint);
+            _sessionId = frame.SessionId;
         }
+        if (_lastSequence is { } sequence && frame.Sequence <= sequence)
+            return AdvanceWithoutFrame(now);
+        _lastSequence = frame.Sequence;
 
         var seen = new HashSet<string>(StringComparer.Ordinal);
         foreach (var entity in frame.RemoteEntities)
@@ -69,6 +76,7 @@ public sealed class RemoteEntityLifecycleTracker
             entry.LastSeenAt = now;
             entry.LastRenderedAt = rendered ? now : entry.LastRenderedAt;
             entry.IsProvisional = entity.IsProvisional;
+            entry.RemovalReason = null;
             entry.State = rendered
                 ? entry.State is RemoteEntityLifecycleState.Discovered
                     or RemoteEntityLifecycleState.Eligible
@@ -76,7 +84,7 @@ public sealed class RemoteEntityLifecycleTracker
                     or RemoteEntityLifecycleState.Stale
                     ? RemoteEntityLifecycleState.Visible
                     : RemoteEntityLifecycleState.Updated
-                : RemoteEntityLifecycleState.Eligible;
+                : RemoteEntityLifecycleState.Discovered;
         }
 
         // A fresh frame with an empty roster is authoritative and therefore
@@ -121,6 +129,8 @@ public sealed class RemoteEntityLifecycleTracker
     {
         _entries.Clear();
         _serverEndpoint = NormalizeEndpoint(serverEndpoint);
+        _sessionId = null;
+        _lastSequence = null;
         _sessionGeneration++;
     }
 

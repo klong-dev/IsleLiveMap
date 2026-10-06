@@ -33,9 +33,16 @@ public partial class HomeWindow
         await LaunchServerAsync("ORIGIN 5X", CreateOriginSessionAsync);
     private async void SdvnServer_Click(object sender, RoutedEventArgs e) =>
         await LaunchServerAsync("SDVN", CreateSdvnSessionAsync);
+    private async void DinoRpServer_Click(object sender, RoutedEventArgs e) =>
+        await LaunchServerAsync(
+            "DINORP",
+            localSourceFactory: source => new DinoRpPositionFileSource(source),
+            expectedServerEndpoint: DinoRpPositionFileSource.ServerEndpoint);
 
     private void RefreshLaunchButtons()
     {
+        if (_reopenUpdateAction is not null)
+            _reopenUpdateAction.Visibility = _mapLaunchGateState == MapLaunchGateState.UpdateRequired ? Visibility.Visible : Visibility.Collapsed;
         var available = MapLaunchGatePolicy.AllowsMap(_mapLaunchGateState) && _mapOpenStarted == 0;
         if (_mapActionButton is not null) _mapActionButton.IsEnabled = available;
         foreach (var button in _serverActionButtons)
@@ -63,7 +70,11 @@ public partial class HomeWindow
         return true;
     }
 
-    private async Task LaunchServerAsync(string label, Func<Task<ITelemetrySession?>> sessionFactory)
+    private async Task LaunchServerAsync(
+        string label,
+        Func<Task<ITelemetrySession?>>? sessionFactory = null,
+        Func<ILocalMovementSource, ILocalMovementSource>? localSourceFactory = null,
+        string? expectedServerEndpoint = null)
     {
         if (Interlocked.Exchange(ref _mapOpenStarted, 1) != 0) return;
         var handedOff = false;
@@ -73,9 +84,10 @@ public partial class HomeWindow
         try
         {
             if (!await PrepareMapLaunchAsync()) return;
-            var session = await sessionFactory();
-            if (session is null) { SetStatus($"Đã hủy kết nối {label}. Bạn vẫn có thể chọn nguồn khác."); return; }
-            handedOff = await OpenOverlaySessionAsync(session, label);
+            var session = sessionFactory is null ? null : await sessionFactory();
+            if (sessionFactory is not null && session is null)
+            { SetStatus($"Đã hủy kết nối {label}. Bạn vẫn có thể chọn nguồn khác."); return; }
+            handedOff = await OpenOverlaySessionAsync(session, label, localSourceFactory, expectedServerEndpoint);
         }
         catch (OperationCanceledException) when (_shutdown.IsCancellationRequested) { }
         catch (Exception error)
@@ -91,7 +103,11 @@ public partial class HomeWindow
     }
 
     // This method owns the remote session from entry, even when Pro startup fails.
-    private async Task<bool> OpenOverlaySessionAsync(ITelemetrySession? remoteSession, string label)
+    private async Task<bool> OpenOverlaySessionAsync(
+        ITelemetrySession? remoteSession,
+        string label,
+        Func<ILocalMovementSource, ILocalMovementSource>? localSourceFactory = null,
+        string? expectedServerEndpoint = null)
     {
         IRemotePlayerTelemetrySource? pro = null;
         ILocalMovementSource? gps = null;
@@ -102,7 +118,10 @@ public partial class HomeWindow
             _shutdown.Token.ThrowIfCancellationRequested();
             pro = await TakeProPlayerSourceAsync();
             gps = App.CurrentApp.TakeLocalTelemetrySource();
-            local = new LocalPositionTelemetrySession(remoteSession, gps, label, pro);
+            if (localSourceFactory is not null)
+                gps = localSourceFactory(gps);
+            local = new LocalPositionTelemetrySession(
+                remoteSession, gps, label, pro, expectedServerEndpoint: expectedServerEndpoint);
             overlay = new MainWindow(local, label, ProFeatureAccessGrant.FromSnapshot(_pro, DateTimeOffset.UtcNow));
             overlay.Show();
             Application.Current.MainWindow = overlay;
