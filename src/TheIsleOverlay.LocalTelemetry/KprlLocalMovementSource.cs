@@ -259,20 +259,18 @@ public sealed class KprlLocalMovementSource : ILocalMovementSource, ILocalVitals
             {
                 _lastVitals = fresh;
                 _lastVitalsGoodAt = now;
+                vitals = fresh;
             }
             else if (_lastVitals is { } cached && now - _lastVitalsGoodAt <= TimeSpan.FromSeconds(2.5))
             {
                 // Carry the last good read through transient failures so the
-                // HUD never flickers between individual IOCTL misses.
-                vitals = cached with { ObservedAt = _lastVitalsGoodAt };
+                // HUD never flickers between individual IOCTL misses. The
+                // carried ObservedAt keeps the merger's freshness gate happy.
+                vitals = cached;
             }
             else
             {
                 _lastVitals = null;
-            }
-            if (vitals is null && _lastVitals is not null)
-            {
-                vitals = _lastVitals;
             }
         }
 
