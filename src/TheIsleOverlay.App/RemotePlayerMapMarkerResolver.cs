@@ -94,6 +94,19 @@ internal static class RemotePlayerMapMarkerResolver
             return true;
         }
 
+        // Canonical Evrima catalog first; the upstream diet (if any) is only
+        // a fallback for species the catalog has not mapped yet.
+        var catalogDiet = EvrimaSpeciesCatalog.DietOf(marker.CreatureSpeciesId);
+        switch (catalogDiet)
+        {
+            case CreatureDiet.Carnivore:
+                category = RemoteEntityMapCategory.OtherCarnivore;
+                return true;
+            case CreatureDiet.Herbivore:
+                category = RemoteEntityMapCategory.OtherHerbivore;
+                return true;
+        }
+
         switch (marker.ProCreatureDiet)
         {
             case CreatureDiet.Carnivore:

@@ -409,7 +409,7 @@ public static class LocalPositionSnapshotMerger
                 eligible++;
                 var speciesLabel = string.IsNullOrWhiteSpace(entity.SpeciesShortName)
                     ? entity.IsProvisional ? "Dino ?" : "Player ?"
-                    : entity.SpeciesShortName;
+                    : EvrimaSpeciesCatalog.ShortName(entity.SpeciesShortName);
                 proMarkers.Add(new MapMarkerTelemetry
                 {
                     SteamId = $"pro-entity:{entity.Kind.ToString().ToLowerInvariant()}:{entity.TrackId}",

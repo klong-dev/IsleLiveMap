@@ -169,21 +169,23 @@ public partial class MainWindow
     private static MarkerPalette PaletteFor(RemoteEntityMapCategory category) =>
         category switch
         {
-            RemoteEntityMapCategory.SameSpecies => new(
-                "#42D66B", "#E9FFEF", "#CFFFD9", "#B50B1A11",
-                System.Windows.Media.Color.FromRgb(66, 214, 107)),
+            // Operator palette (2026-10): Đỏ = ăn thịt, Xanh lá = ăn cỏ,
+            // Xanh dương = đồng loại, Vàng = AI, Trắng = chưa nhận định.
+            RemoteEntityMapCategory.OtherCarnivore => new(
+                "#F03434", "#FFEFEF", "#FFD2D2", "#B50B1717",
+                System.Windows.Media.Color.FromRgb(240, 52, 52)),
             RemoteEntityMapCategory.OtherHerbivore => new(
-                "#3EA6FF", "#EDF7FF", "#D6EDFF", "#B50A1722",
-                System.Windows.Media.Color.FromRgb(62, 166, 255)),
+                "#3FD35F", "#EFFFEF", "#D4F9D9", "#B50A1B10",
+                System.Windows.Media.Color.FromRgb(63, 211, 95)),
+            RemoteEntityMapCategory.SameSpecies => new(
+                "#3E9BFF", "#EDF6FF", "#D5EBFF", "#B50A1722",
+                System.Windows.Media.Color.FromRgb(62, 155, 255)),
             RemoteEntityMapCategory.Ai => new(
                 "#F5C542", "#FFF8D7", "#FFF0A6", "#B51D1808",
                 System.Windows.Media.Color.FromRgb(245, 197, 66)),
             RemoteEntityMapCategory.UnclassifiedPlayer => new(
-                "#C7D0D4", "#F5FAFC", "#E6EDF0", "#B5111719",
-                System.Windows.Media.Color.FromRgb(199, 208, 212)),
-            RemoteEntityMapCategory.OtherCarnivore => new(
-                "#F04444", "#FFF2F2", "#FFD6D6", "#B50B1717",
-                System.Windows.Media.Color.FromRgb(240, 68, 68)),
+                "#E8EDF0", "#F8FBFC", "#EAF0F2", "#B5111719",
+                System.Windows.Media.Color.FromRgb(232, 237, 240)),
             _ => throw new ArgumentOutOfRangeException(nameof(category), category, null)
         };
 
