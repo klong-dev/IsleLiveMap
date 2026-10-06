@@ -33,8 +33,10 @@ public sealed class KprlLocalMovementSource : ILocalMovementSource, ILocalVitals
     private bool _ready;
     private string _diagnostic = "created";
 
-    // Vitals freshness gate in the merger is 15 s; publish at 1 Hz.
-    private DateTimeOffset _lastVitalsPublish;
+    // Vitals freshness gate in the merger is 3 s; cache the last good read
+    // and republish it every frame so the HUD never flickers between reads.
+    private LocalDinosaurVitalsObservation? _lastVitals;
+    private DateTimeOffset _lastVitalsGoodAt;
 
     public bool LocalVitalsEnabled => true;
 
@@ -250,10 +252,28 @@ public sealed class KprlLocalMovementSource : ILocalMovementSource, ILocalVitals
         var havePos = UserPtr(pawn) && ReadPawnLocation(pawn, ref x, ref y, ref z);
 
         LocalDinosaurVitalsObservation? vitals = null;
-        if (UserPtr(pawn) && now - _lastVitalsPublish >= TimeSpan.FromSeconds(1))
+        if (UserPtr(pawn))
         {
-            vitals = ReadVitals(pawn, now);
-            if (vitals is not null) _lastVitalsPublish = now;
+            var fresh = ReadVitals(pawn, now);
+            if (fresh is not null)
+            {
+                _lastVitals = fresh;
+                _lastVitalsGoodAt = now;
+            }
+            else if (_lastVitals is { } cached && now - _lastVitalsGoodAt <= TimeSpan.FromSeconds(2.5))
+            {
+                // Carry the last good read through transient failures so the
+                // HUD never flickers between individual IOCTL misses.
+                vitals = cached with { ObservedAt = _lastVitalsGoodAt };
+            }
+            else
+            {
+                _lastVitals = null;
+            }
+            if (vitals is null && _lastVitals is not null)
+            {
+                vitals = _lastVitals;
+            }
         }
 
         return new LocalMovementObservation(
