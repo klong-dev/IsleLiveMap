@@ -1,5 +1,47 @@
 using System.Text;
 using TheIsleOverlay.LocalTelemetry;
+using System.Security.Cryptography;
+using System.Text.Json;
+using System.Threading.Channels;
+
+if (args.Length == 4 && args[0] == "replay-pipeline")
+{
+    var frames = ReadRaw(args[1], true).Concat(ReadRaw(args[2], false)).OrderBy(p => p.ObservedAt).ToArray();
+    Environment.SetEnvironmentVariable(LocalVitalsFeature.ReplaceIslePilotEnvironmentVariable, "1");
+    await using var source = new NpcapLocalMovementSource(enableLocalVitals: true);
+    // No PID/start ticks: replay cannot restore or write live cache.
+    const string replaySession = "replay";
+    source.SetReplayGameSession(replaySession);
+    var channel = Channel.CreateUnbounded<LocalMovementObservation>();
+    LocalDinosaurVitalsObservation? previous = null;
+    var transitions = new List<object>();
+    var losses = 0; var samples = 0;
+    foreach (var packet in frames)
+    {
+        if (packet.Inbound) source.ProcessInboundPacket(packet, replaySession, channel.Writer);
+        else source.ProcessOutboundPacket(packet, channel.Writer);
+        while (channel.Reader.TryRead(out var published))
+        {
+            if (published.DinosaurVitals is not { } stats || stats.ExperimentalEvidence is not { } evidence) continue;
+            var current = InboundStatsAccumulator.LastKnownVitals(evidence, packet.ObservedAt);
+            var old = previous?.ExperimentalEvidence is { } oldEvidence
+                ? InboundStatsAccumulator.LastKnownVitals(oldEvidence, packet.ObservedAt) : null;
+            samples++;
+            if (old?.Health is not null && current.Health is null) losses++;
+            if (old?.Health != current.Health || old?.MaxHunger != current.MaxHunger
+                || old?.Stamina != current.Stamina || previous?.NetRefHandle != stats.NetRefHandle)
+                transitions.Add(new { At = packet.ObservedAt, Owner = stats.NetRefHandle, Vitals = current });
+            previous = stats;
+        }
+    }
+    using var reportStream = new FileStream(args[3], FileMode.CreateNew);
+    JsonSerializer.Serialize(reportStream, new { PacketCount = frames.Length, Samples = samples, CurrentLosses = losses,
+        Diagnostics = source.GetLocalVitalsDiagnostics(), Transitions = transitions,
+        InboundSha256 = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(args[1]))),
+        OutboundSha256 = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(args[2]))) }, new JsonSerializerOptions { WriteIndented = true });
+    Console.WriteLine($"packets={frames.Length} samples={samples} losses={losses} resets={source.GetLocalVitalsDiagnostics().SessionResets}");
+    return 0;
+}
 
 if (args.Length is 1 or 2 && string.Equals(args[0], "live", StringComparison.OrdinalIgnoreCase))
 {
@@ -100,6 +142,22 @@ while (stream.Position < stream.Length)
 }
 
 return 0;
+
+static IEnumerable<CapturedUdpDatagram> ReadRaw(string path, bool inbound)
+{
+    using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+    using var reader = new BinaryReader(stream, Encoding.UTF8);
+    if (Encoding.ASCII.GetString(reader.ReadBytes(8)) != "ISLEIN01") throw new InvalidDataException("ISLEIN01 required");
+    while (stream.Position < stream.Length)
+    {
+        var at = new DateTimeOffset(reader.ReadInt64(), TimeSpan.Zero);
+        var source = reader.ReadString(); var sourcePort = reader.ReadUInt16();
+        var target = reader.ReadString(); var targetPort = reader.ReadUInt16();
+        var length = reader.ReadInt32();
+        if (length <= 0 || length > 65535 || length > stream.Length - stream.Position) throw new InvalidDataException("Invalid record");
+        yield return new(at, source, sourcePort, target, targetPort, reader.ReadBytes(length), Inbound: inbound, Outbound: !inbound);
+    }
+}
 
 static void SeedVerifiedCache(
     string capturePath,

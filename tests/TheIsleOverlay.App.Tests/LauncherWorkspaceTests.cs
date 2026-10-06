@@ -46,6 +46,7 @@ public sealed class LauncherWorkspaceTests
         Assert.Contains("GachaLogo.png", code, StringComparison.Ordinal);
         Assert.Contains("OriginLogo.png", code, StringComparison.Ordinal);
         Assert.Contains("SDVNIcon.png", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("ServerButton(null, \"DINORP\"", code, StringComparison.Ordinal);
         Assert.Contains("new WrapPanel", code, StringComparison.Ordinal);
         Assert.DoesNotContain("flow đăng nhập riêng", code, StringComparison.Ordinal);
         Assert.Contains("GachaServer_Click,", code, StringComparison.Ordinal);

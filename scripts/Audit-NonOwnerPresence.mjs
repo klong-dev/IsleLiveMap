@@ -1,0 +1,20 @@
+import fs from "node:fs";
+import path from "node:path";
+import readline from "node:readline";
+const root=path.resolve(process.argv[2]);
+const readJson=p=>JSON.parse(fs.readFileSync(path.join(root,p),"utf8").replace(/^\uFEFF/,""));
+if(!readJson("session-manifest.json").CompletedAt)throw Error("Writers not finalized");
+const visit=async(file,cb)=>{for await(const l of readline.createInterface({input:fs.createReadStream(path.join(root,file)),crlfDelay:Infinity}))if(l.trim())cb(JSON.parse(l));};
+const packets=new Map();
+await visit("raw-capture/packet-events.jsonl",p=>{if(!p.parsed||!p.complete)return;for(const b of p.batches||[]){if(b.ownerData||b.bits<=0)continue;const key=p.sourceAddress+":"+p.sourcePort+":"+b.owner;const list=packets.get(key)||[];list.push({at:Date.parse(p.at),sequence:p.sequence,offset:p.rawOffset,bits:b.bits});packets.set(key,list);}});
+const previous=new Map(),matches=[];
+await visit("raw-capture/agent-live-compare.jsonl",f=>{if(f.stage!=="agent-post-fusion")return;const seen=new Set();for(const e of f.mapOutputPlayers||[]){const key=f.sessionId+":"+f.serverEndpoint+":"+e.trackId;seen.add(key);const prev=previous.get(key);previous.set(key,e);
+ if(!prev||e.locationObservedAt!==prev.locationObservedAt||JSON.stringify(e.location)!==JSON.stringify(prev.location)||Date.parse(e.observedAt)<=Date.parse(prev.observedAt))continue;
+ const p=packets.get(f.serverEndpoint+":"+e.actorNetRefHandle)||[];const at=Date.parse(e.observedAt);let lo=0,hi=p.length;while(lo<hi){const m=(lo+hi)>>1;if(p[m].at<at-20)lo=m+1;else hi=m;}const packet=p[lo];
+ if(packet&&Math.abs(packet.at-at)<=20)matches.push({trackId:e.trackId,species:e.species,presenceAt:e.observedAt,locationAt:e.locationObservedAt,frameAt:f.recordedAt,session:f.sessionId,endpoint:f.serverEndpoint,sequence:f.sequence,packet,locationAgeMs:e.locationAgeMs});
+ }for(const k of previous.keys())if(!seen.has(k))previous.delete(k);});
+const renderByKey=new Map();
+await visit("raw-capture/map-diagnostics.jsonl",r=>{if(r.stage!=="render-end")return;for(const m of r.RenderedMarkers||[]){const match=m.Key?.match(/pro-entity:player:(\d+)/);if(!match)continue;const key=r.ProPlayerSessionId+":"+r.ProPlayerServerEndpoint+":"+match[1];const list=renderByKey.get(key)||[];list.push({at:Date.parse(r.ReceivedAt),sequence:r.ProPlayerSequence,stale:m.IsStale});renderByKey.set(key,list);}});
+for(const m of matches){const list=renderByKey.get(m.session+":"+m.endpoint+":"+m.trackId)||[];const at=Date.parse(m.frameAt);const hit=list.find(r=>r.at>=at&&r.at-at<=1000&&r.sequence>=m.sequence);m.renderedWithin1s=!!hit;m.renderWasStale=hit?.stale??null;}
+const result={status:matches.length?"LIVE_PRESENCE_OBSERVED":"NEED_STAGE_EVIDENCE",scope:"Independent Npcap timestamp correlation within 20ms; not exact causal packet proof or dinosaur ground truth",matches:matches.length,distinctActors:new Set(matches.map(m=>m.trackId)).size,renderedWithin1s:matches.filter(m=>m.renderedWithin1s).length,observations:matches};
+fs.writeFileSync(path.join(root,"nonowner-live-evidence.json"),JSON.stringify(result,null,2),{flag:"wx"});console.log(JSON.stringify({...result,observations:matches.filter(m=>m.renderedWithin1s).slice(0,3)},null,2));
