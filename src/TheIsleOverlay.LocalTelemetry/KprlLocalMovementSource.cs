@@ -307,25 +307,35 @@ public sealed class KprlLocalMovementSource : ILocalMovementSource, ILocalVitals
 
     private LocalDinosaurVitalsObservation? ReadVitals(ulong pawn, DateTimeOffset now)
     {
-        var set = ReadU64(pawn + 0x13A0);
+        // Live-verified 2026-10-06 (build 5.3.2+, session pawn): the
+        // AttributeSet lives at pawn+0x1248 with a +0x190 layout shift vs the
+        // SDK base — each attribute occupies 0x10 with CurrentValue @+0x0C.
+        // HP cur@set+0x1CC, Max@+0x1DC, ST@+0x1EC/0x1FC, Thirst@+0x22C/0x23C.
+        // Legacy builds used pawn+0x13A0 or ASC(+0x0AE0)+0x10A8 — kept as
+        // fallbacks so older game patches keep working.
+        var set = ReadU64(pawn + 0x1248);
+        var layoutShift = 0x190;
         if (!UserPtr(set))
         {
-            var asc = ReadU64(pawn + 0x0AE0);
-            if (!UserPtr(asc)) return null;
-            set = ReadU64(asc + 0x10A8);
-            if (!UserPtr(set)) return null;
+            set = ReadU64(pawn + 0x13A0);
+            layoutShift = 0;
+            if (!UserPtr(set))
+            {
+                var asc = ReadU64(pawn + 0x0AE0);
+                if (!UserPtr(asc)) return null;
+                set = ReadU64(asc + 0x10A8);
+                if (!UserPtr(set)) return null;
+            }
         }
-        var buf = ReadMem(set + 0x30, 0xB0);
-        if (buf.Length != 0xB0) return null;
+        var buf = ReadMem(set + 0x30 + (ulong)layoutShift, 0xA0);
+        if (buf.Length != 0xA0) return null;
         static float Cur(byte[] b, int off) => BitConverter.ToSingle(b, off);
         var hp = Cur(buf, 0x0C);
-        var hpMax = Cur(buf, 0x40 - 0x30 + 0x0C);
-        var st = Cur(buf, 0x50 - 0x30 + 0x0C);
-        var stMax = Cur(buf, 0x60 - 0x30 + 0x0C);
-        var hu = Cur(buf, 0x70 - 0x30 + 0x0C);
-        var huMax = Cur(buf, 0x80 - 0x30 + 0x0C);
-        var th = Cur(buf, 0x90 - 0x30 + 0x0C);
-        var thMax = Cur(buf, 0xA0 - 0x30 + 0x0C);
+        var hpMax = Cur(buf, 0x1C);
+        var st = Cur(buf, 0x2C);
+        var stMax = Cur(buf, 0x3C);
+        var th = Cur(buf, 0x6C);
+        var thMax = Cur(buf, 0x7C);
         if (!(hpMax > 1f) || hp < 0f || hp > hpMax * 1.25f) return null;
         var g = ReadMem(pawn + 0x1E68, 4);
         var growth = g.Length == 4 ? BitConverter.ToSingle(g, 0) : float.NaN;
@@ -341,8 +351,6 @@ public sealed class KprlLocalMovementSource : ILocalMovementSource, ILocalVitals
                 MaxHealth = hpMax,
                 Stamina = st,
                 MaxStamina = stMax,
-                Hunger = hu,
-                MaxHunger = huMax,
                 Thirst = th,
                 MaxThirst = thMax,
             },
