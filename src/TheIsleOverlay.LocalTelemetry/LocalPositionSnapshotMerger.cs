@@ -201,7 +201,17 @@ public static class LocalPositionSnapshotMerger
                      LocalVitalsFeature.SourceName,
                      StringComparison.Ordinal))
         {
-            player = RemoveLocalVitals(player);
+            // Keep the last local vitals through brief read misses instead of
+            // blanking the panel: the memory-read source carries its own
+            // 2.5 s hold; a single merger miss must not toggle the HUD between
+            // "LocalIris · LIVE" and "PRO · LIVE" (source-identity flicker).
+            // Only drop them when they have actually aged out of the display
+            // window, which the freshness check below covers.
+            if (localVitals is not { } retained
+                || !IsFresh(retained.ObservedAt, now, TimeSpan.FromSeconds(15)))
+            {
+                player = RemoveLocalVitals(player);
+            }
         }
         // Last-known display is separate from ExactVitals/live percentages.
         // A brief hole in decoded updates need not blank the panel, but cannot
