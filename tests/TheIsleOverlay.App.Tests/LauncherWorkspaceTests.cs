@@ -43,16 +43,15 @@ public sealed class LauncherWorkspaceTests
         Assert.Contains("ĐANG KIỂM TRA CẬP NHẬT", code, StringComparison.Ordinal);
         Assert.Contains("ĐANG CẬP NHẬT v", code, StringComparison.Ordinal);
         Assert.Contains("MỞ MAP PRO  →", code, StringComparison.Ordinal);
-        Assert.Contains("GachaLogo.png", code, StringComparison.Ordinal);
-        Assert.Contains("OriginLogo.png", code, StringComparison.Ordinal);
-        Assert.Contains("SDVNIcon.png", code, StringComparison.Ordinal);
+        // 2026-10: per-server login buttons were removed — the memory-read
+        // pipeline replaced every web-session telemetry source. The single
+        // MỞ MAP action covers all servers without any login.
+        Assert.DoesNotContain("GachaLogo.png", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("OriginLogo.png", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("SDVNIcon.png", code, StringComparison.Ordinal);
         Assert.DoesNotContain("ServerButton(null, \"DINORP\"", code, StringComparison.Ordinal);
-        Assert.Contains("new WrapPanel", code, StringComparison.Ordinal);
-        Assert.DoesNotContain("flow đăng nhập riêng", code, StringComparison.Ordinal);
-        Assert.Contains("GachaServer_Click,", code, StringComparison.Ordinal);
-        Assert.Contains("OriginServer_Click,", code, StringComparison.Ordinal);
-        Assert.Contains("SdvnServer_Click,", code, StringComparison.Ordinal);
-        Assert.Contains("ServerAction", xaml, StringComparison.Ordinal);
+        Assert.Contains("Tự động nhận diện khi vào game", code, StringComparison.Ordinal);
+        Assert.Contains("PHÁT HIỆN GAME", code, StringComparison.Ordinal);
     }
 
     [Fact]

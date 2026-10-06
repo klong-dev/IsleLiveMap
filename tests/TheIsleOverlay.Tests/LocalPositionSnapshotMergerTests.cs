@@ -534,7 +534,7 @@ public sealed class LocalPositionSnapshotMergerTests
         Assert.Same(providerMarker, merged.Map.Markers[0]);
         var inbound = merged.Map.Markers[1];
         Assert.Equal("pro-entity:player:7", inbound.SteamId);
-        Assert.Equal("T-Rex 2.3T", inbound.Label);
+        Assert.Equal("TRex 2.3T", inbound.Label);
         Assert.DoesNotContain("dorimekhang8", inbound.Label);
         Assert.Equal(RemoteEntityKind.Player, inbound.ProEntityKind);
         Assert.Equal("tyrannosaurus", inbound.CreatureSpeciesId);
@@ -705,7 +705,7 @@ public sealed class LocalPositionSnapshotMergerTests
             remotePlayers: [entity]);
 
         var marker = Assert.Single(merged.Map!.Markers);
-        Assert.Equal("T-Rex", marker.Label);
+        Assert.Equal("TRex", marker.Label);
         Assert.Equal(RemoteEntityKind.Player, marker.ProEntityKind);
         Assert.Equal("tyrannosaurus", marker.CreatureSpeciesId);
     }
@@ -1017,7 +1017,7 @@ public sealed class LocalPositionSnapshotMergerTests
 
         var marker = Assert.Single(merged.Map!.Markers);
         Assert.Equal("pro-entity:player:71437", marker.SteamId);
-        Assert.Equal("Trice", marker.Label);
+        Assert.Equal("Trike", marker.Label);
         Assert.Equal(RemoteEntityKind.Player, marker.ProEntityKind);
         Assert.Equal("triceratops", marker.CreatureSpeciesId);
     }
@@ -1149,7 +1149,7 @@ public sealed class LocalPositionSnapshotMergerTests
 
         var marker = Assert.Single(merged.Map!.Markers);
         Assert.Equal("pro-entity:ai:41", marker.SteamId);
-        Assert.Equal("Fish 12.4K", marker.Label);
+        Assert.Equal("FISH 12.4K", marker.Label);
         Assert.Equal(RemoteEntityKind.Ai, marker.ProEntityKind);
     }
 

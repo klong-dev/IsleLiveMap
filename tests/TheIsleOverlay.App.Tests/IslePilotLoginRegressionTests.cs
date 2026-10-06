@@ -16,10 +16,12 @@ public sealed class IslePilotLoginRegressionTests
         var code = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "TestAssets", "HomeWindow.xaml.cs"));
         var handler = code[code.IndexOf("private async void OpenMap_Click", StringComparison.Ordinal)..];
         handler = handler[..handler.IndexOf("private async Task<bool> OpenProOnlyOverlayAsync", StringComparison.Ordinal)];
-        Assert.Contains("new IslePilotOverlayLoginFlow(authHttp, store).ResolveAsync", handler);
-        Assert.Contains("localOnlyRequested = login.LocalOnlyRequested", handler);
-        Assert.Contains("if (localOnlyRequested)", handler);
-        Assert.DoesNotContain("if (proPresentation.HasCurrentProAccess)", handler);
+        // 2026-10: the map opens directly — memory-read telemetry replaced the
+        // IslePilot web login flow entirely.
+        Assert.DoesNotContain("new IslePilotOverlayLoginFlow(authHttp, store).ResolveAsync", handler);
+        Assert.DoesNotContain("localOnlyRequested = login.LocalOnlyRequested", handler);
+        Assert.DoesNotContain("IslePilotSteamLoginWindow", handler);
+        Assert.Contains("OpenProOnlyOverlayAsync", handler);
     }
 
     [Fact]

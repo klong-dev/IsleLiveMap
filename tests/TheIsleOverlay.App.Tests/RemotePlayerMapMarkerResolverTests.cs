@@ -121,8 +121,10 @@ public sealed class RemotePlayerMapMarkerResolverTests
             marker => Assert.Equal(
                 RemoteEntityMapCategory.OtherHerbivore,
                 marker.Category),
+            // gallimimus maps to Herbivore in the canonical Evrima catalog —
+            // the upstream Omnivore tag no longer drives classification.
             marker => Assert.Equal(
-                RemoteEntityMapCategory.UnclassifiedPlayer,
+                RemoteEntityMapCategory.OtherHerbivore,
                 marker.Category),
             marker => Assert.Equal(
                 RemoteEntityMapCategory.UnclassifiedPlayer,
