@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
     <ProjectReference Include="..\TheIsleOverlay.Core\TheIsleOverlay.Core.csproj" />
@@ -56,7 +56,7 @@
     <Product>Isle Live Map</Product>
     <Description>Open-source live map overlay for The Isle Evrima.</Description>
     <Authors>klong-dev</Authors>
-    <Version>2.4.7</Version>
+    <Version>2.5.11</Version>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
     <ApplicationIcon>Assets\IsleLiveMap.ico</ApplicationIcon>
   </PropertyGroup>
