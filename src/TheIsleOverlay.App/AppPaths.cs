@@ -47,4 +47,10 @@ public static class AppPaths
         Root,
         "zalo-channel-invite.json");
 
+    // Stable across releases. Change this filename only for an explicitly
+    // authorized new website campaign.
+    public static string FirstLaunchWebsiteMarker { get; } = Path.Combine(
+        Root,
+        "islecheat-website-opened-20261026.marker");
+
 }

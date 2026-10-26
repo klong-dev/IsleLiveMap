@@ -21,6 +21,8 @@ namespace TheIsleOverlay.App;
 
 public partial class HomeWindow : Window
 {
+    private const string InboundMigrationNotice =
+        "Chuyển đổi nền tảng từ islepilot sang dữ liệu realtime, các thông tin của dino sẽ hiện chậm lúc ban đầu và cần growth lớn thêm 1-2% để hiển thị đầy đủ tất cả thông tin, KHI ĐÃ HIỂN THỊ ĐỦ thì sẽ luôn REALTIME mọi thông tin dino không bị trễ ví dụ ăn dame 1 lát mới hiện.";
     private const int WmNcLButtonDown = 0x00A1;
     private const int HtCaption = 2;
     [DllImport("user32.dll")] private static extern bool ReleaseCapture();
@@ -399,10 +401,19 @@ public partial class HomeWindow : Window
     }
     private async void OpenMap_Click(object? sender, RoutedEventArgs e)
     {
-        // Memory-read mode (2026-10): the kprl driver supplies GPS, vitals,
-        // species, and remote markers straight from the game process. The
-        // IslePilot web login/inbound selection is no longer required — the
-        // overlay opens directly with the Pro agent as the single source.
+        if (MessageBox.Show(
+                this,
+                InboundMigrationNotice,
+                "CHUYỂN ĐỔI SANG DỮ LIỆU REALTIME",
+                MessageBoxButton.OKCancel,
+                MessageBoxImage.Information,
+                MessageBoxResult.OK) != MessageBoxResult.OK)
+        {
+            return;
+        }
+
+        // Direct inbound mode: packet capture supplies GPS/vitals and the Pro
+        // Agent supplies remote markers. IslePilot login is not required.
         // UI Automation and a fast double click can otherwise start two map
         // flows. The first flow closes Home after creating MainWindow; the
         // second then resumes against a closed/disposed launcher lifetime.

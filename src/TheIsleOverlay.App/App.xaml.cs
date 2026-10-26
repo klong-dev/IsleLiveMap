@@ -9,10 +9,17 @@ public partial class App : Application
     private int _zaloChannelInviteShown;
     private readonly object _localTelemetryGate = new();
     private PrewarmedLocalMovementSource? _warmLocalTelemetry;
+    private readonly FirstLaunchWebsiteService _firstLaunchWebsite = new();
 
     public App()
     {
         Team = new TeamCoordinator();
+    }
+
+    protected override void OnStartup(StartupEventArgs e)
+    {
+        base.OnStartup(e);
+        _firstLaunchWebsite.TryOpenOnce();
     }
 
     public TeamCoordinator Team { get; }
@@ -45,15 +52,8 @@ public partial class App : Application
     {
         lock (_localTelemetryGate)
         {
-            // Memory-read source (kprl driver) replaces the Npcap prewarm:
-            // lossless GPS + replicated vitals straight from the game process.
-            // Falls back to Npcap only when the KPRL device is unavailable
-            // (service not installed) so Free-tier machines still work.
-            var memory = new KprlLocalMovementSource();
-            if (memory.TryOpenDeviceForProbe())
-            {
-                return memory;
-            }
+            // Map sessions use the packet/inbound source directly. This keeps
+            // IslePilot out of startup and preserves packet-derived state.
             if (_warmLocalTelemetry is null)
             {
                 _warmLocalTelemetry = new PrewarmedLocalMovementSource();

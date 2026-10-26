@@ -1,9 +1,8 @@
 namespace TheIsleOverlay.LocalTelemetry;
 
 /// <summary>
-/// Production gate for passive inbound Iris vitals. Capture/probe code can opt
-/// in explicitly while the default remains disabled until live fixtures have
-/// validated each supported dinosaur and lifecycle transition.
+/// Inbound Iris vitals are the default source for the direct map. IslePilot
+/// login is not part of the map startup path anymore.
 /// </summary>
 public static class LocalVitalsFeature
 {
@@ -11,11 +10,9 @@ public static class LocalVitalsFeature
     public const string SourceName = "LocalIris";
     public const string ReplaceIslePilotEnvironmentVariable = "ISLELIVEMAP_INBOUND_STATS_REPLACE_ISLEPILOT";
 
-    public static bool ReplacesIslePilot() => IsEnabled(
-        Environment.GetEnvironmentVariable(ReplaceIslePilotEnvironmentVariable));
+    public static bool ReplacesIslePilot() => true;
 
-    public static bool IsEnabled() => ReplacesIslePilot() || IsEnabled(
-        Environment.GetEnvironmentVariable(EnvironmentVariable));
+    public static bool IsEnabled() => true;
 
     internal static bool IsEnabled(string? value) =>
         value is not null
